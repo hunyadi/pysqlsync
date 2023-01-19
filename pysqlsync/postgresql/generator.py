@@ -24,12 +24,11 @@ from strong_typing.auxiliary import (
 from strong_typing.inspection import (
     is_type_enum,
     is_type_optional,
-    get_annotation,
     unwrap_optional_type,
     enum_value_types,
 )
 
-from ..base import PrimaryKey, BaseGenerator
+from ..base import PrimaryKey, BaseGenerator, get_primary_key
 
 
 def sql_quoted_id(name: str) -> str:
@@ -230,17 +229,19 @@ class Generator(BaseGenerator):
         print(f")\n", file=target)
 
     def write_insert_stmt(self, target: TextIO) -> None:
-        class_sql_name = sql_quoted_id(self.cls.__name__)
-
-        print(f"INSERT INTO {class_sql_name}", file=target)
-        field_names = [
-            sql_quoted_id(field.name) for field in dataclasses.fields(self.cls)
-        ]
-        field_list = ", ".join(field_names)
+        print(f"INSERT INTO {sql_quoted_id(self.cls.__name__)}", file=target)
+        field_names = [field.name for field in dataclasses.fields(self.cls)]
+        field_list = ", ".join(sql_quoted_id(field_name) for field_name in field_names)
         value_list = ", ".join(f"${index}" for index in range(1, len(field_names) + 1))
         print(f"({field_list}) VALUES ({value_list})", file=target)
 
-        primary_key_name = sql_quoted_id("id")
-        print(f"ON CONFLICT({primary_key_name}) DO UPDATE SET", file=target)
-        defs = [f"{field_name} = EXCLUDED.{field_name}" for field_name in field_names]
+        primary_key_name, primary_key_type = get_primary_key(self.cls)
+        print(
+            f"ON CONFLICT({sql_quoted_id(primary_key_name)}) DO UPDATE SET", file=target
+        )
+        defs = [
+            f"{sql_quoted_id(field_name)} = EXCLUDED.{sql_quoted_id(field_name)}"
+            for field_name in field_names
+            if field_name != primary_key_name
+        ]
         print(",\n".join(defs), file=target)

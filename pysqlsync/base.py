@@ -1,7 +1,21 @@
 import abc
+import dataclasses
+import enum
+import typing
 from dataclasses import dataclass
 from io import StringIO
 from typing import Any, Generic, Iterable, Optional, TextIO, TypeVar
+
+
+T = TypeVar("T")
+
+
+def get_attribute_value(obj: Any, name: str) -> Any:
+    value = getattr(obj, name)
+    if isinstance(value, enum.Enum):
+        return value.value
+    else:
+        return value
 
 
 class BaseGenerator(abc.ABC):
@@ -25,6 +39,22 @@ class BaseGenerator(abc.ABC):
         s = StringIO()
         self.write_insert_stmt(s)
         return s.getvalue()
+
+    def get_record_as_tuple(self, obj: Any) -> tuple:
+        if not isinstance(obj, self.cls):
+            raise TypeError(f"mismatching type; expected: {self.cls}, got: {type(obj)}")
+
+        return tuple(
+            get_attribute_value(obj, field.name)
+            for field in dataclasses.fields(self.cls)
+        )
+
+    def get_records_as_tuples(self, items: list[Any]) -> list[tuple]:
+        if not isinstance(items, list):
+            return TypeError(f"expected list of objects but got: {type(items)}")
+        if not items:
+            return []
+        return [self.get_record_as_tuple(item) for item in items]
 
 
 @dataclass
@@ -69,9 +99,14 @@ class BaseEngine(abc.ABC):
         ...
 
 
-T = TypeVar("T")
-
-
 @dataclass
 class PrimaryKey(Generic[T]):
     pass
+
+
+def get_primary_key(cls: type) -> tuple[str, type]:
+    for field in dataclasses.fields(cls):
+        if typing.get_origin(field.type) is PrimaryKey:
+            return field.name, typing.get_args(field.type)[0]
+
+    raise TypeError(f"type has no primary key: {cls.__name__}")

@@ -1,0 +1,2 @@
+asyncpg
+json_strong_typing

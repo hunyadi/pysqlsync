@@ -3,16 +3,11 @@ from dataclasses import dataclass
 
 from pysqlsync.base import Parameters, PrimaryKey
 from pysqlsync.factory import get_engine
+from tests.tables import DataTable
 
 engine = get_engine("postgresql")
 Generator = engine.get_generator_type()
 Connection = engine.get_connection_type()
-
-
-@dataclass
-class DataTable:
-    id: PrimaryKey[int]
-    data: str
 
 
 class TestConnection(unittest.IsolatedAsyncioTestCase):
@@ -42,7 +37,10 @@ class TestConnection(unittest.IsolatedAsyncioTestCase):
             statement = generator.get_create_table_stmt()
             await conn.execute(statement)
             statement = generator.get_insert_stmt()
-            await conn.execute_all(statement, [(1, "a"), (2, "b"), (3, "c")])
+            data = generator.get_records_as_tuples(
+                [DataTable(1, "a"), DataTable(2, "b"), DataTable(3, "c")]
+            )
+            await conn.execute_all(statement, data)
 
     async def test_bulk_insert(self):
         async with Connection(self.parameters()) as conn:
@@ -52,9 +50,10 @@ class TestConnection(unittest.IsolatedAsyncioTestCase):
             statement = generator.get_create_table_stmt()
             await conn.execute(statement)
             statement = generator.get_insert_stmt()
-            await conn.execute_all(
-                statement, [(index, str(index)) for index in range(1000000)]
+            data = generator.get_records_as_tuples(
+                [DataTable(index, str(index)) for index in range(1000000)]
             )
+            await conn.execute_all(statement, data)
 
 
 if __name__ == "__main__":
