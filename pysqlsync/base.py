@@ -4,20 +4,26 @@ import enum
 import typing
 from dataclasses import dataclass
 from io import StringIO
-from typing import Annotated, Any, Iterable, Optional, TextIO, TypeVar
+from typing import Annotated, Any, Callable, Iterable, Optional, TextIO, TypeVar
 
 
-from strong_typing.inspection import get_annotation
+from strong_typing.inspection import get_annotation, is_type_enum
 
 T = TypeVar("T")
 
 
-def get_attribute_value(obj: Any, name: str) -> Any:
-    value = getattr(obj, name)
-    if isinstance(value, enum.Enum):
-        return value.value
+def get_extractor(field_name: str, field_type: type) -> Callable[[Any], Any]:
+    if is_type_enum(field_type):
+        return lambda obj: getattr(obj, field_name).value
     else:
-        return value
+        return lambda obj: getattr(obj, field_name)
+
+
+def get_extractors(class_type: type) -> tuple[Callable[[Any], Any], ...]:
+    return tuple(
+        get_extractor(field.name, field.type)
+        for field in dataclasses.fields(class_type)
+    )
 
 
 class BaseGenerator(abc.ABC):
@@ -43,16 +49,12 @@ class BaseGenerator(abc.ABC):
         return s.getvalue()
 
     def get_record_as_tuple(self, obj: Any) -> tuple:
-        if not isinstance(obj, self.cls):
-            raise TypeError(f"mismatching type; expected: {self.cls}, got: {type(obj)}")
-
-        return tuple(
-            get_attribute_value(obj, field.name)
-            for field in dataclasses.fields(self.cls)
-        )
+        extractors = get_extractors(self.cls)
+        return tuple(extractor(obj) for extractor in extractors)
 
     def get_records_as_tuples(self, items: Iterable[Any]) -> list[tuple]:
-        return [self.get_record_as_tuple(item) for item in items]
+        extractors = get_extractors(self.cls)
+        return [tuple(extractor(item) for extractor in extractors) for item in items]
 
 
 @dataclass

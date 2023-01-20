@@ -49,10 +49,11 @@ class TestConnection(unittest.IsolatedAsyncioTestCase):
             statement = generator.get_create_table_stmt()
             await conn.execute(statement)
             statement = generator.get_insert_stmt()
-            data = generator.get_records_as_tuples(
-                [DataTable(index, str(index)) for index in range(1000000)]
-            )
-            await conn.execute_all(statement, data)
+            for i in range(1000):
+                data = generator.get_records_as_tuples(
+                    [DataTable(i * 1000 + j, str(i * 1000 + j)) for j in range(1000)]
+                )
+                await conn.execute_all(statement, data)
 
 
 if __name__ == "__main__":

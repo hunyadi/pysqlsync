@@ -26,7 +26,7 @@ class WorkflowState(enum.Enum):
     deleted = "deleted"
 
 
-@dataclass
+@dataclass(slots=True)
 class NumericTable:
     id: PrimaryKey[int]
 
@@ -49,7 +49,7 @@ class NumericTable:
     nullable_integer: Optional[int]
 
 
-@dataclass
+@dataclass(slots=True)
 class StringTable:
     id: PrimaryKey[int]
     arbitrary_length_string: str
@@ -58,7 +58,7 @@ class StringTable:
     nullable_maximum_length_string: Optional[Annotated[str, MaxLength(255)]]
 
 
-@dataclass
+@dataclass(slots=True)
 class DateTimeTable:
     id: PrimaryKey[int]
     iso_date_time: datetime
@@ -67,13 +67,13 @@ class DateTimeTable:
     optional_date_time: Optional[datetime]
 
 
-@dataclass
+@dataclass(slots=True)
 class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
 
 
-@dataclass
+@dataclass(slots=True)
 class DataTable:
     id: PrimaryKey[int]
     data: str
