@@ -1,7 +1,6 @@
 import unittest
-from dataclasses import dataclass
 
-from pysqlsync.base import Parameters, PrimaryKey
+from pysqlsync.base import Parameters
 from pysqlsync.factory import get_engine
 from tests.tables import DataTable
 

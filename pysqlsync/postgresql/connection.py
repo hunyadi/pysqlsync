@@ -1,7 +1,7 @@
 import asyncpg
 from typing import Any, Iterable
 
-from ..base import BaseConnection, BaseContext, Parameters
+from ..base import BaseConnection, BaseContext
 
 
 class Connection(BaseConnection):

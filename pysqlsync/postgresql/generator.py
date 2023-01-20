@@ -1,7 +1,6 @@
 import dataclasses
 import datetime
 import decimal
-import typing
 import uuid
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, TextIO
@@ -28,7 +27,12 @@ from strong_typing.inspection import (
     enum_value_types,
 )
 
-from ..base import PrimaryKey, BaseGenerator, get_primary_key
+from ..base import (
+    BaseGenerator,
+    get_field_properties,
+    get_primary_key_name,
+    is_primary_key_type,
+)
 
 
 def sql_quoted_id(name: str) -> str:
@@ -122,9 +126,12 @@ class SqlTimeType(SqlDataType):
             return "time"
 
 
-def python_to_sql_type(typ: type, compact: bool = False) -> str:
+def python_to_sql_type(field_type: type, compact: bool = False) -> str:
     "Maps a native Python type to a PostgreSQL type."
 
+    properties = get_field_properties(field_type)
+
+    typ = properties.field_type
     if typ is bool:
         return "boolean"
     if typ is int:
@@ -167,11 +174,9 @@ def python_to_sql_type(typ: type, compact: bool = False) -> str:
     if typ is uuid.UUID:
         return "uuid"
 
-    metadata = getattr(typ, "__metadata__", None)
-    if metadata is not None:
-        # type is Annotated[T, ...]
-        inner_type = typing.get_args(typ)[0]
-
+    metadata = properties.metadata
+    if metadata:
+        inner_type = properties.inner_type
         if inner_type is str:
             return str(SqlCharacterType(metadata, compact=compact))
         elif inner_type is decimal.Decimal:
@@ -180,8 +185,8 @@ def python_to_sql_type(typ: type, compact: bool = False) -> str:
             return str(SqlTimestampType(metadata))
         elif inner_type is datetime.time:
             return str(SqlTimeType(metadata))
-        else:
-            raise TypeError(f"cannot map annotated Python type: {typ}")
+
+        raise TypeError(f"cannot map annotated Python type: {field_type}")
 
     if is_type_enum(typ):
         value_types = enum_value_types(typ)
@@ -193,7 +198,7 @@ def python_to_sql_type(typ: type, compact: bool = False) -> str:
         value_type = value_types.pop()
         return python_to_sql_type(value_type, compact=compact)
 
-    raise NotImplementedError(f"cannot map Python type: {typ}")
+    raise NotImplementedError(f"cannot map Python type: {field_type}")
 
 
 class Generator(BaseGenerator):
@@ -204,10 +209,8 @@ class Generator(BaseGenerator):
         for field in dataclasses.fields(self.cls):
             field_sql_name = sql_quoted_id(field.name)
 
-            origin_type = typing.get_origin(field.type)
-            if origin_type is PrimaryKey:
-                (key_type,) = typing.get_args(field.type)
-                sql_type = python_to_sql_type(key_type)
+            if is_primary_key_type(field.type):
+                sql_type = python_to_sql_type(field.type)
                 defs.append(f"{field_sql_name} {sql_type} PRIMARY KEY")
 
             else:
@@ -235,7 +238,7 @@ class Generator(BaseGenerator):
         value_list = ", ".join(f"${index}" for index in range(1, len(field_names) + 1))
         print(f"({field_list}) VALUES ({value_list})", file=target)
 
-        primary_key_name, primary_key_type = get_primary_key(self.cls)
+        primary_key_name = get_primary_key_name(self.cls)
         print(
             f"ON CONFLICT({sql_quoted_id(primary_key_name)}) DO UPDATE SET", file=target
         )

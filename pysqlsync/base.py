@@ -4,8 +4,10 @@ import enum
 import typing
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any, Generic, Iterable, Optional, TextIO, TypeVar
+from typing import Annotated, Any, Iterable, Optional, TextIO, TypeVar
 
+
+from strong_typing.inspection import get_annotation
 
 T = TypeVar("T")
 
@@ -49,11 +51,7 @@ class BaseGenerator(abc.ABC):
             for field in dataclasses.fields(self.cls)
         )
 
-    def get_records_as_tuples(self, items: list[Any]) -> list[tuple]:
-        if not isinstance(items, list):
-            return TypeError(f"expected list of objects but got: {type(items)}")
-        if not items:
-            return []
+    def get_records_as_tuples(self, items: Iterable[Any]) -> list[tuple]:
         return [self.get_record_as_tuple(item) for item in items]
 
 
@@ -99,14 +97,70 @@ class BaseEngine(abc.ABC):
         ...
 
 
+class PrimaryKeyTag:
+    "Marks a field as the primary key of a table."
+
+
+PrimaryKey = Annotated[T, PrimaryKeyTag()]
+
+
+def is_primary_key_type(field_type: type) -> bool:
+    "Checks if the field type is marked as the primary key of a table."
+
+    return get_annotation(field_type, PrimaryKeyTag) is not None
+
+
+def get_primary_key_name(class_type: type) -> str:
+    "Fetches the primary key of the table."
+
+    for field in dataclasses.fields(class_type):
+        if is_primary_key_type(field.type):
+            return field.name
+
+    raise TypeError(f"table type has no primary key: {class_type.__name__}")
+
+
+def is_constraint(item: Any) -> bool:
+    return isinstance(item, PrimaryKeyTag)
+
+
 @dataclass
-class PrimaryKey(Generic[T]):
-    pass
+class FieldProperties:
+    """
+    Captures type information associated with a field type.
+
+    :param field_type: Type without constraint annotations such as identity, primary key, or unique.
+    :param inner_type: Type with no metadata (annotations).
+    :param metadata: Any metadata that is not a constraint such as identity, primary key or unique.
+    :param is_primary: True if the field is a primary key.
+    """
+
+    field_type: type
+    inner_type: type
+    metadata: list
+    is_primary: bool
 
 
-def get_primary_key(cls: type) -> tuple[str, type]:
-    for field in dataclasses.fields(cls):
-        if typing.get_origin(field.type) is PrimaryKey:
-            return field.name, typing.get_args(field.type)[0]
+def get_field_properties(field_type: type) -> FieldProperties:
+    metadata = getattr(field_type, "__metadata__", None)
+    if metadata is None:
+        # field has a type without annotations or constraints
+        return FieldProperties(field_type, field_type, [], False)
 
-    raise TypeError(f"type has no primary key: {cls.__name__}")
+    # field has a type of Annotated[T, ...]
+    inner_type = typing.get_args(field_type)[0]
+
+    # check for constraints
+    is_primary = is_primary_key_type(field_type)
+
+    # filter annotations that represent constraints
+    metadata = [item for item in metadata if not is_constraint(item)]
+
+    if metadata:
+        # type becomes Annotated[T, ...]
+        outer_type: type = Annotated[(inner_type, *metadata)]  # type: ignore
+    else:
+        # type becomes a regular type
+        outer_type = inner_type
+
+    return FieldProperties(outer_type, inner_type, metadata, is_primary)
