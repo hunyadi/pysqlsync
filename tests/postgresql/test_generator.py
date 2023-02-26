@@ -1,4 +1,5 @@
 import unittest
+from datetime import timezone
 
 from pysqlsync.factory import get_engine
 from tests.tables import *
@@ -13,7 +14,7 @@ def get_create_table(table: type) -> str:
 
 def get_insert(table: type) -> str:
     generator = Generator(table)
-    return generator.get_insert_stmt().rstrip()
+    return generator.get_upsert_stmt().rstrip()
 
 
 class TestGenerator(unittest.TestCase):
@@ -62,6 +63,15 @@ class TestGenerator(unittest.TestCase):
             ")",
         ]
         self.assertMultiLineEqual(get_create_table(DateTimeTable), "\n".join(lines))
+
+    def test_create_enum_table(self):
+        lines = [
+            'CREATE TABLE "EnumTable" (',
+            '"id" integer PRIMARY KEY,',
+            "\"state\" text NOT NULL CHECK (\"state\" IN ('active', 'inactive', 'deleted'))",
+            ")",
+        ]
+        self.assertMultiLineEqual(get_create_table(EnumTable), "\n".join(lines))
 
     def test_create_primary_key_table(self):
         lines = [

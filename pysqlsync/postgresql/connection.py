@@ -1,36 +1,53 @@
-import asyncpg
-from typing import Any, Iterable
+import dataclasses
+import typing
+from typing import Any, Iterable, TypeVar
 
-from ..base import BaseConnection, BaseContext
+import asyncpg
+
+from ..base import BaseConnection, BaseContext, check_dataclass_type
+
+T = TypeVar("T")
 
 
 class Connection(BaseConnection):
-    conn: asyncpg.Connection
+    native: asyncpg.Connection
 
     async def __aenter__(self) -> BaseContext:
-        self.conn = await asyncpg.connect(
+        self.native = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
             user=self.params.username,
             password=self.params.password,
             database=self.params.database,
         )
-        return Context(self.conn)
+        return Context(self)
 
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.conn.close()
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.native.close()
 
 
 class Context(BaseContext):
-    conn: asyncpg.Connection
+    def __init__(self, connection: Connection) -> None:
+        super().__init__(connection)
 
-    def __init__(self, conn: asyncpg.Connection) -> None:
-        self.conn = conn
+    @property
+    def native_connection(self) -> asyncpg.Connection:
+        return typing.cast(Connection, self.connection).native
 
     async def execute(self, statement: str) -> None:
-        await self.conn.execute(statement)
+        await self.native_connection.execute(statement)
 
     async def execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
-        await self.conn.executemany(statement, args)
+        await self.native_connection.executemany(statement, args)
+
+    async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
+        check_dataclass_type(table)
+        generator = self.connection.generator_type(table)
+        records = generator.get_records_as_tuples(data)
+        await self.native_connection.copy_records_to_table(
+            table_name=table.__name__,
+            columns=tuple(field.name for field in dataclasses.fields(table)),
+            records=records,
+        )

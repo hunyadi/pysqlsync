@@ -1,6 +1,6 @@
+from ..base import BaseConnection, BaseEngine, BaseGenerator
 from .connection import Connection
 from .generator import Generator
-from ..base import BaseConnection, BaseEngine, BaseGenerator
 
 
 class PostgreSQLEngine(BaseEngine):

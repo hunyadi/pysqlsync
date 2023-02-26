@@ -1,9 +1,9 @@
 import enum
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from typing import Optional
+from uuid import UUID
 
-from pysqlsync.base import PrimaryKey
 from strong_typing.auxiliary import (
     Annotated,
     MaxLength,
@@ -18,6 +18,8 @@ from strong_typing.auxiliary import (
     uint32,
     uint64,
 )
+
+from pysqlsync.properties import PrimaryKey
 
 
 class WorkflowState(enum.Enum):
@@ -77,3 +79,17 @@ class EnumTable:
 class DataTable:
     id: PrimaryKey[int]
     data: str
+
+
+@dataclass(slots=True)
+class UserTable:
+    id: PrimaryKey[int]
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime
+    workflow_state: WorkflowState
+    uuid: UUID
+    name: str
+    short_name: str
+    sortable_name: str
+    homepage_url: Optional[str]

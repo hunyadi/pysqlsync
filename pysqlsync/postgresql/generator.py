@@ -21,23 +21,24 @@ from strong_typing.auxiliary import (
     uint64,
 )
 from strong_typing.inspection import (
+    enum_value_types,
     is_type_enum,
     is_type_optional,
     unwrap_optional_type,
-    enum_value_types,
 )
 
-from ..base import (
-    BaseGenerator,
-    get_field_properties,
-    get_primary_key_name,
-    is_primary_key_type,
-)
+from ..base import BaseGenerator
+from ..properties import get_field_properties, get_primary_key_name, is_primary_key_type
 
 
 def sql_quoted_id(name: str) -> str:
-    id = name.replace('"', '""')
-    return f'"{id}"'
+    escaped_name = name.replace('"', '""')
+    return f'"{escaped_name}"'
+
+
+def sql_quoted_string(value: str) -> str:
+    escaped_value = value.replace("'", "''")
+    return f"'{escaped_value}'"
 
 
 class SqlDataType:
@@ -225,13 +226,21 @@ class Generator(BaseGenerator):
                 else:
                     extended_sql_type = f"{sql_type} NOT NULL"
 
-                defs.append(f"{field_sql_name} {extended_sql_type}")
+                if is_type_enum(field.type):
+                    enum_values = ", ".join(
+                        sql_quoted_string(e.value) for e in field.type
+                    )
+                    constrained_sql_type = f"{extended_sql_type} CHECK ({field_sql_name} IN ({enum_values}))"
+                else:
+                    constrained_sql_type = extended_sql_type
+
+                defs.append(f"{field_sql_name} {constrained_sql_type}")
 
         print(f"CREATE TABLE {class_sql_name} (", file=target)
         print(",\n".join(defs), file=target)
         print(f")\n", file=target)
 
-    def write_insert_stmt(self, target: TextIO) -> None:
+    def write_upsert_stmt(self, target: TextIO) -> None:
         print(f"INSERT INTO {sql_quoted_id(self.cls.__name__)}", file=target)
         field_names = [field.name for field in dataclasses.fields(self.cls)]
         field_list = ", ".join(sql_quoted_id(field_name) for field_name in field_names)
