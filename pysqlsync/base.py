@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import ipaddress
 from dataclasses import dataclass
 from io import StringIO
 from typing import Any, Callable, Iterable, Optional, TextIO, TypeVar
@@ -12,6 +13,8 @@ T = TypeVar("T")
 def _get_extractor(field_name: str, field_type: type) -> Callable[[Any], Any]:
     if is_type_enum(field_type):
         return lambda obj: getattr(obj, field_name).value
+    elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+        return lambda obj: str(getattr(obj, field_name))
     else:
         return lambda obj: getattr(obj, field_name)
 

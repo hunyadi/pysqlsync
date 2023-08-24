@@ -5,7 +5,7 @@
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder}"
     },
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "python.linting.mypyEnabled": true,
     "editor.formatOnSave": true,
     "files.insertFinalNewline": true,
@@ -15,5 +15,8 @@
     "isort.args": [
         "--profile",
         "black"
-    ]
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    }
 }

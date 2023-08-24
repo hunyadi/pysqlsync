@@ -73,6 +73,16 @@ class TestGenerator(unittest.TestCase):
         ]
         self.assertMultiLineEqual(get_create_table(EnumTable), "\n".join(lines))
 
+    def test_create_ipaddress_table(self):
+        lines = [
+            'CREATE TABLE "IPAddressTable" (',
+            '"id" integer PRIMARY KEY,',
+            '"ipv4" inet NOT NULL,',
+            '"ipv6" inet NOT NULL',
+            ")",
+        ]
+        self.assertMultiLineEqual(get_create_table(IPAddressTable), "\n".join(lines))
+
     def test_create_primary_key_table(self):
         lines = [
             'CREATE TABLE "DataTable" (',
@@ -142,6 +152,18 @@ class TestGenerator(unittest.TestCase):
         self.assertEqual(
             generator.get_record_as_tuple(EnumTable(1, WorkflowState.active)),
             (1, "active"),
+        )
+
+        generator = Generator(IPAddressTable)
+        self.assertEqual(
+            generator.get_record_as_tuple(
+                IPAddressTable(
+                    1,
+                    ipaddress.ip_address("192.168.0.1"),
+                    ipaddress.ip_address("2001:db8::"),
+                )
+            ),
+            (1, "192.168.0.1", "2001:db8::"),
         )
 
 

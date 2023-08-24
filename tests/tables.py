@@ -1,4 +1,5 @@
 import enum
+import ipaddress
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Optional
@@ -73,6 +74,13 @@ class DateTimeTable:
 class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
+
+
+@dataclass(slots=True)
+class IPAddressTable:
+    id: PrimaryKey[int]
+    ipv4: ipaddress.IPv4Address
+    ipv6: ipaddress.IPv6Address
 
 
 @dataclass(slots=True)

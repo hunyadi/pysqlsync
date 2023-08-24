@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import decimal
+import ipaddress
 import uuid
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, TextIO
@@ -174,6 +175,8 @@ def python_to_sql_type(field_type: type, compact: bool = False) -> str:
         return "interval"
     if typ is uuid.UUID:
         return "uuid"
+    if typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
+        return "inet"
 
     metadata = properties.metadata
     if metadata:

@@ -17,7 +17,7 @@ class TestConnection(TimedAsyncioTestCase):
         return Parameters(
             host="localhost",
             port=5432,
-            username="postgres",
+            username="levente.hunyadi",
             password=None,
             database="levente.hunyadi",
         )
