@@ -1,0 +1,163 @@
+import enum
+from dataclasses import dataclass
+from typing import Optional
+
+from ..model.data_types import SqlDataType
+
+
+@dataclass
+class LocalId:
+    name: str
+
+    def __str__(self) -> str:
+        "Quotes an identifier to be embedded in an SQL statement."
+        return '"' + str(self.name).replace('"', '""') + '"'
+
+
+@dataclass
+class QualifiedId:
+    namespace: Optional[str]
+    name: str
+
+    def __str__(self) -> str:
+        if self.namespace is not None:
+            return (
+                '"'
+                + str(self.namespace).replace('"', '""')
+                + '"."'
+                + str(self.name).replace('"', '""')
+                + '"'
+            )
+        else:
+            return '"' + str(self.name).replace('"', '""') + '"'
+
+
+def quote(s: str) -> str:
+    "Quotes a string to be embedded in an SQL statement."
+
+    return "'" + s.replace("'", "''") + "'"
+
+
+@dataclass
+class EnumType:
+    name: QualifiedId
+    values: list[str]
+
+    def __init__(
+        self, enum: type[enum.Enum], *, namespace: Optional[str] = None
+    ) -> None:
+        self.name = QualifiedId(namespace, enum.__name__)
+        self.values = [e.name for e in enum]
+
+    def __str__(self) -> str:
+        vals = ", ".join(quote(val) for val in self.values)
+        return f"CREATE TYPE {self.name} AS ENUM ({vals});"
+
+
+@dataclass
+class StructMember:
+    name: LocalId
+    data_type: SqlDataType
+
+    def __str__(self) -> str:
+        return f"{self.name} {self.data_type}"
+
+
+@dataclass
+class StructType:
+    name: QualifiedId
+    members: list[StructMember]
+
+    def __str__(self) -> str:
+        members = ", ".join(str(m) for m in self.members)
+        return f"CREATE TYPE {self.name} AS ({members});"
+
+
+@dataclass
+class Column:
+    name: LocalId
+    data_type: SqlDataType
+    nullable: bool
+
+    def __init__(self, name: LocalId, data_type: SqlDataType, nullable: bool) -> None:
+        self.name = name
+        self.data_type = data_type
+        self.nullable = nullable
+
+    def __str__(self) -> str:
+        if self.nullable:
+            return f"{self.name} {self.data_type}"
+        else:
+            return f"{self.name} {self.data_type} NOT NULL"
+
+
+@dataclass
+class Constraint:
+    name: LocalId
+
+
+@dataclass
+class ForeignConstraint(Constraint):
+    foreign_column: LocalId
+    primary_table: QualifiedId
+    primary_column: LocalId
+
+    def __str__(self) -> str:
+        return f"CONSTRAINT {self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.primary_table} ({self.primary_column})"
+
+
+@dataclass
+class CheckConstraint(Constraint):
+    condition: str
+
+    def __str__(self) -> str:
+        return f"CONSTRAINT {self.name} CHECK ({self.condition})"
+
+
+@dataclass
+class Table:
+    name: QualifiedId
+    columns: list[Column]
+    primary_key: LocalId
+    constraints: Optional[list[Constraint]] = None
+
+    def __str__(self) -> str:
+        defs: list[str] = []
+        defs.extend(str(c) for c in self.columns)
+        defs.append(f"PRIMARY KEY ({self.primary_key})")
+        if self.constraints is not None:
+            defs.extend(str(c) for c in self.constraints)
+        definition = ",\n".join(defs)
+        return f"CREATE TABLE {self.name} (\n{definition}\n);"
+
+    def create_table_stmt(self) -> str:
+        defs: list[str] = []
+        defs.extend(str(c) for c in self.columns)
+        defs.append(f"PRIMARY KEY ({self.primary_key})")
+        definition = ",\n".join(defs)
+        return f"CREATE TABLE {self.name} (\n{definition}\n);"
+
+    def alter_table_stmt(self) -> Optional[str]:
+        if self.constraints:
+            return (
+                f"ALTER TABLE {self.name}\n"
+                + ",\n".join(f"ADD {c}" for c in self.constraints)
+                + "\n;"
+            )
+        else:
+            return None
+
+
+@dataclass
+class Namespace:
+    enums: list[EnumType]
+    structs: list[StructType]
+    tables: list[Table]
+
+    def __str__(self) -> str:
+        items: list[str] = []
+        items.extend(str(e) for e in self.enums)
+        items.extend(str(s) for s in self.structs)
+        items.extend(t.create_table_stmt() for t in self.tables)
+        items.extend(filter(None, (t.alter_table_stmt() for t in self.tables)))
+        return "\n".join(items)

@@ -1,9 +1,9 @@
 import abc
 import dataclasses
 import ipaddress
+import types
 from dataclasses import dataclass
-from io import StringIO
-from typing import Any, Callable, Iterable, Optional, TextIO, TypeVar
+from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.inspection import is_dataclass_type, is_type_enum
 
@@ -35,22 +35,12 @@ class BaseGenerator(abc.ABC):
         self.cls = cls
 
     @abc.abstractmethod
-    def write_create_table_stmt(self, target: TextIO) -> None:
+    def get_create_table_stmt(self) -> str:
         ...
 
     @abc.abstractmethod
-    def write_upsert_stmt(self, target: TextIO) -> None:
-        ...
-
-    def get_create_table_stmt(self) -> str:
-        s = StringIO()
-        self.write_create_table_stmt(s)
-        return s.getvalue()
-
     def get_upsert_stmt(self) -> str:
-        s = StringIO()
-        self.write_upsert_stmt(s)
-        return s.getvalue()
+        ...
 
     def get_record_as_tuple(self, obj: Any) -> tuple:
         extractors = _get_extractors(self.cls)
@@ -87,13 +77,13 @@ class BaseConnection(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[types.TracebackType],
+    ) -> None:
         ...
-
-
-def check_dataclass_type(table: type) -> None:
-    if not is_dataclass_type(table):
-        raise TypeError(f"expected dataclass type, got: {table}")
 
 
 class BaseContext(abc.ABC):
@@ -109,6 +99,10 @@ class BaseContext(abc.ABC):
         ...
 
     @abc.abstractmethod
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        ...
+
+    @abc.abstractmethod
     async def execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
@@ -117,7 +111,9 @@ class BaseContext(abc.ABC):
     async def drop_table(self, table: type, ignore_missing: bool = False) -> None:
         "Drops a database table corresponding to the dataclass type."
 
-        check_dataclass_type(table)
+        if not is_dataclass_type(table):
+            raise TypeError(f"expected dataclass type, got: {table}")
+
         table_name = table.__name__
 
         if ignore_missing:
@@ -129,7 +125,8 @@ class BaseContext(abc.ABC):
     async def create_table(self, table: type) -> None:
         "Creates a database table for storing data encapsulated in the dataclass type."
 
-        check_dataclass_type(table)
+        if not is_dataclass_type(table):
+            raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator_type(table)
         statement = generator.get_create_table_stmt()
         await self.execute(statement)

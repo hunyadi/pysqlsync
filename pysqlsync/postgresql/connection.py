@@ -1,10 +1,12 @@
 import dataclasses
+import types
 import typing
-from typing import Any, Iterable, TypeVar
+from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
+from strong_typing.inspection import is_dataclass_type
 
-from ..base import BaseConnection, BaseContext, check_dataclass_type
+from ..base import BaseConnection, BaseContext
 
 T = TypeVar("T")
 
@@ -22,7 +24,12 @@ class Connection(BaseConnection):
         )
         return Context(self)
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[types.TracebackType],
+    ) -> None:
         await self.native.close()
 
 
@@ -42,8 +49,13 @@ class Context(BaseContext):
     ) -> None:
         await self.native_connection.executemany(statement, args)
 
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
+        return [tuple(record.values()) for record in records]  # type: ignore
+
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
-        check_dataclass_type(table)
+        if not is_dataclass_type(table):
+            raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator_type(table)
         records = generator.get_records_as_tuples(data)
         await self.native_connection.copy_records_to_table(

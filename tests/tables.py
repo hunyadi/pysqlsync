@@ -20,7 +20,7 @@ from strong_typing.auxiliary import (
     uint64,
 )
 
-from pysqlsync.properties import PrimaryKey
+from pysqlsync.model.properties import PrimaryKey
 
 
 class WorkflowState(enum.Enum):
@@ -101,3 +101,36 @@ class UserTable:
     short_name: str
     sortable_name: str
     homepage_url: Optional[str]
+
+
+@dataclass
+class Address:
+    id: PrimaryKey[int]
+    city: str
+    state: Optional[str] = None
+
+
+@dataclass
+class Person:
+    id: PrimaryKey[int]
+    address: Address
+
+
+@dataclass
+class Coordinates:
+    lat: float
+    long: float
+
+
+@dataclass
+class Employee:
+    id: PrimaryKey[UUID]
+    name: str
+    reports_to: "Employee"
+
+
+@dataclass
+class Teacher:
+    id: PrimaryKey[UUID]
+    name: str
+    teaches: list[Person]
