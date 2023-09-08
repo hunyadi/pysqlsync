@@ -1,13 +1,11 @@
-import dataclasses
 import datetime
 import decimal
 import inspect
 import ipaddress
-import sys
 import types
 import typing
 import uuid
-from typing import Any, Iterable, Optional, TypeGuard, TypeVar
+from typing import Iterable, Optional, TypeVar
 
 from strong_typing.auxiliary import (
     float32,
@@ -23,8 +21,11 @@ from strong_typing.auxiliary import (
 )
 from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
+    DataclassField,
     DataclassInstance,
+    dataclass_fields,
     enum_value_types,
+    evaluate_type,
     is_dataclass_type,
     is_generic_list,
     is_type_enum,
@@ -40,10 +41,19 @@ from strong_typing.inspection import (
 
 from ..model.data_types import *
 from ..model.properties import get_field_properties
+from .inspection import (
+    dataclass_primary_key_name,
+    dataclass_primary_key_type,
+    is_entity_type,
+    is_simple_type,
+    is_struct_type,
+)
 from .object_types import (
     CheckConstraint,
     Column,
     Constraint,
+    ConstraintReference,
+    DiscriminatedConstraint,
     EnumType,
     ForeignConstraint,
     LocalId,
@@ -58,25 +68,6 @@ from .object_types import (
 T = TypeVar("T")
 
 
-def _evaluate_type(typ: Any, cls: type) -> Any:
-    """
-    Evaluates a forward reference type.
-
-    :param typ: The type to convert, typically a dataclass member type.
-    :param cls: The context for the type, typically the dataclass in which the member is defined.
-    """
-
-    if isinstance(typ, str):
-        # evaluate data-class field whose type annotation is a string
-        return eval(typ, sys.modules[cls.__module__].__dict__, locals())
-    if isinstance(typ, typing.ForwardRef):
-        return typ._evaluate(
-            sys.modules[cls.__module__].__dict__, locals(), frozenset()
-        )
-    else:
-        return typ
-
-
 def is_unique(items: Iterable[T]) -> bool:
     "Uniqueness check of unhashable iterables."
 
@@ -85,104 +76,6 @@ def is_unique(items: Iterable[T]) -> bool:
         if item not in unique:
             unique.append(item)
     return len(unique) == 1
-
-
-@dataclass
-class DataclassField:
-    name: str
-    type: Any
-
-
-def dataclass_fields(cls: type[DataclassInstance]) -> Iterable[DataclassField]:
-    "Generates the fields of a data-class resolving forward references."
-
-    for field in dataclasses.fields(cls):
-        yield DataclassField(field.name, _evaluate_type(field.type, cls))
-
-
-def dataclass_field_by_name(cls: type[DataclassInstance], name: str) -> DataclassField:
-    "Looks up a field in a data-class by its field name."
-
-    for field in dataclasses.fields(cls):
-        if field.name == name:
-            return DataclassField(field.name, _evaluate_type(field.type, cls))
-
-    raise LookupError(f"field `{name}` missing from class `{cls.__name__}`")
-
-
-def is_simple_type(typ: type) -> bool:
-    "True if the type is not a composite or user-defined type."
-
-    typ = unwrap_annotated_type(typ)
-
-    if (
-        typ is bool
-        or typ is int
-        or typ is float
-        or typ is str
-        or typ is decimal.Decimal
-        or typ is datetime.datetime
-        or typ is datetime.date
-        or typ is datetime.time
-        or typ is datetime.timedelta
-        or typ is uuid.UUID
-        or typ is ipaddress.IPv4Address  # PostgreSQL only
-        or typ is ipaddress.IPv6Address  # PostgreSQL only
-    ):
-        return True
-    if is_type_enum(typ):
-        return True
-    if is_type_optional(typ):
-        typ = unwrap_optional_type(typ)
-        return is_simple_type(typ)
-    return False
-
-
-def is_entity_type(typ: type) -> TypeGuard[type[DataclassInstance]]:
-    "True for data-class types that have a primary key."
-
-    if not is_dataclass_type(typ):
-        return False
-
-    return _dataclass_has_primary_key(typ)
-
-
-def is_struct_type(typ: type) -> TypeGuard[type[DataclassInstance]]:
-    "True for data-class types that have no primary key."
-
-    if not is_dataclass_type(typ):
-        return False
-
-    return not _dataclass_has_primary_key(typ)
-
-
-def _dataclass_has_primary_key(typ: type[DataclassInstance]) -> bool:
-    for field in dataclass_fields(typ):
-        props = get_field_properties(field.type)
-        if props.is_primary:
-            return True
-
-    return False
-
-
-def _dataclass_primary_key_name(typ: type[DataclassInstance]) -> LocalId:
-    for field in dataclass_fields(typ):
-        props = get_field_properties(field.type)
-        if props.is_primary:
-            return LocalId(field.name)
-
-    raise TypeError(f"table {typ.__name__} lacks primary key")
-
-
-def _dataclass_primary_key_type(typ: type[DataclassInstance]) -> type:
-    "Extracts the primary key data type from a dataclass."
-
-    for field in dataclass_fields(typ):
-        props = get_field_properties(field.type)
-        if props.is_primary:
-            return props.field_type
-
-    raise TypeError(f"table {typ.__name__} lacks primary key")
 
 
 @dataclass
@@ -322,16 +215,15 @@ class DataclassConverter:
 
         if is_simple_type(typ):
             return self.simple_type_to_sql_data_type(typ)
+        if is_entity_type(typ):
+            # a many-to-one relationship to another entity class
+            key_field_type = dataclass_primary_key_type(typ)
+            return self.member_to_sql_data_type(key_field_type, typ)
         if is_dataclass_type(typ):
-            if _dataclass_has_primary_key(typ):
-                # a many-to-one relationship to another entity class
-                key_field_type = _dataclass_primary_key_type(typ)
-                return self.member_to_sql_data_type(key_field_type, typ)
-            else:
-                # an embedded user-defined type
-                return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
+            # an embedded user-defined type
+            return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
         if isinstance(typ, typing.ForwardRef):
-            return self.member_to_sql_data_type(_evaluate_type(typ, cls), cls)
+            return self.member_to_sql_data_type(evaluate_type(typ, cls), cls)
         if is_type_literal(typ):
             literal_types = unwrap_literal_types(typ)
             sql_literal_types = [
@@ -354,11 +246,11 @@ class DataclassConverter:
                 )
             raise TypeError(f"unsupported array data type: {item_type}")
         if is_type_union(typ):
-            member_types = [_evaluate_type(t, cls) for t in unwrap_union_types(typ)]
+            member_types = [evaluate_type(t, cls) for t in unwrap_union_types(typ)]
             if all(is_entity_type(t) for t in member_types):
                 # discriminated union type
                 primary_key_types = set(
-                    _dataclass_primary_key_type(t) for t in member_types
+                    dataclass_primary_key_type(t) for t in member_types
                 )
                 if len(primary_key_types) > 1:
                     raise TypeError(
@@ -425,17 +317,39 @@ class DataclassConverter:
         # table constraints
         constraints: list[Constraint] = []
 
-        # foreign keys
         for field in dataclass_fields(cls):
-            if is_dataclass_type(field.type):
+            if is_entity_type(field.type):
+                # foreign keys
                 constraints.append(
                     ForeignConstraint(
                         LocalId(f"fk_{cls.__name__}_{field.name}"),
                         LocalId(field.name),
-                        QualifiedId(self.namespace, field.type.__name__),
-                        _dataclass_primary_key_name(field.type),
+                        ConstraintReference(
+                            QualifiedId(self.namespace, field.type.__name__),
+                            LocalId(dataclass_primary_key_name(field.type)),
+                        ),
                     )
                 )
+
+            if is_type_union(field.type):
+                member_types = [
+                    evaluate_type(t, cls) for t in unwrap_union_types(field.type)
+                ]
+                if all(is_entity_type(t) for t in member_types):
+                    # discriminated keys
+                    constraints.append(
+                        DiscriminatedConstraint(
+                            LocalId(f"dk_{cls.__name__}_{field.name}"),
+                            LocalId(field.name),
+                            [
+                                ConstraintReference(
+                                    QualifiedId(self.namespace, t.__name__),
+                                    LocalId(dataclass_primary_key_name(t)),
+                                )
+                                for t in member_types
+                            ],
+                        )
+                    )
 
         # checks
         if not self.options.enum_as_type:
@@ -452,7 +366,7 @@ class DataclassConverter:
         return Table(
             name=QualifiedId(self.namespace, cls.__name__),
             columns=columns,
-            primary_key=_dataclass_primary_key_name(cls),
+            primary_key=LocalId(dataclass_primary_key_name(cls)),
             constraints=constraints if constraints else None,
             description=doc.full_description,
         )
@@ -570,8 +484,8 @@ def module_to_sql(
 
             table_left = entity.__name__
             table_right = item_type.__name__
-            primary_key_left = _dataclass_primary_key_name(entity)
-            primary_key_right = _dataclass_primary_key_name(item_type)
+            primary_key_left = LocalId(dataclass_primary_key_name(entity))
+            primary_key_right = LocalId(dataclass_primary_key_name(item_type))
             column_left = f"{table_left}_{field.name}"
             column_right = f"{table_right}_{primary_key_right.name}"
             tables.append(
@@ -586,14 +500,14 @@ def module_to_sql(
                         Column(
                             LocalId(column_left),
                             converter.member_to_sql_data_type(
-                                _dataclass_primary_key_type(entity), entity
+                                dataclass_primary_key_type(entity), entity
                             ),
                             False,
                         ),
                         Column(
                             LocalId(column_right),
                             converter.member_to_sql_data_type(
-                                _dataclass_primary_key_type(item_type), item_type
+                                dataclass_primary_key_type(item_type), item_type
                             ),
                             False,
                         ),
@@ -603,14 +517,18 @@ def module_to_sql(
                         ForeignConstraint(
                             LocalId(f"jk_{column_left}"),
                             LocalId(column_left),
-                            QualifiedId(module.__name__, table_left),
-                            primary_key_left,
+                            ConstraintReference(
+                                QualifiedId(module.__name__, table_left),
+                                primary_key_left,
+                            ),
                         ),
                         ForeignConstraint(
                             LocalId(f"jk_{column_right}"),
                             LocalId(column_right),
-                            QualifiedId(module.__name__, table_right),
-                            primary_key_right,
+                            ConstraintReference(
+                                QualifiedId(module.__name__, table_right),
+                                primary_key_right,
+                            ),
                         ),
                     ],
                 )

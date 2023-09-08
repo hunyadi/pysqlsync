@@ -69,13 +69,24 @@ class Constraint:
 
 
 @dataclass
+class ConstraintReference:
+    table: QualifiedId
+    column: LocalId
+
+
+@dataclass
 class ForeignConstraint(Constraint):
     foreign_column: LocalId
-    primary_table: QualifiedId
-    primary_column: LocalId
+    reference: ConstraintReference
 
     def __str__(self) -> str:
-        return f"CONSTRAINT {self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.primary_table} ({self.primary_column})"
+        return f"CONSTRAINT {self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.reference.table} ({self.reference.column})"
+
+
+@dataclass
+class DiscriminatedConstraint(Constraint):
+    foreign_column: LocalId
+    references: list[ConstraintReference]
 
 
 @dataclass
