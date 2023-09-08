@@ -3,6 +3,8 @@ from typing import Any, Optional
 
 from strong_typing.auxiliary import MaxLength, Precision, TimePrecision
 
+from .id_types import QualifiedId
+
 
 @dataclass
 class SqlDataType:
@@ -157,10 +159,10 @@ class SqlIntervalType(SqlDataType):
 
 @dataclass
 class SqlUserDefinedType(SqlDataType):
-    type_name: str
+    ref: QualifiedId
 
     def __str__(self) -> str:
-        return self.type_name
+        return str(self.ref)
 
 
 def sql_data_type_from_spec(

@@ -3,33 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..model.data_types import SqlDataType
-
-
-@dataclass
-class LocalId:
-    name: str
-
-    def __str__(self) -> str:
-        "Quotes an identifier to be embedded in an SQL statement."
-        return '"' + str(self.name).replace('"', '""') + '"'
-
-
-@dataclass
-class QualifiedId:
-    namespace: Optional[str]
-    name: str
-
-    def __str__(self) -> str:
-        if self.namespace is not None:
-            return (
-                '"'
-                + str(self.namespace).replace('"', '""')
-                + '"."'
-                + str(self.name).replace('"', '""')
-                + '"'
-            )
-        else:
-            return '"' + str(self.name).replace('"', '""') + '"'
+from ..model.id_types import LocalId, QualifiedId
 
 
 def quote(s: str) -> str:
@@ -150,12 +124,13 @@ class Table:
 
 @dataclass
 class Namespace:
+    name: LocalId
     enums: list[EnumType]
     structs: list[StructType]
     tables: list[Table]
 
     def __str__(self) -> str:
-        items: list[str] = []
+        items: list[str] = [f"CREATE SCHEMA IF NOT EXISTS {self.name};"]
         items.extend(str(e) for e in self.enums)
         items.extend(str(s) for s in self.structs)
         items.extend(t.create_table_stmt() for t in self.tables)

@@ -7,7 +7,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Iterable, Optional, TypeGuard
+from typing import Any, Iterable, Optional, TypeGuard
 
 from strong_typing.auxiliary import (
     float32,
@@ -28,9 +28,11 @@ from strong_typing.inspection import (
     is_generic_list,
     is_type_enum,
     is_type_optional,
+    is_type_union,
     unwrap_annotated_type,
     unwrap_generic_list,
     unwrap_optional_type,
+    unwrap_union_types,
 )
 
 from ..model.data_types import *
@@ -51,27 +53,52 @@ from .object_types import (
 )
 
 
+def _evaluate_type(typ: Any, cls: type) -> Any:
+    """
+    Evaluates a forward reference type.
+
+    :param typ: The type to convert, typically a dataclass member type.
+    :param cls: The context for the type, typically the dataclass in which the member is defined.
+    """
+
+    if isinstance(typ, str):
+        # evaluate data-class field whose type annotation is a string
+        return eval(typ, sys.modules[cls.__module__].__dict__, locals())
+    if isinstance(typ, typing.ForwardRef):
+        return typ._evaluate(
+            sys.modules[cls.__module__].__dict__, locals(), frozenset()
+        )
+    else:
+        return typ
+
+
 @dataclass
 class DataclassField:
     name: str
-    type: type
+    type: Any
 
 
 def dataclass_fields(cls: type[DataclassInstance]) -> Iterable[DataclassField]:
-    for field in dataclasses.fields(cls):
-        if isinstance(field.type, str):
-            # evaluate data-class fields whose type annotation is a string
-            field_type = eval(
-                field.type, sys.modules[cls.__module__].__dict__, locals()
-            )
-        else:
-            field_type = field.type
+    "Generates the fields of a data-class resolving forward references."
 
-        yield DataclassField(field.name, field_type)
+    for field in dataclasses.fields(cls):
+        yield DataclassField(field.name, _evaluate_type(field.type, cls))
+
+
+def dataclass_field_by_name(cls: type[DataclassInstance], name: str) -> DataclassField:
+    "Looks up a field in a data-class by its field name."
+
+    for field in dataclasses.fields(cls):
+        if field.name == name:
+            return DataclassField(field.name, _evaluate_type(field.type, cls))
+
+    raise LookupError(f"field `{name}` missing from class `{cls.__name__}`")
 
 
 def is_simple_type(typ: type) -> bool:
     "True if the type is not a composite or user-defined type."
+
+    typ = unwrap_annotated_type(typ)
 
     if (
         typ is bool
@@ -84,6 +111,8 @@ def is_simple_type(typ: type) -> bool:
         or typ is datetime.time
         or typ is datetime.timedelta
         or typ is uuid.UUID
+        or typ is ipaddress.IPv4Address  # PostgreSQL only
+        or typ is ipaddress.IPv6Address  # PostgreSQL only
     ):
         return True
     if is_type_enum(typ):
@@ -95,6 +124,8 @@ def is_simple_type(typ: type) -> bool:
 
 
 def is_entity_type(typ: type) -> TypeGuard[type[DataclassInstance]]:
+    "True for data-class types that have a primary key."
+
     if not is_dataclass_type(typ):
         return False
 
@@ -102,6 +133,8 @@ def is_entity_type(typ: type) -> TypeGuard[type[DataclassInstance]]:
 
 
 def is_struct_type(typ: type) -> TypeGuard[type[DataclassInstance]]:
+    "True for data-class types that have no primary key."
+
     if not is_dataclass_type(typ):
         return False
 
@@ -137,21 +170,30 @@ def _dataclass_primary_key_type(typ: type[DataclassInstance]) -> type:
     raise TypeError(f"table {typ.__name__} lacks primary key")
 
 
-class DataclassConverter:
-    enum_as_type: bool
+@dataclass
+class DataclassConverterOptions:
+    enum_as_type: bool = True
     extra_numeric_types: bool = False
+    user_defined_annotation_classes: tuple[type, ...] = ()
 
-    def __init__(self, *, enum_as_type: bool = True):
-        self.enum_as_type = enum_as_type
 
-    def member_to_sql_data_type(self, typ: type, cls: type) -> SqlDataType:
-        """
-        Maps a native Python type into a SQL data type.
+class DataclassConverter:
+    namespace: Optional[str]
+    options: DataclassConverterOptions
 
-        :param typ: The type to convert, typically a dataclass member type.
-        :param cls: The context for the type, typically the dataclass in which the member is defined.
-        """
+    def __init__(
+        self,
+        *,
+        namespace: Optional[str] = None,
+        options: Optional[DataclassConverterOptions] = None,
+    ):
+        self.namespace = namespace
+        if options is not None:
+            self.options = options
+        else:
+            self.options = DataclassConverterOptions()
 
+    def simple_type_to_sql_data_type(self, typ: type) -> SqlDataType:
         if typ is bool:
             return SqlBooleanType()
         if typ is int:
@@ -159,8 +201,10 @@ class DataclassConverter:
         if typ is float:
             return SqlDoubleType()
         if typ is int8:
-            if self.extra_numeric_types:
-                return SqlUserDefinedType("int1")  # PostgreSQL extension required
+            if self.options.extra_numeric_types:
+                return SqlUserDefinedType(
+                    QualifiedId(None, "int1")
+                )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
         if typ is int16:
@@ -170,23 +214,31 @@ class DataclassConverter:
         if typ is int64:
             return SqlIntegerType(8)
         if typ is uint8:
-            if self.extra_numeric_types:
-                return SqlUserDefinedType("uint1")  # PostgreSQL extension required
+            if self.options.extra_numeric_types:
+                return SqlUserDefinedType(
+                    QualifiedId(None, "uint1")
+                )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
         if typ is uint16:
-            if self.extra_numeric_types:
-                return SqlUserDefinedType("uint2")  # PostgreSQL extension required
+            if self.options.extra_numeric_types:
+                return SqlUserDefinedType(
+                    QualifiedId(None, "uint2")
+                )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
         if typ is uint32:
-            if self.extra_numeric_types:
-                return SqlUserDefinedType("uint4")  # PostgreSQL extension required
+            if self.options.extra_numeric_types:
+                return SqlUserDefinedType(
+                    QualifiedId(None, "uint4")
+                )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(4)
         if typ is uint64:
-            if self.extra_numeric_types:
-                return SqlUserDefinedType("uint8")  # PostgreSQL extension required
+            if self.options.extra_numeric_types:
+                return SqlUserDefinedType(
+                    QualifiedId(None, "uint8")
+                )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(8)
         if typ is float32:
@@ -208,7 +260,7 @@ class DataclassConverter:
         if typ is uuid.UUID:
             return SqlUuidType()
         if typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
-            return SqlUserDefinedType("inet")  # PostgreSQL extension required
+            return SqlUserDefinedType(QualifiedId(None, "inet"))  # PostgreSQL only
 
         metadata = getattr(typ, "__metadata__", None)
         if metadata:
@@ -225,18 +277,11 @@ class DataclassConverter:
                 raise TypeError(f"unsupported annotated Python type: {typ}")
 
             for meta in metadata:
-                sql_type.parse_meta(meta)
+                if not isinstance(meta, self.options.user_defined_annotation_classes):
+                    sql_type.parse_meta(meta)
 
             return sql_type
 
-        if is_dataclass_type(typ):
-            if _dataclass_has_primary_key(typ):
-                # a many-to-one relationship to another entity class
-                key_field_type = _dataclass_primary_key_type(typ)
-                return self.member_to_sql_data_type(key_field_type, typ)
-            else:
-                # an embedded user-defined type
-                return SqlUserDefinedType(typ.__name__)
         if is_type_enum(typ):
             value_types = enum_value_types(typ)
             if len(value_types) > 1:
@@ -245,40 +290,70 @@ class DataclassConverter:
                 )
             value_type = value_types.pop()
 
-            if self.enum_as_type:
-                return SqlUserDefinedType(typ.__name__)
+            if self.options.enum_as_type:
+                return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
             else:
-                return self.member_to_sql_data_type(value_type, cls)
+                return self.simple_type_to_sql_data_type(value_type)
+
+        raise TypeError(f"not a simple type: {typ}")
+
+    def member_to_sql_data_type(self, typ: type, cls: type) -> SqlDataType:
+        """
+        Maps a native Python type into a SQL data type.
+
+        :param typ: The type to convert, typically a dataclass member type.
+        :param cls: The context for the type, typically the dataclass in which the member is defined.
+        """
+
+        if is_simple_type(typ):
+            return self.simple_type_to_sql_data_type(typ)
+        if is_dataclass_type(typ):
+            if _dataclass_has_primary_key(typ):
+                # a many-to-one relationship to another entity class
+                key_field_type = _dataclass_primary_key_type(typ)
+                return self.member_to_sql_data_type(key_field_type, typ)
+            else:
+                # an embedded user-defined type
+                return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
         if isinstance(typ, typing.ForwardRef):
-            eval_type = typ._evaluate(
-                sys.modules[cls.__module__].__dict__, locals(), frozenset()
-            )
-            return self.member_to_sql_data_type(eval_type)
+            return self.member_to_sql_data_type(_evaluate_type(typ, cls), cls)
         if is_generic_list(typ):
             item_type = unwrap_generic_list(typ)
-            if item_type is bool:
-                return SqlArrayType(SqlBooleanType())
-            if item_type is int:
-                return SqlArrayType(SqlIntegerType(8))
-            if item_type is float:
-                return SqlArrayType(SqlDoubleType())
-            if item_type is str:
-                return SqlArrayType(SqlCharacterType())
-            if is_dataclass_type(item_type) and _dataclass_has_primary_key(item_type):
+            if is_simple_type(item_type):
+                return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
+            if is_entity_type(item_type):
                 raise TypeError(
                     f"use a join table, unable to convert list of entity type with primary key: {typ}"
                 )
             if isinstance(item_type, type):
-                return SqlArrayType(SqlUserDefinedType(item_type.__name__))
+                return SqlArrayType(
+                    SqlUserDefinedType(QualifiedId(self.namespace, item_type.__name__))
+                )
             raise TypeError(f"unsupported array data type: {item_type}")
+        if is_type_union(typ):
+            member_types = [_evaluate_type(t, cls) for t in unwrap_union_types(typ)]
+            if all(is_entity_type(t) for t in member_types):
+                # discriminated union type
+                primary_key_types = set(
+                    _dataclass_primary_key_type(t) for t in member_types
+                )
+                if len(primary_key_types) > 1:
+                    raise TypeError(
+                        f"mismatching key types in discriminated union of: {member_types}"
+                    )
+
+                common_key_type = primary_key_types.pop()
+                return self.member_to_sql_data_type(common_key_type, typ)
         if isinstance(typ, type):
-            return SqlUserDefinedType(typ.__name__)
+            return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
 
         raise TypeError(f"unsupported data type: {typ}")
 
     def member_to_column(
         self, field: DataclassField, cls: type[DataclassInstance]
     ) -> Column:
+        "Converts a data-class field into a SQL table column."
+
         props = get_field_properties(field.type)
         typ = props.field_type
 
@@ -292,9 +367,9 @@ class DataclassConverter:
 
         return Column(LocalId(field.name), data_type, nullable)
 
-    def dataclass_to_table(
-        self, cls: type[DataclassInstance], *, namespace: Optional[str] = None
-    ) -> Table:
+    def dataclass_to_table(self, cls: type[DataclassInstance]) -> Table:
+        "Converts a data-class with a primary key into a SQL table type."
+
         if not is_dataclass_type(cls):
             raise TypeError("expected: dataclass type")
 
@@ -317,13 +392,13 @@ class DataclassConverter:
                     ForeignConstraint(
                         LocalId(f"fk_{cls.__name__}_{field.name}"),
                         LocalId(field.name),
-                        QualifiedId(namespace, field.type.__name__),
+                        QualifiedId(self.namespace, field.type.__name__),
                         _dataclass_primary_key_name(field.type),
                     )
                 )
 
         # checks
-        if not self.enum_as_type:
+        if not self.options.enum_as_type:
             for field in dataclass_fields(cls):
                 if is_type_enum(field.type):
                     enum_values = ", ".join(quote(e.value) for e in field.type)
@@ -335,40 +410,67 @@ class DataclassConverter:
                     )
 
         return Table(
-            QualifiedId(namespace, cls.__name__),
+            QualifiedId(self.namespace, cls.__name__),
             columns,
             _dataclass_primary_key_name(cls),
             constraints if constraints else None,
         )
 
-    def dataclass_to_struct(
-        self, cls: type[DataclassInstance], *, namespace: Optional[str] = None
-    ) -> StructType:
+    def member_to_field(
+        self, field: DataclassField, cls: type[DataclassInstance]
+    ) -> SqlDataType:
+        "Converts a data-class field into a SQL struct (composite type) field."
+
+        props = get_field_properties(field.type)
+        typ = props.field_type
+
+        if is_type_optional(typ):
+            typ = unwrap_optional_type(typ)
+
+        return self.member_to_sql_data_type(typ, cls)
+
+    def dataclass_to_struct(self, cls: type[DataclassInstance]) -> StructType:
+        "Converts a data-class without a primary key into a SQL struct type."
+
         try:
             members = [
-                StructMember(
-                    LocalId(field.name), self.member_to_sql_data_type(field.type, cls)
-                )
+                StructMember(LocalId(field.name), self.member_to_field(field, cls))
                 for field in dataclass_fields(cls)
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
 
-        return StructType(QualifiedId(namespace, cls.__name__), members)
+        return StructType(QualifiedId(self.namespace, cls.__name__), members)
 
 
 def dataclass_to_table(
-    cls: type[DataclassInstance], *, namespace: Optional[str] = None
+    cls: type[DataclassInstance],
+    *,
+    namespace: Optional[str] = None,
+    options: Optional[DataclassConverterOptions] = None,
 ) -> Table:
-    converter = DataclassConverter(enum_as_type=True)
-    return converter.dataclass_to_table(cls, namespace=namespace)
+    "Converts a data-class with a primary key into a SQL table type."
+
+    if options is None:
+        options = DataclassConverterOptions(enum_as_type=True)
+
+    converter = DataclassConverter(namespace=namespace, options=options)
+    return converter.dataclass_to_table(cls)
 
 
 def dataclass_to_struct(
-    cls: type[DataclassInstance], *, namespace: Optional[str] = None
+    cls: type[DataclassInstance],
+    *,
+    namespace: Optional[str] = None,
+    options: Optional[DataclassConverterOptions] = None,
 ) -> StructType:
-    converter = DataclassConverter(enum_as_type=True)
-    return converter.dataclass_to_struct(cls, namespace=namespace)
+    "Converts a data-class without a primary key into a SQL struct type."
+
+    if options is None:
+        options = DataclassConverterOptions(enum_as_type=True)
+
+    converter = DataclassConverter(namespace=namespace, options=options)
+    return converter.dataclass_to_struct(cls)
 
 
 def _has_user_defined_members(cls: type) -> bool:
@@ -378,8 +480,16 @@ def _has_user_defined_members(cls: type) -> bool:
     return False
 
 
-def module_to_sql(module: types.ModuleType) -> Namespace:
-    converter = DataclassConverter()
+def module_to_sql(
+    module: types.ModuleType,
+    *,
+    options: Optional[DataclassConverterOptions] = None,
+) -> Namespace:
+    "Converts the entire contents of a Python module into a SQL namespace (schema)."
+
+    if options is None:
+        options = DataclassConverterOptions(enum_as_type=True)
+    converter = DataclassConverter(namespace=module.__name__, options=options)
 
     enums = [
         EnumType(obj, namespace=module.__name__)
@@ -387,13 +497,9 @@ def module_to_sql(module: types.ModuleType) -> Namespace:
     ]
     items = [obj for name, obj in inspect.getmembers(module, is_struct_type)]
     items.sort(key=lambda obj: _has_user_defined_members(obj))
-    structs = [
-        converter.dataclass_to_struct(item, namespace=module.__name__) for item in items
-    ]
+    structs = [converter.dataclass_to_struct(item) for item in items]
     entities = [obj for name, obj in inspect.getmembers(module, is_entity_type)]
-    tables = [
-        converter.dataclass_to_table(cls, namespace=module.__name__) for cls in entities
-    ]
+    tables = [converter.dataclass_to_table(cls) for cls in entities]
 
     # create join tables for one-to-many relationships
     for entity in entities:
@@ -453,4 +559,6 @@ def module_to_sql(module: types.ModuleType) -> Namespace:
                 )
             )
 
-    return Namespace(enums=enums, structs=structs, tables=tables)
+    return Namespace(
+        name=LocalId(module.__name__), enums=enums, structs=structs, tables=tables
+    )

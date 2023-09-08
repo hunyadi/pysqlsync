@@ -1,7 +1,7 @@
 import dataclasses
 
 from ..base import BaseGenerator
-from ..formation.converter import DataclassConverter
+from ..formation.converter import DataclassConverter, DataclassConverterOptions
 from ..model.properties import get_primary_key_name
 
 
@@ -17,7 +17,8 @@ def sql_quoted_string(value: str) -> str:
 
 class Generator(BaseGenerator):
     def get_create_table_stmt(self) -> str:
-        converter = DataclassConverter(enum_as_type=False)
+        options = DataclassConverterOptions(enum_as_type=False)
+        converter = DataclassConverter(options=options)
         table = converter.dataclass_to_table(self.cls)
         return str(table)
 

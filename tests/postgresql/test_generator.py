@@ -83,8 +83,8 @@ class TestGenerator(unittest.TestCase):
         lines = [
             'CREATE TABLE "IPAddressTable" (',
             '"id" bigint NOT NULL,',
-            '"ipv4" inet NOT NULL,',
-            '"ipv6" inet NOT NULL,',
+            '"ipv4" "inet" NOT NULL,',
+            '"ipv6" "inet" NOT NULL,',
             'PRIMARY KEY ("id")',
             ");",
         ]
