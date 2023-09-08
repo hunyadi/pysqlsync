@@ -1,7 +1,13 @@
 import dataclasses
 
 from ..base import BaseGenerator
-from ..formation.converter import DataclassConverter, DataclassConverterOptions
+from ..formation.converter import (
+    DataclassConverter,
+    DataclassConverterOptions,
+    is_entity_type,
+    is_struct_type,
+    quote,
+)
 from ..model.properties import get_primary_key_name
 
 
@@ -16,11 +22,39 @@ def sql_quoted_string(value: str) -> str:
 
 
 class Generator(BaseGenerator):
-    def get_create_table_stmt(self) -> str:
+    def get_create_stmt(self) -> str:
         options = DataclassConverterOptions(enum_as_type=False)
         converter = DataclassConverter(options=options)
-        table = converter.dataclass_to_table(self.cls)
-        return str(table)
+
+        output: list[str] = []
+        if is_entity_type(self.cls):
+            table = converter.dataclass_to_table(self.cls)
+
+            output.append(str(table))
+            if table.description is not None:
+                output.append(
+                    f"COMMENT ON TABLE {table.name} IS {quote(table.description)};"
+                )
+            for column in table.columns:
+                if column.description is not None:
+                    output.append(
+                        f"COMMENT ON COLUMN {table.name}.{column.name} IS {quote(column.description)};"
+                    )
+        elif is_struct_type(self.cls):
+            struct = converter.dataclass_to_struct(self.cls)
+
+            output.append(str(struct))
+            if struct.description is not None:
+                output.append(
+                    f"COMMENT ON TYPE {struct.name} IS {quote(struct.description)};"
+                )
+            for member in struct.members:
+                if member.description is not None:
+                    output.append(
+                        f"COMMENT ON COLUMN {struct.name}.{member.name} IS {quote(member.description)};"
+                    )
+
+        return "\n".join(output)
 
     def get_upsert_stmt(self) -> str:
         statements: list[str] = []

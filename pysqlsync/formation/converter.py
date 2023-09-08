@@ -21,6 +21,7 @@ from strong_typing.auxiliary import (
     uint32,
     uint64,
 )
+from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
     DataclassInstance,
     enum_value_types,
@@ -378,7 +379,7 @@ class DataclassConverter:
         raise TypeError(f"unsupported data type: {typ}")
 
     def member_to_column(
-        self, field: DataclassField, cls: type[DataclassInstance]
+        self, field: DataclassField, cls: type[DataclassInstance], doc: Docstring
     ) -> Column:
         "Converts a data-class field into a SQL table column."
 
@@ -393,7 +394,16 @@ class DataclassConverter:
 
         data_type = self.member_to_sql_data_type(typ, cls)
 
-        return Column(LocalId(field.name), data_type, nullable)
+        description = (
+            doc.params[field.name].description if field.name in doc.params else None
+        )
+
+        return Column(
+            name=LocalId(field.name),
+            data_type=data_type,
+            nullable=nullable,
+            description=description,
+        )
 
     def dataclass_to_table(self, cls: type[DataclassInstance]) -> Table:
         "Converts a data-class with a primary key into a SQL table type."
@@ -401,9 +411,11 @@ class DataclassConverter:
         if not is_dataclass_type(cls):
             raise TypeError("expected: dataclass type")
 
+        doc = parse_type(cls)
+
         try:
             columns = [
-                self.member_to_column(field, cls)
+                self.member_to_column(field, cls, doc)
                 for field in dataclass_fields(cls)
                 if not is_generic_list(field.type)
             ]
@@ -438,15 +450,16 @@ class DataclassConverter:
                     )
 
         return Table(
-            QualifiedId(self.namespace, cls.__name__),
-            columns,
-            _dataclass_primary_key_name(cls),
-            constraints if constraints else None,
+            name=QualifiedId(self.namespace, cls.__name__),
+            columns=columns,
+            primary_key=_dataclass_primary_key_name(cls),
+            constraints=constraints if constraints else None,
+            description=doc.full_description,
         )
 
     def member_to_field(
-        self, field: DataclassField, cls: type[DataclassInstance]
-    ) -> SqlDataType:
+        self, field: DataclassField, cls: type[DataclassInstance], doc: Docstring
+    ) -> StructMember:
         "Converts a data-class field into a SQL struct (composite type) field."
 
         props = get_field_properties(field.type)
@@ -455,20 +468,36 @@ class DataclassConverter:
         if is_type_optional(typ):
             typ = unwrap_optional_type(typ)
 
-        return self.member_to_sql_data_type(typ, cls)
+        description = (
+            doc.params[field.name].description if field.name in doc.params else None
+        )
+
+        return StructMember(
+            name=LocalId(field.name),
+            data_type=self.member_to_sql_data_type(typ, cls),
+            description=description,
+        )
 
     def dataclass_to_struct(self, cls: type[DataclassInstance]) -> StructType:
         "Converts a data-class without a primary key into a SQL struct type."
 
+        if not is_dataclass_type(cls):
+            raise TypeError("expected: dataclass type")
+
+        doc = parse_type(cls)
+
         try:
             members = [
-                StructMember(LocalId(field.name), self.member_to_field(field, cls))
-                for field in dataclass_fields(cls)
+                self.member_to_field(field, cls, doc) for field in dataclass_fields(cls)
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
 
-        return StructType(QualifiedId(self.namespace, cls.__name__), members)
+        return StructType(
+            name=QualifiedId(self.namespace, cls.__name__),
+            members=members,
+            description=doc.full_description,
+        )
 
 
 def dataclass_to_table(

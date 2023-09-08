@@ -77,4 +77,4 @@ class Reflection:
             "ORDER BY col.ordinal_position",
         )
         primary_keys = [r[0] for r in primary_records]
-        return Table(id, columns, LocalId(primary_keys[0]))
+        return Table(name=id, columns=columns, primary_key=LocalId(primary_keys[0]))

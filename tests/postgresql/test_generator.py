@@ -8,14 +8,14 @@ from tests.tables import *
 Generator = get_engine("postgresql").get_generator_type()
 
 
-def get_create_table(table: type) -> str:
+def get_create_stmt(table: type) -> str:
     generator = Generator(table)
-    return generator.get_create_table_stmt().rstrip()
+    return generator.get_create_stmt()
 
 
-def get_insert(table: type) -> str:
+def get_insert_stmt(table: type) -> str:
     generator = Generator(table)
-    return generator.get_upsert_stmt().rstrip()
+    return generator.get_upsert_stmt()
 
 
 class TestGenerator(unittest.TestCase):
@@ -40,7 +40,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(NumericTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(NumericTable), "\n".join(lines))
 
     def test_create_string_table(self) -> None:
         lines = [
@@ -53,7 +53,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(StringTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(StringTable), "\n".join(lines))
 
     def test_create_date_time_table(self) -> None:
         lines = [
@@ -66,7 +66,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(DateTimeTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(DateTimeTable), "\n".join(lines))
 
     def test_create_enum_table(self) -> None:
         lines = [
@@ -77,7 +77,7 @@ class TestGenerator(unittest.TestCase):
             """CONSTRAINT "ch_EnumTable_state" CHECK ("state" IN ('active', 'inactive', 'deleted'))""",
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(EnumTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(EnumTable), "\n".join(lines))
 
     def test_create_ipaddress_table(self) -> None:
         lines = [
@@ -88,7 +88,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(IPAddressTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(IPAddressTable), "\n".join(lines))
 
     def test_create_primary_key_table(self) -> None:
         lines = [
@@ -98,7 +98,32 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_table(DataTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(DataTable), "\n".join(lines))
+
+    def test_create_table_with_description(self) -> None:
+        lines = [
+            'CREATE TABLE "Person" (',
+            '"id" bigint NOT NULL,',
+            '"address" bigint NOT NULL,',
+            'PRIMARY KEY ("id"),',
+            'CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")',
+            ");",
+            """COMMENT ON TABLE "Person" IS 'A person.';""",
+            """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
+        ]
+        self.assertMultiLineEqual(get_create_stmt(Person), "\n".join(lines))
+
+    def test_create_type_with_description(self) -> None:
+        lines = [
+            'CREATE TYPE "Coordinates" AS (',
+            '"lat" double precision,',
+            '"long" double precision',
+            ");",
+            """COMMENT ON TYPE "Coordinates" IS 'Coordinates in the geographic coordinate system.';""",
+            """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
+            """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
+        ]
+        self.assertMultiLineEqual(get_create_stmt(Coordinates), "\n".join(lines))
 
     def test_insert(self) -> None:
         lines = [
@@ -107,7 +132,7 @@ class TestGenerator(unittest.TestCase):
             'ON CONFLICT("id") DO UPDATE SET',
             '"data" = EXCLUDED."data"',
         ]
-        self.assertMultiLineEqual(get_insert(DataTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_insert_stmt(DataTable), "\n".join(lines))
 
         lines = [
             'INSERT INTO "DateTimeTable"',
@@ -118,7 +143,7 @@ class TestGenerator(unittest.TestCase):
             '"iso_time" = EXCLUDED."iso_time",',
             '"optional_date_time" = EXCLUDED."optional_date_time"',
         ]
-        self.assertMultiLineEqual(get_insert(DateTimeTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_insert_stmt(DateTimeTable), "\n".join(lines))
 
     def test_table_data(self) -> None:
         generator = Generator(DataTable)

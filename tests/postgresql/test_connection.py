@@ -34,7 +34,7 @@ class TestConnection(TimedAsyncioTestCase):
             await conn.drop_table(DataTable, ignore_missing=True)
 
             generator = engine.create_generator(DataTable)
-            statement = generator.get_create_table_stmt()
+            statement = generator.get_create_stmt()
             await conn.execute(statement)
             statement = generator.get_upsert_stmt()
             records = generator.get_records_as_tuples(
@@ -47,7 +47,7 @@ class TestConnection(TimedAsyncioTestCase):
             await conn.drop_table(DataTable, ignore_missing=True)
 
             generator = engine.create_generator(DataTable)
-            statement = generator.get_create_table_stmt()
+            statement = generator.get_create_stmt()
             await conn.execute(statement)
             statement = generator.get_upsert_stmt()
             for i in range(10):

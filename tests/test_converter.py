@@ -6,13 +6,14 @@ from pysqlsync.formation.converter import (
     dataclass_to_table,
     module_to_sql,
 )
-from pysqlsync.formation.object_types import Column, LocalId, StructMember
+from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.model.data_types import (
     SqlCharacterType,
     SqlDoubleType,
     SqlIntegerType,
     SqlUuidType,
 )
+from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.model.properties import PrimaryKey
 
 
@@ -30,23 +31,30 @@ class TestConverter(unittest.TestCase):
 
     def test_foreign_key(self) -> None:
         table_def = dataclass_to_table(tables.Person)
+        self.assertEqual(table_def.name, QualifiedId(None, "Person"))
+        self.assertEqual(table_def.description, "A person.")
         self.assertListEqual(
+            table_def.columns,
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("address"), SqlIntegerType(8), False),
+                Column(
+                    LocalId("address"),
+                    SqlIntegerType(8),
+                    False,
+                    "The address of the person's permanent residence.",
+                ),
             ],
-            table_def.columns,
         )
 
     def test_recursive_table(self) -> None:
         table_def = dataclass_to_table(tables.Employee)
         self.assertListEqual(
+            table_def.columns,
             [
                 Column(LocalId("id"), SqlUuidType(), False),
                 Column(LocalId("name"), SqlCharacterType(), False),
                 Column(LocalId("reports_to"), SqlUuidType(), False),
             ],
-            table_def.columns,
         )
 
     def test_module(self) -> None:
@@ -55,12 +63,15 @@ class TestConverter(unittest.TestCase):
 
     def test_struct(self) -> None:
         struct_def = dataclass_to_struct(tables.Coordinates)
+        self.assertEqual(
+            struct_def.description, "Coordinates in the geographic coordinate system."
+        )
         self.assertListEqual(
-            [
-                StructMember(LocalId("lat"), SqlDoubleType()),
-                StructMember(LocalId("long"), SqlDoubleType()),
-            ],
             struct_def.members,
+            [
+                StructMember(LocalId("lat"), SqlDoubleType(), "Latitude in degrees."),
+                StructMember(LocalId("long"), SqlDoubleType(), "Longitude in degrees."),
+            ],
         )
 
 

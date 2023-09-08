@@ -112,12 +112,25 @@ class Address:
 
 @dataclass
 class Person:
+    """
+    A person.
+
+    :param address: The address of the person's permanent residence.
+    """
+
     id: PrimaryKey[int]
     address: Address
 
 
 @dataclass
 class Coordinates:
+    """
+    Coordinates in the geographic coordinate system.
+
+    :param lat: Latitude in degrees.
+    :param long: Longitude in degrees.
+    """
+
     lat: float
     long: float
 

@@ -32,6 +32,7 @@ class EnumType:
 class StructMember:
     name: LocalId
     data_type: SqlDataType
+    description: Optional[str] = None
 
     def __str__(self) -> str:
         return f"{self.name} {self.data_type}"
@@ -41,10 +42,11 @@ class StructMember:
 class StructType:
     name: QualifiedId
     members: list[StructMember]
+    description: Optional[str] = None
 
     def __str__(self) -> str:
-        members = ", ".join(str(m) for m in self.members)
-        return f"CREATE TYPE {self.name} AS ({members});"
+        members = ",\n".join(str(m) for m in self.members)
+        return f"CREATE TYPE {self.name} AS (\n{members}\n);"
 
 
 @dataclass
@@ -52,11 +54,7 @@ class Column:
     name: LocalId
     data_type: SqlDataType
     nullable: bool
-
-    def __init__(self, name: LocalId, data_type: SqlDataType, nullable: bool) -> None:
-        self.name = name
-        self.data_type = data_type
-        self.nullable = nullable
+    description: Optional[str] = None
 
     def __str__(self) -> str:
         if self.nullable:
@@ -94,6 +92,7 @@ class Table:
     columns: list[Column]
     primary_key: LocalId
     constraints: Optional[list[Constraint]] = None
+    description: Optional[str] = None
 
     def __str__(self) -> str:
         defs: list[str] = []

@@ -35,7 +35,7 @@ class BaseGenerator(abc.ABC):
         self.cls = cls
 
     @abc.abstractmethod
-    def get_create_table_stmt(self) -> str:
+    def get_create_stmt(self) -> str:
         ...
 
     @abc.abstractmethod
@@ -128,7 +128,7 @@ class BaseContext(abc.ABC):
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator_type(table)
-        statement = generator.get_create_table_stmt()
+        statement = generator.get_create_stmt()
         await self.execute(statement)
 
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
