@@ -7,7 +7,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Any, Iterable, Optional, TypeGuard
+from typing import Any, Iterable, Optional, TypeGuard, TypeVar
 
 from strong_typing.auxiliary import (
     float32,
@@ -27,10 +27,12 @@ from strong_typing.inspection import (
     is_dataclass_type,
     is_generic_list,
     is_type_enum,
+    is_type_literal,
     is_type_optional,
     is_type_union,
     unwrap_annotated_type,
     unwrap_generic_list,
+    unwrap_literal_types,
     unwrap_optional_type,
     unwrap_union_types,
 )
@@ -52,6 +54,8 @@ from .object_types import (
     quote,
 )
 
+T = TypeVar("T")
+
 
 def _evaluate_type(typ: Any, cls: type) -> Any:
     """
@@ -70,6 +74,16 @@ def _evaluate_type(typ: Any, cls: type) -> Any:
         )
     else:
         return typ
+
+
+def is_unique(items: Iterable[T]) -> bool:
+    "Uniqueness check of unhashable iterables."
+
+    unique: list[T] = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return len(unique) == 1
 
 
 @dataclass
@@ -317,6 +331,14 @@ class DataclassConverter:
                 return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
         if isinstance(typ, typing.ForwardRef):
             return self.member_to_sql_data_type(_evaluate_type(typ, cls), cls)
+        if is_type_literal(typ):
+            literal_types = unwrap_literal_types(typ)
+            sql_literal_types = [
+                self.member_to_sql_data_type(t, cls) for t in literal_types
+            ]
+            if not is_unique(sql_literal_types):
+                raise TypeError(f"inconsistent literal data types: {literal_types}")
+            return sql_literal_types[0]
         if is_generic_list(typ):
             item_type = unwrap_generic_list(typ)
             if is_simple_type(item_type):
@@ -341,9 +363,15 @@ class DataclassConverter:
                     raise TypeError(
                         f"mismatching key types in discriminated union of: {member_types}"
                     )
-
                 common_key_type = primary_key_types.pop()
-                return self.member_to_sql_data_type(common_key_type, typ)
+                return self.member_to_sql_data_type(common_key_type, cls)
+
+            sql_member_types = [
+                self.member_to_sql_data_type(t, cls) for t in member_types
+            ]
+            if not is_unique(sql_member_types):
+                raise TypeError(f"inconsistent union data types: {member_types}")
+            return sql_member_types[0]
         if isinstance(typ, type):
             return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
 
