@@ -26,16 +26,29 @@ def _get_extractors(class_type: type) -> tuple[Callable[[Any], Any], ...]:
     )
 
 
+@dataclass
+class GeneratorOptions:
+    namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
+        default_factory=dict
+    )
+
+
 class BaseGenerator(abc.ABC):
     "Generates SQL statements for creating or dropping tables, and inserting, updating or deleting data."
 
     cls: type
+    options: GeneratorOptions
 
-    def __init__(self, cls: type) -> None:
+    def __init__(self, cls: type, options: GeneratorOptions) -> None:
         self.cls = cls
+        self.options = options
 
     @abc.abstractmethod
     def get_create_stmt(self) -> str:
+        ...
+
+    @abc.abstractmethod
+    def get_drop_stmt(self, ignore_missing: bool) -> str:
         ...
 
     @abc.abstractmethod
@@ -52,7 +65,7 @@ class BaseGenerator(abc.ABC):
 
 
 @dataclass
-class Parameters:
+class ConnectionParameters:
     "Database connection parameters that would typically be encapsulated in a connection string."
 
     host: Optional[str]
@@ -65,11 +78,15 @@ class Parameters:
 class BaseConnection(abc.ABC):
     "An active connection to a database."
 
-    generator_type: type[BaseGenerator]
-    params: Parameters
+    create_generator: Callable[[type], BaseGenerator]
+    params: ConnectionParameters
 
-    def __init__(self, generator_type: type[BaseGenerator], params: Parameters) -> None:
-        self.generator_type = generator_type
+    def __init__(
+        self,
+        create_generator: Callable[[type], BaseGenerator],
+        params: ConnectionParameters,
+    ) -> None:
+        self.create_generator = create_generator
         self.params = params
 
     @abc.abstractmethod
@@ -113,13 +130,8 @@ class BaseContext(abc.ABC):
 
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
-
-        table_name = table.__name__
-
-        if ignore_missing:
-            statement = f'DROP TABLE IF EXISTS "{table_name}"'
-        else:
-            statement = f'DROP TABLE "{table_name}"'
+        generator = self.connection.create_generator(table)
+        statement = generator.get_drop_stmt(ignore_missing)
         await self.execute(statement)
 
     async def create_table(self, table: type) -> None:
@@ -127,7 +139,7 @@ class BaseContext(abc.ABC):
 
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
-        generator = self.connection.generator_type(table)
+        generator = self.connection.create_generator(table)
         statement = generator.get_create_stmt()
         await self.execute(statement)
 
@@ -137,7 +149,7 @@ class BaseContext(abc.ABC):
     async def upsert_data(self, table: type[T], data: Iterable[T]) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
 
-        generator = self.connection.generator_type(table)
+        generator = self.connection.create_generator(table)
         statement = generator.get_upsert_stmt()
         records = generator.get_records_as_tuples(data)
         await self.execute_all(statement, records)
@@ -154,11 +166,12 @@ class BaseEngine(abc.ABC):
     def get_connection_type(self) -> type[BaseConnection]:
         ...
 
-    def create_connection(self, params: Parameters) -> BaseConnection:
-        generator_type = self.get_generator_type()
+    def create_connection(
+        self, params: ConnectionParameters, options: GeneratorOptions
+    ) -> BaseConnection:
         connection_type = self.get_connection_type()
-        return connection_type(generator_type, params)
+        return connection_type(lambda cls: self.create_generator(cls, options), params)
 
-    def create_generator(self, cls: type) -> BaseGenerator:
+    def create_generator(self, cls: type, options: GeneratorOptions) -> BaseGenerator:
         generator_type = self.get_generator_type()
-        return generator_type(cls)
+        return generator_type(cls, options)

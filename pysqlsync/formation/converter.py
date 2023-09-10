@@ -1,7 +1,9 @@
+import dataclasses
 import datetime
 import decimal
 import inspect
 import ipaddress
+import sys
 import types
 import typing
 import uuid
@@ -25,7 +27,8 @@ from strong_typing.inspection import (
     DataclassInstance,
     dataclass_fields,
     enum_value_types,
-    evaluate_type,
+    evaluate_member_type,
+    get_referenced_types,
     is_dataclass_type,
     is_generic_list,
     is_type_enum,
@@ -78,24 +81,50 @@ def is_unique(items: Iterable[T]) -> bool:
     return len(unique) == 1
 
 
+def dataclass_fields_as_required(
+    cls: type[DataclassInstance],
+) -> Iterable[DataclassField]:
+    for field in dataclass_fields(cls):
+        yield DataclassField(
+            field.name,
+            unwrap_optional_type(field.type)
+            if is_type_optional(field.type)
+            else field.type,
+        )
+
+
+class NamespaceMapping:
+    dictionary: dict[types.ModuleType, Optional[str]]
+
+    def __init__(
+        self, dictionary: Optional[dict[types.ModuleType, Optional[str]]] = None
+    ) -> None:
+        self.dictionary = dictionary if dictionary is not None else {}
+
+    def get(self, name: str) -> Optional[str]:
+        module = sys.modules[name]
+        if module in self.dictionary:
+            return self.dictionary[module]  # include special return value `None`
+        else:
+            return module.__name__
+
+
 @dataclass
 class DataclassConverterOptions:
     enum_as_type: bool = True
     extra_numeric_types: bool = False
+    namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     user_defined_annotation_classes: tuple[type, ...] = ()
 
 
 class DataclassConverter:
-    namespace: Optional[str]
     options: DataclassConverterOptions
 
     def __init__(
         self,
         *,
-        namespace: Optional[str] = None,
         options: Optional[DataclassConverterOptions] = None,
     ):
-        self.namespace = namespace
         if options is not None:
             self.options = options
         else:
@@ -199,7 +228,11 @@ class DataclassConverter:
             value_type = value_types.pop()
 
             if self.options.enum_as_type:
-                return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
+                return SqlUserDefinedType(
+                    QualifiedId(
+                        self.options.namespaces.get(typ.__module__), typ.__name__
+                    )
+                )
             else:
                 return self.simple_type_to_sql_data_type(value_type)
 
@@ -221,9 +254,11 @@ class DataclassConverter:
             return self.member_to_sql_data_type(key_field_type, typ)
         if is_dataclass_type(typ):
             # an embedded user-defined type
-            return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
+            return SqlUserDefinedType(
+                QualifiedId(self.options.namespaces.get(typ.__module__), typ.__name__)
+            )
         if isinstance(typ, typing.ForwardRef):
-            return self.member_to_sql_data_type(evaluate_type(typ, cls), cls)
+            return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_type_literal(typ):
             literal_types = unwrap_literal_types(typ)
             sql_literal_types = [
@@ -242,11 +277,18 @@ class DataclassConverter:
                 )
             if isinstance(item_type, type):
                 return SqlArrayType(
-                    SqlUserDefinedType(QualifiedId(self.namespace, item_type.__name__))
+                    SqlUserDefinedType(
+                        QualifiedId(
+                            self.options.namespaces.get(item_type.__module__),
+                            item_type.__name__,
+                        )
+                    )
                 )
             raise TypeError(f"unsupported array data type: {item_type}")
         if is_type_union(typ):
-            member_types = [evaluate_type(t, cls) for t in unwrap_union_types(typ)]
+            member_types = [
+                evaluate_member_type(t, cls) for t in unwrap_union_types(typ)
+            ]
             if all(is_entity_type(t) for t in member_types):
                 # discriminated union type
                 primary_key_types = set(
@@ -266,7 +308,9 @@ class DataclassConverter:
                 raise TypeError(f"inconsistent union data types: {member_types}")
             return sql_member_types[0]
         if isinstance(typ, type):
-            return SqlUserDefinedType(QualifiedId(self.namespace, typ.__name__))
+            return SqlUserDefinedType(
+                QualifiedId(self.options.namespaces.get(typ.__module__), typ.__name__)
+            )
 
         raise TypeError(f"unsupported data type: {typ}")
 
@@ -317,7 +361,7 @@ class DataclassConverter:
         # table constraints
         constraints: list[Constraint] = []
 
-        for field in dataclass_fields(cls):
+        for field in dataclass_fields_as_required(cls):
             if is_entity_type(field.type):
                 # foreign keys
                 constraints.append(
@@ -325,7 +369,10 @@ class DataclassConverter:
                         LocalId(f"fk_{cls.__name__}_{field.name}"),
                         LocalId(field.name),
                         ConstraintReference(
-                            QualifiedId(self.namespace, field.type.__name__),
+                            QualifiedId(
+                                self.options.namespaces.get(field.type.__module__),
+                                field.type.__name__,
+                            ),
                             LocalId(dataclass_primary_key_name(field.type)),
                         ),
                     )
@@ -333,7 +380,7 @@ class DataclassConverter:
 
             if is_type_union(field.type):
                 member_types = [
-                    evaluate_type(t, cls) for t in unwrap_union_types(field.type)
+                    evaluate_member_type(t, cls) for t in unwrap_union_types(field.type)
                 ]
                 if all(is_entity_type(t) for t in member_types):
                     # discriminated keys
@@ -343,7 +390,10 @@ class DataclassConverter:
                             LocalId(field.name),
                             [
                                 ConstraintReference(
-                                    QualifiedId(self.namespace, t.__name__),
+                                    QualifiedId(
+                                        self.options.namespaces.get(t.__module__),
+                                        t.__name__,
+                                    ),
                                     LocalId(dataclass_primary_key_name(t)),
                                 )
                                 for t in member_types
@@ -353,7 +403,7 @@ class DataclassConverter:
 
         # checks
         if not self.options.enum_as_type:
-            for field in dataclass_fields(cls):
+            for field in dataclass_fields_as_required(cls):
                 if is_type_enum(field.type):
                     enum_values = ", ".join(quote(e.value) for e in field.type)
                     constraints.append(
@@ -364,7 +414,7 @@ class DataclassConverter:
                     )
 
         return Table(
-            name=QualifiedId(self.namespace, cls.__name__),
+            name=QualifiedId(self.options.namespaces.get(cls.__module__), cls.__name__),
             columns=columns,
             primary_key=LocalId(dataclass_primary_key_name(cls)),
             constraints=constraints if constraints else None,
@@ -408,7 +458,7 @@ class DataclassConverter:
             raise TypeError(f"error processing data-class: {cls}") from e
 
         return StructType(
-            name=QualifiedId(self.namespace, cls.__name__),
+            name=QualifiedId(self.options.namespaces.get(cls.__module__), cls.__name__),
             members=members,
             description=doc.full_description,
         )
@@ -417,7 +467,6 @@ class DataclassConverter:
 def dataclass_to_table(
     cls: type[DataclassInstance],
     *,
-    namespace: Optional[str] = None,
     options: Optional[DataclassConverterOptions] = None,
 ) -> Table:
     "Converts a data-class with a primary key into a SQL table type."
@@ -425,14 +474,13 @@ def dataclass_to_table(
     if options is None:
         options = DataclassConverterOptions(enum_as_type=True)
 
-    converter = DataclassConverter(namespace=namespace, options=options)
+    converter = DataclassConverter(options=options)
     return converter.dataclass_to_table(cls)
 
 
 def dataclass_to_struct(
     cls: type[DataclassInstance],
     *,
-    namespace: Optional[str] = None,
     options: Optional[DataclassConverterOptions] = None,
 ) -> StructType:
     "Converts a data-class without a primary key into a SQL struct type."
@@ -440,7 +488,7 @@ def dataclass_to_struct(
     if options is None:
         options = DataclassConverterOptions(enum_as_type=True)
 
-    converter = DataclassConverter(namespace=namespace, options=options)
+    converter = DataclassConverter(options=options)
     return converter.dataclass_to_struct(cls)
 
 
@@ -460,20 +508,43 @@ def module_to_sql(
 
     if options is None:
         options = DataclassConverterOptions(enum_as_type=True)
-    converter = DataclassConverter(namespace=module.__name__, options=options)
+    converter = DataclassConverter(options=options)
 
-    enums = [
-        EnumType(obj, namespace=module.__name__)
-        for name, obj in inspect.getmembers(module, is_type_enum)
+    namespace_name = options.namespaces.get(module.__name__)
+    if namespace_name is None:
+        raise ValueError(
+            f"expected: module to map to explicit database schema name: {module.__name__}"
+        )
+
+    # collect all entity types defined in this module
+    entity_types: list[type[DataclassInstance]] = [
+        obj for name, obj in inspect.getmembers(module, is_entity_type)
     ]
-    items = [obj for name, obj in inspect.getmembers(module, is_struct_type)]
-    items.sort(key=lambda obj: _has_user_defined_members(obj))
-    structs = [converter.dataclass_to_struct(item) for item in items]
-    entities = [obj for name, obj in inspect.getmembers(module, is_entity_type)]
-    tables = [converter.dataclass_to_table(cls) for cls in entities]
+
+    # collect all dependent types defined in this module
+    referenced_types: set[type] = set(entity_types)
+    for entity_type in entity_types:
+        for ref_type in get_referenced_types(entity_type):
+            if sys.modules[ref_type.__module__] is module:
+                referenced_types.add(ref_type)
+
+    # collect all enumeration types in alphabetical order
+    enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
+    enum_types.sort(key=lambda e: e.__name__)
+
+    # collect all struct types in alphabetical order
+    struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
+    struct_types.sort(
+        key=lambda obj: (not _has_user_defined_members(obj), obj.__name__)
+    )
+
+    # create database objects
+    enums = [EnumType(e, namespace=namespace_name) for e in enum_types]
+    structs = [converter.dataclass_to_struct(item) for item in struct_types]
+    tables = [converter.dataclass_to_table(cls) for cls in entity_types]
 
     # create join tables for one-to-many relationships
-    for entity in entities:
+    for entity in entity_types:
         for field in dataclass_fields(entity):
             if not is_generic_list(field.type):
                 continue
@@ -490,7 +561,7 @@ def module_to_sql(
             column_right = f"{table_right}_{primary_key_right.name}"
             tables.append(
                 Table(
-                    QualifiedId(module.__name__, f"{column_left}_{table_right}"),
+                    QualifiedId(namespace_name, f"{column_left}_{table_right}"),
                     [
                         Column(
                             LocalId("uuid"),
@@ -518,7 +589,7 @@ def module_to_sql(
                             LocalId(f"jk_{column_left}"),
                             LocalId(column_left),
                             ConstraintReference(
-                                QualifiedId(module.__name__, table_left),
+                                QualifiedId(namespace_name, table_left),
                                 primary_key_left,
                             ),
                         ),
@@ -526,7 +597,7 @@ def module_to_sql(
                             LocalId(f"jk_{column_right}"),
                             LocalId(column_right),
                             ConstraintReference(
-                                QualifiedId(module.__name__, table_right),
+                                QualifiedId(namespace_name, table_right),
                                 primary_key_right,
                             ),
                         ),
@@ -535,5 +606,5 @@ def module_to_sql(
             )
 
     return Namespace(
-        name=LocalId(module.__name__), enums=enums, structs=structs, tables=tables
+        name=LocalId(namespace_name), enums=enums, structs=structs, tables=tables
     )

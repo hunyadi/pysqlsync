@@ -56,7 +56,7 @@ class Context(BaseContext):
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
-        generator = self.connection.generator_type(table)
+        generator = self.connection.create_generator(table)
         records = generator.get_records_as_tuples(data)
         await self.native_connection.copy_records_to_table(
             table_name=table.__name__,

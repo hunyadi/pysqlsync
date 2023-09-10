@@ -1,9 +1,13 @@
 import dataclasses
+import re
+
+from pysqlsync.model.id_types import QualifiedId
 
 from ..base import BaseGenerator
 from ..formation.converter import (
     DataclassConverter,
     DataclassConverterOptions,
+    NamespaceMapping,
     is_entity_type,
     is_struct_type,
     quote,
@@ -16,16 +20,36 @@ def sql_quoted_id(name: str) -> str:
     return f'"{escaped_name}"'
 
 
-def sql_quoted_string(value: str) -> str:
-    escaped_value = value.replace("'", "''")
-    return f"'{escaped_value}'"
+_sql_quoted_str_table = str.maketrans(
+    {
+        "\\": "\\\\",
+        "'": "\\'",
+        "\b": "\\b",
+        "\f": "\\f",
+        "\n": "\\n",
+        "\r": "\\r",
+        "\t": "\\t",
+    }
+)
+
+
+def sql_quoted_string(text: str) -> str:
+    if re.search(r"[\b\f\n\r\t]", text):
+        string = text.translate(_sql_quoted_str_table)
+        return f"E'{string}'"
+    else:
+        string = text.replace("'", "''")
+        return f"'{string}'"
 
 
 class Generator(BaseGenerator):
     def get_create_stmt(self) -> str:
-        options = DataclassConverterOptions(enum_as_type=False)
+        options = DataclassConverterOptions(
+            enum_as_type=False, namespaces=NamespaceMapping(self.options.namespaces)
+        )
         converter = DataclassConverter(options=options)
 
+        # output comments for table and column objects
         output: list[str] = []
         if is_entity_type(self.cls):
             table = converter.dataclass_to_table(self.cls)
@@ -55,6 +79,15 @@ class Generator(BaseGenerator):
                     )
 
         return "\n".join(output)
+
+    def get_drop_stmt(self, ignore_missing: bool) -> str:
+        namespaces = NamespaceMapping(self.options.namespaces)
+        table = QualifiedId(namespaces.get(self.cls.__module__), self.cls.__name__)
+
+        if ignore_missing:
+            return f"DROP TABLE IF EXISTS {table}"
+        else:
+            return f"DROP TABLE {table}"
 
     def get_upsert_stmt(self) -> str:
         statements: list[str] = []

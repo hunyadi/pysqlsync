@@ -2,6 +2,8 @@ import unittest
 
 import tests.tables as tables
 from pysqlsync.formation.converter import (
+    DataclassConverterOptions,
+    NamespaceMapping,
     dataclass_to_struct,
     dataclass_to_table,
     module_to_sql,
@@ -30,7 +32,8 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_foreign_key(self) -> None:
-        table_def = dataclass_to_table(tables.Person)
+        options = DataclassConverterOptions(namespaces=NamespaceMapping({tables: None}))
+        table_def = dataclass_to_table(tables.Person, options=options)
         self.assertEqual(table_def.name, QualifiedId(None, "Person"))
         self.assertEqual(table_def.description, "A person.")
         self.assertListEqual(

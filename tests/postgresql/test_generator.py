@@ -1,21 +1,25 @@
+import ipaddress
 import typing
 import unittest
-from datetime import timezone
+from datetime import date, datetime, time, timezone
 
+import tests.tables as tables
+from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.factory import get_engine
-from tests.tables import *
 
 Generator = get_engine("postgresql").get_generator_type()
 
 
+def get_generator(table: type) -> BaseGenerator:
+    return Generator(table, GeneratorOptions(namespaces={tables: None}))
+
+
 def get_create_stmt(table: type) -> str:
-    generator = Generator(table)
-    return generator.get_create_stmt()
+    return get_generator(table).get_create_stmt()
 
 
 def get_insert_stmt(table: type) -> str:
-    generator = Generator(table)
-    return generator.get_upsert_stmt()
+    return get_generator(table).get_upsert_stmt()
 
 
 class TestGenerator(unittest.TestCase):
@@ -40,7 +44,9 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(NumericTable), "\n".join(lines))
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.NumericTable), "\n".join(lines)
+        )
 
     def test_create_string_table(self) -> None:
         lines = [
@@ -53,7 +59,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(StringTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.StringTable), "\n".join(lines))
 
     def test_create_date_time_table(self) -> None:
         lines = [
@@ -66,7 +72,9 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(DateTimeTable), "\n".join(lines))
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DateTimeTable), "\n".join(lines)
+        )
 
     def test_create_enum_table(self) -> None:
         lines = [
@@ -77,7 +85,7 @@ class TestGenerator(unittest.TestCase):
             """CONSTRAINT "ch_EnumTable_state" CHECK ("state" IN ('active', 'inactive', 'deleted'))""",
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(EnumTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.EnumTable), "\n".join(lines))
 
     def test_create_ipaddress_table(self) -> None:
         lines = [
@@ -88,7 +96,9 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(IPAddressTable), "\n".join(lines))
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.IPAddressTable), "\n".join(lines)
+        )
 
     def test_create_primary_key_table(self) -> None:
         lines = [
@@ -98,7 +108,7 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")',
             ");",
         ]
-        self.assertMultiLineEqual(get_create_stmt(DataTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.DataTable), "\n".join(lines))
 
     def test_create_table_with_description(self) -> None:
         lines = [
@@ -111,7 +121,7 @@ class TestGenerator(unittest.TestCase):
             """COMMENT ON TABLE "Person" IS 'A person.';""",
             """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
         ]
-        self.assertMultiLineEqual(get_create_stmt(Person), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.Person), "\n".join(lines))
 
     def test_create_type_with_description(self) -> None:
         lines = [
@@ -123,7 +133,7 @@ class TestGenerator(unittest.TestCase):
             """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
             """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
         ]
-        self.assertMultiLineEqual(get_create_stmt(Coordinates), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.Coordinates), "\n".join(lines))
 
     def test_insert(self) -> None:
         lines = [
@@ -132,7 +142,7 @@ class TestGenerator(unittest.TestCase):
             'ON CONFLICT("id") DO UPDATE SET',
             '"data" = EXCLUDED."data"',
         ]
-        self.assertMultiLineEqual(get_insert_stmt(DataTable), "\n".join(lines))
+        self.assertMultiLineEqual(get_insert_stmt(tables.DataTable), "\n".join(lines))
 
         lines = [
             'INSERT INTO "DateTimeTable"',
@@ -143,28 +153,34 @@ class TestGenerator(unittest.TestCase):
             '"iso_time" = EXCLUDED."iso_time",',
             '"optional_date_time" = EXCLUDED."optional_date_time"',
         ]
-        self.assertMultiLineEqual(get_insert_stmt(DateTimeTable), "\n".join(lines))
-
-    def test_table_data(self) -> None:
-        generator = Generator(DataTable)
-        self.assertEqual(
-            generator.get_record_as_tuple(DataTable(123, "abc")), (123, "abc")
+        self.assertMultiLineEqual(
+            get_insert_stmt(tables.DateTimeTable), "\n".join(lines)
         )
 
-        generator = Generator(StringTable)
+    def test_table_data(self) -> None:
+        generator = get_generator(tables.DataTable)
         self.assertEqual(
-            generator.get_record_as_tuple(StringTable(1, "abc", None, "def", None)),
+            generator.get_record_as_tuple(tables.DataTable(123, "abc")), (123, "abc")
+        )
+
+        generator = get_generator(tables.StringTable)
+        self.assertEqual(
+            generator.get_record_as_tuple(
+                tables.StringTable(1, "abc", None, "def", None)
+            ),
             (1, "abc", None, "def", None),
         )
         self.assertEqual(
-            generator.get_record_as_tuple(StringTable(2, "abc", "def", "ghi", "jkl")),
+            generator.get_record_as_tuple(
+                tables.StringTable(2, "abc", "def", "ghi", "jkl")
+            ),
             (2, "abc", "def", "ghi", "jkl"),
         )
 
-        generator = Generator(DateTimeTable)
+        generator = get_generator(tables.DateTimeTable)
         self.assertEqual(
             generator.get_record_as_tuple(
-                DateTimeTable(
+                tables.DateTimeTable(
                     1,
                     datetime(1982, 10, 23, 23, 59, 59, tzinfo=timezone.utc),
                     date(2023, 1, 1),
@@ -181,16 +197,18 @@ class TestGenerator(unittest.TestCase):
             ),
         )
 
-        generator = Generator(EnumTable)
+        generator = get_generator(tables.EnumTable)
         self.assertEqual(
-            generator.get_record_as_tuple(EnumTable(1, WorkflowState.active)),
+            generator.get_record_as_tuple(
+                tables.EnumTable(1, tables.WorkflowState.active)
+            ),
             (1, "active"),
         )
 
-        generator = Generator(IPAddressTable)
+        generator = get_generator(tables.IPAddressTable)
         self.assertEqual(
             generator.get_record_as_tuple(
-                IPAddressTable(
+                tables.IPAddressTable(
                     1,
                     typing.cast(
                         ipaddress.IPv4Address, ipaddress.ip_address("192.168.0.1")

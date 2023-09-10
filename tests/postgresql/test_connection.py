@@ -2,7 +2,8 @@ import unittest
 import uuid
 from datetime import datetime
 
-from pysqlsync.base import Parameters
+import tests.tables
+from pysqlsync.base import ConnectionParameters, GeneratorOptions
 from pysqlsync.factory import get_engine
 from tests.tables import DataTable, UserTable, WorkflowState
 from tests.timed_test import TimedAsyncioTestCase
@@ -11,10 +12,11 @@ engine = get_engine("postgresql")
 
 
 class TestConnection(TimedAsyncioTestCase):
-    params: Parameters
+    params: ConnectionParameters
 
-    def parameters(self) -> Parameters:
-        return Parameters(
+    @property
+    def parameters(self) -> ConnectionParameters:
+        return ConnectionParameters(
             host="localhost",
             port=5432,
             username="levente.hunyadi",
@@ -22,18 +24,22 @@ class TestConnection(TimedAsyncioTestCase):
             database="levente.hunyadi",
         )
 
+    @property
+    def options(self) -> GeneratorOptions:
+        return GeneratorOptions(namespaces={tests.tables: None})
+
     async def test_connection(self) -> None:
-        async with engine.create_connection(self.parameters()) as conn:
+        async with engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_table(DataTable, ignore_missing=True)
             await conn.execute(
                 'CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text)'
             )
 
     async def test_insert(self) -> None:
-        async with engine.create_connection(self.parameters()) as conn:
+        async with engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_table(DataTable, ignore_missing=True)
 
-            generator = engine.create_generator(DataTable)
+            generator = engine.create_generator(DataTable, self.options)
             statement = generator.get_create_stmt()
             await conn.execute(statement)
             statement = generator.get_upsert_stmt()
@@ -43,10 +49,12 @@ class TestConnection(TimedAsyncioTestCase):
             await conn.execute_all(statement, records)
 
     async def test_bulk_insert(self) -> None:
-        async with engine.create_connection(self.parameters()) as conn:
+        async with engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_table(DataTable, ignore_missing=True)
 
-            generator = engine.create_generator(DataTable)
+            generator = engine.create_generator(
+                DataTable, GeneratorOptions(namespaces={tests.tables: None})
+            )
             statement = generator.get_create_stmt()
             await conn.execute(statement)
             statement = generator.get_upsert_stmt()
@@ -76,7 +84,7 @@ class TestConnection(TimedAsyncioTestCase):
     async def test_dataclass_insert(self) -> None:
         data = self.get_user_data()
 
-        async with engine.create_connection(self.parameters()) as conn:
+        async with engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_table(UserTable, ignore_missing=True)
             await conn.create_table(UserTable)
             await conn.insert_data(UserTable, data)
@@ -84,7 +92,7 @@ class TestConnection(TimedAsyncioTestCase):
     async def test_dataclass_upsert(self) -> None:
         data = self.get_user_data()
 
-        async with engine.create_connection(self.parameters()) as conn:
+        async with engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_table(UserTable, ignore_missing=True)
             await conn.create_table(UserTable)
             await conn.upsert_data(UserTable, data)

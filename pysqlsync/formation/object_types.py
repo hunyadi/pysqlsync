@@ -21,7 +21,7 @@ class EnumType:
         self, enum: type[enum.Enum], *, namespace: Optional[str] = None
     ) -> None:
         self.name = QualifiedId(namespace, enum.__name__)
-        self.values = [e.name for e in enum]
+        self.values = [str(e.value) for e in enum]
 
     def __str__(self) -> str:
         vals = ", ".join(quote(val) for val in self.values)
@@ -67,6 +67,9 @@ class Column:
 class Constraint:
     name: LocalId
 
+    def is_alter_table(self) -> bool:
+        return False
+
 
 @dataclass
 class ConstraintReference:
@@ -78,6 +81,9 @@ class ConstraintReference:
 class ForeignConstraint(Constraint):
     foreign_column: LocalId
     reference: ConstraintReference
+
+    def is_alter_table(self) -> bool:
+        return True
 
     def __str__(self) -> str:
         return f"CONSTRAINT {self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.reference.table} ({self.reference.column})"
@@ -92,6 +98,9 @@ class DiscriminatedConstraint(Constraint):
 @dataclass
 class CheckConstraint(Constraint):
     condition: str
+
+    def is_alter_table(self) -> bool:
+        return True
 
     def __str__(self) -> str:
         return f"CONSTRAINT {self.name} CHECK ({self.condition})"
@@ -122,10 +131,10 @@ class Table:
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
     def alter_table_stmt(self) -> Optional[str]:
-        if self.constraints:
+        if self.constraints and any(c.is_alter_table() for c in self.constraints):
             return (
                 f"ALTER TABLE {self.name}\n"
-                + ",\n".join(f"ADD {c}" for c in self.constraints)
+                + ",\n".join(f"ADD {c}" for c in self.constraints if c.is_alter_table())
                 + "\n;"
             )
         else:
