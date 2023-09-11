@@ -11,7 +11,7 @@ from ..base import BaseConnection, BaseContext
 T = TypeVar("T")
 
 
-class Connection(BaseConnection):
+class PostgreSQLConnection(BaseConnection):
     native: asyncpg.Connection
 
     async def __aenter__(self) -> BaseContext:
@@ -22,7 +22,7 @@ class Connection(BaseConnection):
             password=self.params.password,
             database=self.params.database,
         )
-        return Context(self)
+        return PostgreSQLContext(self)
 
     async def __aexit__(
         self,
@@ -33,13 +33,13 @@ class Connection(BaseConnection):
         await self.native.close()
 
 
-class Context(BaseContext):
-    def __init__(self, connection: Connection) -> None:
+class PostgreSQLContext(BaseContext):
+    def __init__(self, connection: PostgreSQLConnection) -> None:
         super().__init__(connection)
 
     @property
     def native_connection(self) -> asyncpg.Connection:
-        return typing.cast(Connection, self.connection).native
+        return typing.cast(PostgreSQLConnection, self.connection).native
 
     async def execute(self, statement: str) -> None:
         await self.native_connection.execute(statement)

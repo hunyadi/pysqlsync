@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -158,6 +159,12 @@ class SqlIntervalType(SqlDataType):
 
 
 @dataclass
+class SqlJsonType(SqlDataType):
+    def __str__(self) -> str:
+        return "json"
+
+
+@dataclass
 class SqlUserDefinedType(SqlDataType):
     ref: QualifiedId
 
@@ -185,7 +192,7 @@ def sql_data_type_from_spec(
         return SqlFloatType()
     elif type_name == "double precision":
         return SqlDoubleType()
-    elif type_name == "numeric":
+    elif type_name == "numeric" or type_name == "decimal":
         return SqlDecimalType(numeric_precision, numeric_scale)
     elif type_name == "timestamp" or type_name == "timestamp without time zone":
         return SqlTimestampType(timestamp_precision, False)
@@ -203,5 +210,21 @@ def sql_data_type_from_spec(
         return SqlCharacterType()
     elif type_name == "uuid":
         return SqlUuidType()
-    else:
-        raise TypeError(f"unrecognized SQL type: {type_name}")
+    elif type_name == "json" or type_name == "jsonb":
+        return SqlJsonType()
+
+    m = re.fullmatch(
+        r"^(?:decimal|numeric)[(](\d+),\s*(\d+)[)]$", type_name, re.IGNORECASE
+    )
+    if m is not None:
+        return SqlDecimalType(int(m.group(1)), int(m.group(2)))
+
+    m = re.fullmatch(r"^timestamp[(](\d+)[)]$", type_name, re.IGNORECASE)
+    if m is not None:
+        return SqlTimestampType(int(m.group(1)), False)
+
+    m = re.fullmatch(r"^varchar[(](\d+)[)]$", type_name, re.IGNORECASE)
+    if m is not None:
+        return SqlCharacterType(int(m.group(1)))
+
+    raise TypeError(f"unrecognized SQL type: {type_name}")

@@ -42,7 +42,7 @@ def sql_quoted_string(text: str) -> str:
         return f"'{string}'"
 
 
-class Generator(BaseGenerator):
+class PostgreSQLGenerator(BaseGenerator):
     def get_create_stmt(self) -> str:
         options = DataclassConverterOptions(
             enum_as_type=False, namespaces=NamespaceMapping(self.options.namespaces)
@@ -57,12 +57,12 @@ class Generator(BaseGenerator):
             output.append(str(table))
             if table.description is not None:
                 output.append(
-                    f"COMMENT ON TABLE {table.name} IS {quote(table.description)};"
+                    f"COMMENT ON TABLE {table.name} IS {sql_quoted_string(table.description)};"
                 )
             for column in table.columns:
                 if column.description is not None:
                     output.append(
-                        f"COMMENT ON COLUMN {table.name}.{column.name} IS {quote(column.description)};"
+                        f"COMMENT ON COLUMN {table.name}.{column.name} IS {sql_quoted_string(column.description)};"
                     )
         elif is_struct_type(self.cls):
             struct = converter.dataclass_to_struct(self.cls)
@@ -70,12 +70,12 @@ class Generator(BaseGenerator):
             output.append(str(struct))
             if struct.description is not None:
                 output.append(
-                    f"COMMENT ON TYPE {struct.name} IS {quote(struct.description)};"
+                    f"COMMENT ON TYPE {struct.name} IS {sql_quoted_string(struct.description)};"
                 )
             for member in struct.members:
                 if member.description is not None:
                     output.append(
-                        f"COMMENT ON COLUMN {struct.name}.{member.name} IS {quote(member.description)};"
+                        f"COMMENT ON COLUMN {struct.name}.{member.name} IS {sql_quoted_string(member.description)};"
                     )
 
         return "\n".join(output)
