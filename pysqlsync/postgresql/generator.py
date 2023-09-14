@@ -10,7 +10,6 @@ from ..formation.converter import (
     NamespaceMapping,
     is_entity_type,
     is_struct_type,
-    quote,
 )
 from ..model.properties import get_primary_key_name
 
@@ -59,7 +58,7 @@ class PostgreSQLGenerator(BaseGenerator):
                 output.append(
                     f"COMMENT ON TABLE {table.name} IS {sql_quoted_string(table.description)};"
                 )
-            for column in table.columns:
+            for column in table.columns.values():
                 if column.description is not None:
                     output.append(
                         f"COMMENT ON COLUMN {table.name}.{column.name} IS {sql_quoted_string(column.description)};"
@@ -72,7 +71,7 @@ class PostgreSQLGenerator(BaseGenerator):
                 output.append(
                     f"COMMENT ON TYPE {struct.name} IS {sql_quoted_string(struct.description)};"
                 )
-            for member in struct.members:
+            for member in struct.members.values():
                 if member.description is not None:
                     output.append(
                         f"COMMENT ON COLUMN {struct.name}.{member.name} IS {sql_quoted_string(member.description)};"

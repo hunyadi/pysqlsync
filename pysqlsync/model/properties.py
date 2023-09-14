@@ -1,20 +1,10 @@
 import dataclasses
 from dataclasses import dataclass
-from typing import Annotated, Any, TypeAlias, TypeVar
+from typing import Annotated, Any
 
 from strong_typing.inspection import get_annotation, unwrap_annotated_type
 
-T = TypeVar("T")
-
-
-class PrimaryKeyTag:
-    "Marks a field as the primary key of a table."
-
-    def __repr__(self) -> str:
-        return "PrimaryKey"
-
-
-PrimaryKey: TypeAlias = Annotated[T, PrimaryKeyTag()]
+from .key_types import PrimaryKey, PrimaryKeyTag
 
 
 def is_primary_key_type(field_type: type) -> bool:
@@ -48,7 +38,7 @@ class FieldProperties:
     """
 
     field_type: type
-    metadata: list
+    metadata: tuple[Any, ...]
     is_primary: bool
 
 
@@ -56,7 +46,7 @@ def get_field_properties(field_type: type) -> FieldProperties:
     metadata = getattr(field_type, "__metadata__", None)
     if metadata is None:
         # field has a type without annotations or constraints
-        return FieldProperties(field_type, [], False)
+        return FieldProperties(field_type, (), False)
 
     # field has a type of Annotated[T, ...]
     inner_type = unwrap_annotated_type(field_type)
@@ -65,7 +55,7 @@ def get_field_properties(field_type: type) -> FieldProperties:
     is_primary = is_primary_key_type(field_type)
 
     # filter annotations that represent constraints
-    metadata = [item for item in metadata if not is_constraint(item)]
+    metadata = tuple(item for item in metadata if not is_constraint(item))
 
     if metadata:
         # type becomes Annotated[T, ...]

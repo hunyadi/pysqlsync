@@ -558,7 +558,7 @@ def module_to_sql(
             primary_key_left = LocalId(dataclass_primary_key_name(entity))
             primary_key_right = LocalId(dataclass_primary_key_name(item_type))
             column_left = f"{table_left}_{field.name}"
-            column_right = f"{table_right}_{primary_key_right.name}"
+            column_right = f"{table_right}_{primary_key_right.id}"
             tables.append(
                 Table(
                     QualifiedId(namespace_name, f"{column_left}_{table_right}"),
@@ -583,8 +583,8 @@ def module_to_sql(
                             False,
                         ),
                     ],
-                    LocalId("uuid"),
-                    [
+                    primary_key=LocalId("uuid"),
+                    constraints=[
                         ForeignConstraint(
                             LocalId(f"jk_{column_left}"),
                             LocalId(column_left),

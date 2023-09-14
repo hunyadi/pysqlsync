@@ -38,7 +38,7 @@ class Reflection:
 
     async def get_table(self, id: QualifiedId) -> Table:
         conditions: list[str] = []
-        conditions.append(f"col.table_name = {quote(id.name)}")
+        conditions.append(f"col.table_name = {quote(id.id)}")
         if id.namespace is not None:
             conditions.append(f"col.table_schema = {quote(id.namespace)}")
         condition = " AND ".join(f"({c})" for c in conditions)

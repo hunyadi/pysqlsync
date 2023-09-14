@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 import tests.tables as tables
@@ -23,12 +24,12 @@ class TestConverter(unittest.TestCase):
     def test_primary_key(self) -> None:
         table_def = dataclass_to_table(tables.Address)
         self.assertListEqual(
+            list(table_def.columns.values()),
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
                 Column(LocalId("city"), SqlCharacterType(), False),
                 Column(LocalId("state"), SqlCharacterType(), True),
             ],
-            table_def.columns,
         )
 
     def test_foreign_key(self) -> None:
@@ -37,7 +38,7 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(table_def.name, QualifiedId(None, "Person"))
         self.assertEqual(table_def.description, "A person.")
         self.assertListEqual(
-            table_def.columns,
+            list(table_def.columns.values()),
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
                 Column(
@@ -52,7 +53,7 @@ class TestConverter(unittest.TestCase):
     def test_recursive_table(self) -> None:
         table_def = dataclass_to_table(tables.Employee)
         self.assertListEqual(
-            table_def.columns,
+            list(table_def.columns.values()),
             [
                 Column(LocalId("id"), SqlUuidType(), False),
                 Column(LocalId("name"), SqlCharacterType(), False),
@@ -70,11 +71,30 @@ class TestConverter(unittest.TestCase):
             struct_def.description, "Coordinates in the geographic coordinate system."
         )
         self.assertListEqual(
-            struct_def.members,
+            list(struct_def.members.values()),
             [
                 StructMember(LocalId("lat"), SqlDoubleType(), "Latitude in degrees."),
                 StructMember(LocalId("long"), SqlDoubleType(), "Longitude in degrees."),
             ],
+        )
+
+    def test_mutate(self) -> None:
+        source = module_to_sql(tables)
+        target = copy.deepcopy(source)
+        target.enums["WorkflowState"].values.append("unknown")
+        target.tables.remove("Employee")
+        target.tables["UserTable"].columns.remove("homepage_url")
+        target.tables["UserTable"].columns.add(
+            Column(LocalId("social_url"), SqlCharacterType(), False)
+        )
+        self.assertEqual(
+            source.mutate_stmt(target),
+            'ALTER TYPE "tests.tables"."WorkflowState"\n'
+            "ADD VALUE 'unknown';\n"
+            'ALTER TABLE "tests.tables"."UserTable"\n'
+            'DROP COLUMN "homepage_url",\n'
+            'ADD COLUMN "social_url" text NOT NULL;\n'
+            'DROP TABLE "tests.tables"."Employee";',
         )
 
 
