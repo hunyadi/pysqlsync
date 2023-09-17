@@ -43,6 +43,7 @@ from strong_typing.inspection import (
 )
 
 from ..model.data_types import *
+from ..model.id_types import GlobalId, LocalId, PrefixedId, QualifiedId
 from ..model.properties import get_field_properties
 from .inspection import (
     dataclass_primary_key_name,
@@ -52,6 +53,7 @@ from .inspection import (
     is_struct_type,
 )
 from .object_types import (
+    Catalog,
     CheckConstraint,
     Column,
     Constraint,
@@ -59,9 +61,7 @@ from .object_types import (
     DiscriminatedConstraint,
     EnumType,
     ForeignConstraint,
-    LocalId,
     Namespace,
-    QualifiedId,
     StructMember,
     StructType,
     Table,
@@ -112,7 +112,9 @@ class NamespaceMapping:
 @dataclass
 class DataclassConverterOptions:
     enum_as_type: bool = True
+    struct_as_type: bool = True
     extra_numeric_types: bool = False
+    qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     user_defined_annotation_classes: tuple[type, ...] = ()
 
@@ -130,6 +132,15 @@ class DataclassConverter:
         else:
             self.options = DataclassConverterOptions()
 
+    def create_qualified_id(
+        self, module_name: str, object_name: str
+    ) -> SupportsQualifiedId:
+        mapped_name = self.options.namespaces.get(module_name)
+        if self.options.qualified_names:
+            return QualifiedId(mapped_name, object_name)
+        else:
+            return PrefixedId(mapped_name, object_name)
+
     def simple_type_to_sql_data_type(self, typ: type) -> SqlDataType:
         if typ is bool:
             return SqlBooleanType()
@@ -140,7 +151,7 @@ class DataclassConverter:
         if typ is int8:
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(
-                    QualifiedId(None, "int1")
+                    GlobalId("int1")
                 )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
@@ -153,28 +164,28 @@ class DataclassConverter:
         if typ is uint8:
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(
-                    QualifiedId(None, "uint1")
+                    GlobalId("uint1")
                 )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
         if typ is uint16:
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(
-                    QualifiedId(None, "uint2")
+                    GlobalId("uint2")
                 )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(2)
         if typ is uint32:
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(
-                    QualifiedId(None, "uint4")
+                    GlobalId("uint4")
                 )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(4)
         if typ is uint64:
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(
-                    QualifiedId(None, "uint8")
+                    GlobalId("uint8")
                 )  # PostgreSQL extension required
             else:
                 return SqlIntegerType(8)
@@ -197,7 +208,7 @@ class DataclassConverter:
         if typ is uuid.UUID:
             return SqlUuidType()
         if typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
-            return SqlUserDefinedType(QualifiedId(None, "inet"))  # PostgreSQL only
+            return SqlUserDefinedType(GlobalId("inet"))  # PostgreSQL only
 
         metadata = getattr(typ, "__metadata__", None)
         if metadata:
@@ -229,9 +240,7 @@ class DataclassConverter:
 
             if self.options.enum_as_type:
                 return SqlUserDefinedType(
-                    QualifiedId(
-                        self.options.namespaces.get(typ.__module__), typ.__name__
-                    )
+                    self.create_qualified_id(typ.__module__, typ.__name__)
                 )
             else:
                 return self.simple_type_to_sql_data_type(value_type)
@@ -254,9 +263,12 @@ class DataclassConverter:
             return self.member_to_sql_data_type(key_field_type, typ)
         if is_dataclass_type(typ):
             # an embedded user-defined type
-            return SqlUserDefinedType(
-                QualifiedId(self.options.namespaces.get(typ.__module__), typ.__name__)
-            )
+            if self.options.struct_as_type:
+                return SqlUserDefinedType(
+                    self.create_qualified_id(typ.__module__, typ.__name__)
+                )
+            else:
+                return SqlJsonType()
         if isinstance(typ, typing.ForwardRef):
             return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_type_literal(typ):
@@ -278,9 +290,8 @@ class DataclassConverter:
             if isinstance(item_type, type):
                 return SqlArrayType(
                     SqlUserDefinedType(
-                        QualifiedId(
-                            self.options.namespaces.get(item_type.__module__),
-                            item_type.__name__,
+                        self.create_qualified_id(
+                            item_type.__module__, item_type.__name__
                         )
                     )
                 )
@@ -309,7 +320,7 @@ class DataclassConverter:
             return sql_member_types[0]
         if isinstance(typ, type):
             return SqlUserDefinedType(
-                QualifiedId(self.options.namespaces.get(typ.__module__), typ.__name__)
+                self.create_qualified_id(typ.__module__, typ.__name__)
             )
 
         raise TypeError(f"unsupported data type: {typ}")
@@ -369,9 +380,8 @@ class DataclassConverter:
                         LocalId(f"fk_{cls.__name__}_{field.name}"),
                         LocalId(field.name),
                         ConstraintReference(
-                            QualifiedId(
-                                self.options.namespaces.get(field.type.__module__),
-                                field.type.__name__,
+                            self.create_qualified_id(
+                                field.type.__module__, field.type.__name__
                             ),
                             LocalId(dataclass_primary_key_name(field.type)),
                         ),
@@ -390,10 +400,7 @@ class DataclassConverter:
                             LocalId(field.name),
                             [
                                 ConstraintReference(
-                                    QualifiedId(
-                                        self.options.namespaces.get(t.__module__),
-                                        t.__name__,
-                                    ),
+                                    self.create_qualified_id(t.__module__, t.__name__),
                                     LocalId(dataclass_primary_key_name(t)),
                                 )
                                 for t in member_types
@@ -414,7 +421,7 @@ class DataclassConverter:
                     )
 
         return Table(
-            name=QualifiedId(self.options.namespaces.get(cls.__module__), cls.__name__),
+            name=self.create_qualified_id(cls.__module__, cls.__name__),
             columns=columns,
             primary_key=LocalId(dataclass_primary_key_name(cls)),
             constraints=constraints if constraints else None,
@@ -458,9 +465,135 @@ class DataclassConverter:
             raise TypeError(f"error processing data-class: {cls}") from e
 
         return StructType(
-            name=QualifiedId(self.options.namespaces.get(cls.__module__), cls.__name__),
+            name=self.create_qualified_id(cls.__module__, cls.__name__),
             members=members,
             description=doc.full_description,
+        )
+
+    def dataclasses_to_catalog(
+        self, entity_types: list[type[DataclassInstance]]
+    ) -> Catalog:
+        # collect all dependent types
+        referenced_types: set[type] = set(entity_types)
+        for entity_type in entity_types:
+            for ref_type in get_referenced_types(entity_type):
+                referenced_types.add(ref_type)
+
+        # collect all enumeration types in alphabetical order
+        enums: dict[str, list[EnumType]] = {}
+        if self.options.enum_as_type:
+            enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
+            enum_types.sort(key=lambda e: e.__name__)
+            for enum_type in enum_types:
+                enum_defs = enums.setdefault(enum_type.__module__, [])
+                enum_defs.append(
+                    EnumType(
+                        enum_type,
+                        namespace=self.options.namespaces.get(enum_type.__module__),
+                    )
+                )
+
+        # collect all struct types in alphabetical order
+        structs: dict[str, list[StructType]] = {}
+        if self.options.struct_as_type:
+            struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
+            struct_types.sort(
+                key=lambda obj: (not _has_user_defined_members(obj), obj.__name__)
+            )
+            for struct_type in struct_types:
+                struct_defs = structs.setdefault(struct_type.__module__, [])
+                struct_defs.append(self.dataclass_to_struct(struct_type))
+
+        # create tables
+        tables: dict[str, list[Table]] = {}
+        table_types = [obj for obj in referenced_types if is_entity_type(obj)]
+        table_types.sort(key=lambda obj: obj.__name__)
+        for table_type in table_types:
+            table_defs = tables.setdefault(table_type.__module__, [])
+            table_defs.append(self.dataclass_to_table(table_type))
+
+        # create join tables for one-to-many relationships
+        for entity in table_types:
+            for field in dataclass_fields(entity):
+                if not is_generic_list(field.type):
+                    continue
+
+                item_type = unwrap_generic_list(field.type)
+                if not is_entity_type(item_type):
+                    continue
+
+                table_left = entity.__name__
+                table_right = item_type.__name__
+                primary_key_left = LocalId(dataclass_primary_key_name(entity))
+                primary_key_right = LocalId(dataclass_primary_key_name(item_type))
+                column_left = f"{table_left}_{field.name}"
+                column_right = f"{table_right}_{primary_key_right.id}"
+                table_defs = tables.setdefault(entity.__module__, [])
+                table_defs.append(
+                    Table(
+                        self.create_qualified_id(
+                            entity.__module__,
+                            f"{column_left}_{table_right}",
+                        ),
+                        [
+                            Column(
+                                LocalId("uuid"),
+                                self.member_to_sql_data_type(uuid.UUID, entity),
+                                False,
+                            ),
+                            Column(
+                                LocalId(column_left),
+                                self.member_to_sql_data_type(
+                                    dataclass_primary_key_type(entity), entity
+                                ),
+                                False,
+                            ),
+                            Column(
+                                LocalId(column_right),
+                                self.member_to_sql_data_type(
+                                    dataclass_primary_key_type(item_type), item_type
+                                ),
+                                False,
+                            ),
+                        ],
+                        primary_key=LocalId("uuid"),
+                        constraints=[
+                            ForeignConstraint(
+                                LocalId(f"jk_{column_left}"),
+                                LocalId(column_left),
+                                ConstraintReference(
+                                    self.create_qualified_id(
+                                        entity.__module__,
+                                        table_left,
+                                    ),
+                                    primary_key_left,
+                                ),
+                            ),
+                            ForeignConstraint(
+                                LocalId(f"jk_{column_right}"),
+                                LocalId(column_right),
+                                ConstraintReference(
+                                    self.create_qualified_id(
+                                        entity.__module__,
+                                        table_right,
+                                    ),
+                                    primary_key_right,
+                                ),
+                            ),
+                        ],
+                    )
+                )
+
+        return Catalog(
+            [
+                Namespace(
+                    name=LocalId(self.options.namespaces.get(module_name) or ""),
+                    enums=enums.get(module_name, []),
+                    structs=structs.get(module_name, []),
+                    tables=table_defs,
+                )
+                for module_name, table_defs in tables.items()
+            ]
         )
 
 
@@ -492,119 +625,37 @@ def dataclass_to_struct(
     return converter.dataclass_to_struct(cls)
 
 
+def module_to_catalog(
+    module: types.ModuleType,
+    *,
+    options: Optional[DataclassConverterOptions] = None,
+) -> Catalog:
+    return modules_to_catalog([module], options=options)
+
+
+def modules_to_catalog(
+    modules: list[types.ModuleType],
+    *,
+    options: Optional[DataclassConverterOptions] = None,
+) -> Catalog:
+    "Converts the entire contents of a Python module into a SQL namespace (schema)."
+
+    if options is None:
+        options = DataclassConverterOptions(enum_as_type=True, struct_as_type=True)
+
+    # collect all entity types defined in this module
+    entity_types: list[type[DataclassInstance]] = []
+    for module in modules:
+        for name, obj in inspect.getmembers(module, is_entity_type):
+            if sys.modules[obj.__module__] in modules:
+                entity_types.append(obj)
+
+    converter = DataclassConverter(options=options)
+    return converter.dataclasses_to_catalog(entity_types)
+
+
 def _has_user_defined_members(cls: type) -> bool:
     for field in dataclass_fields(cls):
         if not is_simple_type(field.type):
             return True
     return False
-
-
-def module_to_sql(
-    module: types.ModuleType,
-    *,
-    options: Optional[DataclassConverterOptions] = None,
-) -> Namespace:
-    "Converts the entire contents of a Python module into a SQL namespace (schema)."
-
-    if options is None:
-        options = DataclassConverterOptions(enum_as_type=True)
-    converter = DataclassConverter(options=options)
-
-    namespace_name = options.namespaces.get(module.__name__)
-    if namespace_name is None:
-        raise ValueError(
-            f"expected: module to map to explicit database schema name: {module.__name__}"
-        )
-
-    # collect all entity types defined in this module
-    entity_types: list[type[DataclassInstance]] = [
-        obj for name, obj in inspect.getmembers(module, is_entity_type)
-    ]
-
-    # collect all dependent types defined in this module
-    referenced_types: set[type] = set(entity_types)
-    for entity_type in entity_types:
-        for ref_type in get_referenced_types(entity_type):
-            if sys.modules[ref_type.__module__] is module:
-                referenced_types.add(ref_type)
-
-    # collect all enumeration types in alphabetical order
-    enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
-    enum_types.sort(key=lambda e: e.__name__)
-
-    # collect all struct types in alphabetical order
-    struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
-    struct_types.sort(
-        key=lambda obj: (not _has_user_defined_members(obj), obj.__name__)
-    )
-
-    # create database objects
-    enums = [EnumType(e, namespace=namespace_name) for e in enum_types]
-    structs = [converter.dataclass_to_struct(item) for item in struct_types]
-    tables = [converter.dataclass_to_table(cls) for cls in entity_types]
-
-    # create join tables for one-to-many relationships
-    for entity in entity_types:
-        for field in dataclass_fields(entity):
-            if not is_generic_list(field.type):
-                continue
-
-            item_type = unwrap_generic_list(field.type)
-            if not is_entity_type(item_type):
-                continue
-
-            table_left = entity.__name__
-            table_right = item_type.__name__
-            primary_key_left = LocalId(dataclass_primary_key_name(entity))
-            primary_key_right = LocalId(dataclass_primary_key_name(item_type))
-            column_left = f"{table_left}_{field.name}"
-            column_right = f"{table_right}_{primary_key_right.id}"
-            tables.append(
-                Table(
-                    QualifiedId(namespace_name, f"{column_left}_{table_right}"),
-                    [
-                        Column(
-                            LocalId("uuid"),
-                            converter.member_to_sql_data_type(uuid.UUID, entity),
-                            False,
-                        ),
-                        Column(
-                            LocalId(column_left),
-                            converter.member_to_sql_data_type(
-                                dataclass_primary_key_type(entity), entity
-                            ),
-                            False,
-                        ),
-                        Column(
-                            LocalId(column_right),
-                            converter.member_to_sql_data_type(
-                                dataclass_primary_key_type(item_type), item_type
-                            ),
-                            False,
-                        ),
-                    ],
-                    primary_key=LocalId("uuid"),
-                    constraints=[
-                        ForeignConstraint(
-                            LocalId(f"jk_{column_left}"),
-                            LocalId(column_left),
-                            ConstraintReference(
-                                QualifiedId(namespace_name, table_left),
-                                primary_key_left,
-                            ),
-                        ),
-                        ForeignConstraint(
-                            LocalId(f"jk_{column_right}"),
-                            LocalId(column_right),
-                            ConstraintReference(
-                                QualifiedId(namespace_name, table_right),
-                                primary_key_right,
-                            ),
-                        ),
-                    ],
-                )
-            )
-
-    return Namespace(
-        name=LocalId(namespace_name), enums=enums, structs=structs, tables=tables
-    )

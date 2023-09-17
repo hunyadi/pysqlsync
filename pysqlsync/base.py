@@ -5,9 +5,9 @@ import types
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
-from strong_typing.inspection import is_dataclass_type, is_type_enum
+from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
-T = TypeVar("T")
+T = TypeVar("T", bound=DataclassInstance)
 
 
 def _get_extractor(field_name: str, field_type: type) -> Callable[[Any], Any]:
@@ -48,7 +48,7 @@ class BaseGenerator(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def get_drop_stmt(self, ignore_missing: bool) -> str:
+    def get_drop_stmt(self) -> str:
         ...
 
     @abc.abstractmethod
@@ -125,16 +125,16 @@ class BaseContext(abc.ABC):
     ) -> None:
         ...
 
-    async def drop_table(self, table: type, ignore_missing: bool = False) -> None:
+    async def drop_table(self, table: type[DataclassInstance]) -> None:
         "Drops a database table corresponding to the dataclass type."
 
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.create_generator(table)
-        statement = generator.get_drop_stmt(ignore_missing)
+        statement = generator.get_drop_stmt()
         await self.execute(statement)
 
-    async def create_table(self, table: type) -> None:
+    async def create_table(self, table: type[DataclassInstance]) -> None:
         "Creates a database table for storing data encapsulated in the dataclass type."
 
         if not is_dataclass_type(table):
@@ -144,6 +144,8 @@ class BaseContext(abc.ABC):
         await self.execute(statement)
 
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
+        "Inserts data in the database table corresponding to the dataclass type."
+
         return await self.upsert_data(table, data)
 
     async def upsert_data(self, table: type[T], data: Iterable[T]) -> None:

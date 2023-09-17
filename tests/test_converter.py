@@ -7,17 +7,17 @@ from pysqlsync.formation.converter import (
     NamespaceMapping,
     dataclass_to_struct,
     dataclass_to_table,
-    module_to_sql,
+    module_to_catalog,
 )
 from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.model.data_types import (
     SqlCharacterType,
     SqlDoubleType,
     SqlIntegerType,
+    SqlUserDefinedType,
     SqlUuidType,
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId
-from pysqlsync.model.properties import PrimaryKey
 
 
 class TestConverter(unittest.TestCase):
@@ -61,11 +61,7 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
-    def test_module(self) -> None:
-        namespace = module_to_sql(tables)
-        print(namespace)
-
-    def test_struct(self) -> None:
+    def test_struct_definition(self) -> None:
         struct_def = dataclass_to_struct(tables.Coordinates)
         self.assertEqual(
             struct_def.description, "Coordinates in the geographic coordinate system."
@@ -78,23 +74,56 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
+    def test_struct_reference(self) -> None:
+        table_def = dataclass_to_table(
+            tables.Location, options=DataclassConverterOptions(struct_as_type=True)
+        )
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(
+                    LocalId("coords"),
+                    SqlUserDefinedType(
+                        QualifiedId(tables.__name__, tables.Coordinates.__name__)
+                    ),
+                    False,
+                ),
+            ],
+        )
+
+    def test_module(self) -> None:
+        catalog = module_to_catalog(
+            tables,
+            options=DataclassConverterOptions(enum_as_type=False, struct_as_type=False),
+        )
+        print(catalog)
+
     def test_mutate(self) -> None:
-        source = module_to_sql(tables)
+        source = module_to_catalog(
+            tables,
+            options=DataclassConverterOptions(
+                enum_as_type=True,
+                struct_as_type=True,
+                namespaces=NamespaceMapping({tables: "public"}),
+            ),
+        )
         target = copy.deepcopy(source)
-        target.enums["WorkflowState"].values.append("unknown")
-        target.tables.remove("Employee")
-        target.tables["UserTable"].columns.remove("homepage_url")
-        target.tables["UserTable"].columns.add(
+        target_ns = target.namespaces["public"]
+        target_ns.enums["WorkflowState"].values.append("unknown")
+        target_ns.tables.remove("Employee")
+        target_ns.tables["UserTable"].columns.remove("homepage_url")
+        target_ns.tables["UserTable"].columns.add(
             Column(LocalId("social_url"), SqlCharacterType(), False)
         )
         self.assertEqual(
-            source.mutate_stmt(target),
-            'ALTER TYPE "tests.tables"."WorkflowState"\n'
+            target.mutate_stmt(source),
+            'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
-            'ALTER TABLE "tests.tables"."UserTable"\n'
+            'ALTER TABLE "public"."UserTable"\n'
             'DROP COLUMN "homepage_url",\n'
             'ADD COLUMN "social_url" text NOT NULL;\n'
-            'DROP TABLE "tests.tables"."Employee";',
+            'DROP TABLE "public"."Employee";',
         )
 
 

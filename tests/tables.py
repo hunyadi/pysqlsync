@@ -104,10 +104,29 @@ class UserTable:
 
 
 @dataclass
+class Coordinates:
+    """
+    Coordinates in the geographic coordinate system.
+
+    :param lat: Latitude in degrees.
+    :param long: Longitude in degrees.
+    """
+
+    lat: float
+    long: float
+
+
+@dataclass
 class Address:
     id: PrimaryKey[int]
     city: str
     state: Optional[str] = None
+
+
+@dataclass
+class Location:
+    id: PrimaryKey[int]
+    coords: Coordinates
 
 
 @dataclass
@@ -120,19 +139,6 @@ class Person:
 
     id: PrimaryKey[int]
     address: Address
-
-
-@dataclass
-class Coordinates:
-    """
-    Coordinates in the geographic coordinate system.
-
-    :param lat: Latitude in degrees.
-    :param long: Longitude in degrees.
-    """
-
-    lat: float
-    long: float
 
 
 @dataclass

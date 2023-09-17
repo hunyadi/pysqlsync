@@ -1,4 +1,5 @@
-from ..base import BaseConnection, BaseEngine, BaseGenerator
+from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator
+
 from .connection import TrinoConnection
 from .generator import TrinoGenerator
 

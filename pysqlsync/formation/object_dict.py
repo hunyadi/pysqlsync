@@ -31,6 +31,9 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
     def __len__(self) -> int:
         return len(self._items)
 
+    def __repr__(self) -> str:
+        return repr(list(self._items.values()))
+
     @overload
     def get(self, key: str, /) -> ObjectItem | None:
         ...

@@ -4,11 +4,46 @@ from typing import Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
+class SupportsQuotedId(Protocol):
+    __slots__ = ()
+
+    @abc.abstractproperty
+    def quoted_id(self) -> str:
+        "A fully-quoted identifier."
+        ...
+
+
+@runtime_checkable
 class SupportsLocalId(Protocol):
     __slots__ = ()
 
     @abc.abstractproperty
     def local_id(self) -> str:
+        "The component of an identifier to be used in a local context, e.g. columns of a table."
+        ...
+
+    @abc.abstractproperty
+    def quoted_id(self) -> str:
+        "A fully-quoted identifier."
+        ...
+
+
+@runtime_checkable
+class SupportsQualifiedId(Protocol):
+    __slots__ = ()
+
+    @abc.abstractproperty
+    def scope_id(self) -> Optional[str]:
+        ...
+
+    @abc.abstractproperty
+    def local_id(self) -> str:
+        "The component of an identifier to be used in a local context, e.g. columns of a table."
+        ...
+
+    @abc.abstractproperty
+    def quoted_id(self) -> str:
+        "A fully-quoted identifier."
         ...
 
 
@@ -26,17 +61,17 @@ class LocalId:
     id: str
 
     @property
-    def compact_id(self) -> str:
+    def local_id(self) -> str:
         return self.id
 
     @property
-    def local_id(self) -> str:
-        return self.id
+    def quoted_id(self) -> str:
+        return '"' + self.id.replace('"', '""') + '"'
 
     def __str__(self) -> str:
         "Quotes an identifier to be embedded in a SQL statement."
 
-        return '"' + self.id.replace('"', '""') + '"'
+        return self.quoted_id
 
 
 @dataclass(frozen=True)
@@ -45,16 +80,15 @@ class PrefixedId:
     id: str
 
     @property
-    def compact_id(self) -> str:
-        return f"{self.namespace}__{self.id}"
+    def scope_id(self) -> Optional[str]:
+        return None
 
     @property
     def local_id(self) -> str:
-        return self.compact_id
+        return f"{self.namespace}__{self.id}"
 
-    def __str__(self) -> str:
-        "Quotes a qualified identifier to be embedded in a SQL statement."
-
+    @property
+    def quoted_id(self) -> str:
         if self.namespace is not None:
             return (
                 '"'
@@ -66,6 +100,11 @@ class PrefixedId:
         else:
             return '"' + self.id.replace('"', '""') + '"'
 
+    def __str__(self) -> str:
+        "Quotes a qualified identifier to be embedded in a SQL statement."
+
+        return self.quoted_id
+
 
 @dataclass(frozen=True)
 class QualifiedId:
@@ -73,16 +112,15 @@ class QualifiedId:
     id: str
 
     @property
-    def compact_id(self) -> str:
-        return f"{self.namespace}.{self.id}"
+    def scope_id(self) -> Optional[str]:
+        return self.namespace
 
     @property
     def local_id(self) -> str:
         return self.id
 
-    def __str__(self) -> str:
-        "Quotes a qualified identifier to be embedded in a SQL statement."
-
+    @property
+    def quoted_id(self) -> str:
         if self.namespace is not None:
             return (
                 '"'
@@ -93,3 +131,28 @@ class QualifiedId:
             )
         else:
             return '"' + self.id.replace('"', '""') + '"'
+
+    def __str__(self) -> str:
+        "Quotes a qualified identifier to be embedded in a SQL statement."
+
+        return self.quoted_id
+
+
+@dataclass(frozen=True)
+class GlobalId:
+    id: str
+
+    @property
+    def scope_id(self) -> Optional[str]:
+        return None
+
+    @property
+    def local_id(self) -> str:
+        return self.id
+
+    @property
+    def quoted_id(self) -> str:
+        return self.id
+
+    def __str__(self) -> str:
+        return self.id

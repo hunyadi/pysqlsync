@@ -28,8 +28,8 @@ The data-class can be defined statically in code, or generated dynamically from 
 Next, instantiate a database engine, open a connection, create the database structure (with a `CREATE TABLE` statement), and populate the database with initial data (with SQL `INSERT` or `COPY`):
 
 ```python
-engine = get_engine("postgresql")
-parameters = Parameters(
+engine = get_dialect("postgresql")
+parameters = ConnectionParameters(
     host="localhost",
     port=5432,
     username="postgres",

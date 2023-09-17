@@ -1,2 +1,4 @@
 asyncpg
+aiomysql
+aiotrino
 json_strong_typing

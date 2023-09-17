@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..model.data_types import SqlDataType
-from ..model.id_types import LocalId, QualifiedId
+from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
 
@@ -22,17 +22,11 @@ class FormationError(RuntimeError):
 
 @dataclass
 class QualifiedObject(abc.ABC):
-    name: QualifiedId
+    name: SupportsQualifiedId
 
     def check_identity(self, other: "QualifiedObject") -> None:
         if self.name != other.name:
             raise FormationError(f"object mismatch: {self.name} != {other.name}")
-
-    def check_namespace(self, namespace: LocalId) -> None:
-        if self.name.namespace != namespace.id:
-            raise FormationError(
-                f"namespace mismatch; expected: {self.name.namespace} != {namespace.id}"
-            )
 
 
 class MutableObject(abc.ABC):
@@ -45,7 +39,7 @@ class MutableObject(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def mutate_stmt(self, target: "MutableObject") -> Optional[str]:
+    def mutate_stmt(self, src: "MutableObject") -> Optional[str]:
         ...
 
 
@@ -66,11 +60,12 @@ class EnumType(QualifiedObject, MutableObject):
     def drop_stmt(self) -> str:
         return f"DROP TYPE {self.name};"
 
-    def mutate_stmt(self, other: MutableObject) -> Optional[str]:
-        target = typing.cast(EnumType, other)
-        self.check_identity(target)
+    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
+        source = typing.cast(EnumType, src)
+        target = self
+        self.check_identity(source)
 
-        source_values = set(self.values)
+        source_values = set(source.values)
         target_values = set(target.values)
 
         if source_values - target_values:
@@ -79,7 +74,7 @@ class EnumType(QualifiedObject, MutableObject):
             )
 
         return (
-            f"ALTER TYPE {self.name}\n"
+            f"ALTER TYPE {source.name}\n"
             + ",\n".join(f"ADD VALUE {quote(v)}" for v in target_values - source_values)
             + ";"
         )
@@ -105,7 +100,7 @@ class StructType(QualifiedObject, MutableObject):
 
     def __init__(
         self,
-        name: QualifiedId,
+        name: SupportsQualifiedId,
         members: list[StructMember],
         description: Optional[str] = None,
     ) -> None:
@@ -120,19 +115,20 @@ class StructType(QualifiedObject, MutableObject):
     def drop_stmt(self) -> str:
         return f"DROP TYPE {self.name};"
 
-    def mutate_stmt(self, other: MutableObject) -> Optional[str]:
-        target = typing.cast(StructType, other)
-        self.check_identity(target)
+    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
+        source = typing.cast(StructType, src)
+        target = self
+        self.check_identity(source)
 
         statements: list[str] = []
-        for source_member in self.members.values():
+        for source_member in source.members.values():
             if source_member not in target.members.values():
                 statements.append(f"DROP ATTRIBUTE {source_member.name}")
         for target_member in target.members.values():
-            if target_member not in self.members.values():
+            if target_member not in target.members.values():
                 statements.append(f"ADD ATTRIBUTE {target_member}")
         if statements:
-            return f"ALTER TYPE {self.name}\n" + ",\n".join(statements) + ";\n"
+            return f"ALTER TYPE {source.name}\n" + ",\n".join(statements) + ";\n"
         else:
             return None
 
@@ -167,16 +163,17 @@ class Column(MutableObject):
     def drop_stmt(self) -> str:
         return f"DROP COLUMN {self.name}"
 
-    def mutate_stmt(self, other: MutableObject) -> str | None:
-        target = typing.cast(Column, other)
+    def mutate_stmt(self, src: MutableObject) -> str | None:
+        source = typing.cast(Column, src)
+        target = self
 
-        if self.nullable == target.nullable and self.data_type == target.data_type:
+        if source.nullable == target.nullable and source.data_type == target.data_type:
             return None
 
-        if self.nullable and not target.nullable:
+        if source.nullable and not target.nullable:
             raise FormationError("cannot make a nullable column non-nullable")
 
-        return f"ALTER COLUMN {self.name} {target.data_spec}"
+        return f"ALTER COLUMN {source.name} {target.data_spec}"
 
 
 @dataclass
@@ -189,7 +186,7 @@ class Constraint:
 
 @dataclass
 class ConstraintReference:
-    table: QualifiedId
+    table: SupportsQualifiedId
     column: LocalId
 
 
@@ -231,7 +228,7 @@ class Table(QualifiedObject, MutableObject):
 
     def __init__(
         self,
-        name: QualifiedId,
+        name: SupportsQualifiedId,
         columns: list[Column],
         *,
         primary_key: LocalId,
@@ -263,25 +260,26 @@ class Table(QualifiedObject, MutableObject):
     def drop_stmt(self) -> str:
         return f"DROP TABLE {self.name};"
 
-    def mutate_stmt(self, other: MutableObject) -> Optional[str]:
-        target = typing.cast(Table, other)
-        self.check_identity(target)
+    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
+        source = typing.cast(Table, src)
+        target = self
+        self.check_identity(source)
 
         statements: list[str] = []
         source_column: Optional[Column]
-        for source_column in self.columns.values():
+        for source_column in source.columns.values():
             if source_column not in target.columns.values():
                 statements.append(source_column.drop_stmt())
         for target_column in target.columns.values():
-            source_column = self.columns.get(target_column.name.id)
+            source_column = source.columns.get(target_column.name.id)
             if source_column is None:
                 statements.append(target_column.create_stmt())
             else:
-                statement = source_column.mutate_stmt(target_column)
+                statement = target_column.mutate_stmt(source_column)
                 if statement:
                     statements.append(statement)
         if statements:
-            return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"
+            return f"ALTER TABLE {source.name}\n" + ",\n".join(statements) + ";"
         else:
             return None
 
@@ -315,7 +313,7 @@ def _mutate_diff(
 
     for id in source.keys():
         if id in target.keys():
-            statement = source[id].mutate_stmt(target[id])
+            statement = target[id].mutate_stmt(source[id])
             if statement:
                 statements.append(statement)
 
@@ -337,20 +335,14 @@ class Namespace(MutableObject):
         tables: list[Table],
     ) -> None:
         self.name = name
-
-        for e in enums:
-            e.check_namespace(self.name)
-        for s in structs:
-            s.check_namespace(self.name)
-        for t in tables:
-            t.check_namespace(self.name)
-
         self.enums = ObjectDict(enums)
         self.structs = ObjectDict(structs)
         self.tables = ObjectDict(tables)
 
     def create_stmt(self) -> str:
-        items = [f"CREATE SCHEMA IF NOT EXISTS {self.name};"]
+        items: list[str] = []
+        if self.name.local_id:
+            items.append(f"CREATE SCHEMA IF NOT EXISTS {self.name};")
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
@@ -358,28 +350,65 @@ class Namespace(MutableObject):
         return "\n".join(items)
 
     def drop_stmt(self) -> str:
-        return f"DROP SCHEMA {self.name};"
+        items: list[str] = []
+        items.extend(t.drop_stmt() for t in self.tables.values())
+        items.extend(s.drop_stmt() for s in self.structs.values())
+        items.extend(e.drop_stmt() for e in self.enums.values())
+        if self.name.local_id:
+            items.append(f"DROP SCHEMA {self.name};")
+        return "\n".join(items)
 
-    def mutate_stmt(self, other: MutableObject) -> Optional[str]:
-        target = typing.cast(Namespace, other)
+    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
+        source = typing.cast(Namespace, src)
+        target = self
 
-        if self.name != target.name:
-            raise FormationError(f"object mismatch: {self.name} != {target.name}")
+        if source.name != target.name:
+            raise FormationError(f"object mismatch: {source.name} != {target.name}")
 
         statements: list[str] = []
 
-        statements.extend(_create_diff(self.enums, target.enums))
-        statements.extend(_create_diff(self.structs, target.structs))
-        statements.extend(_create_diff(self.tables, target.tables))
+        statements.extend(_create_diff(source.enums, target.enums))
+        statements.extend(_create_diff(source.structs, target.structs))
+        statements.extend(_create_diff(source.tables, target.tables))
 
-        statements.extend(_mutate_diff(self.enums, target.enums))
-        statements.extend(_mutate_diff(self.structs, target.structs))
-        statements.extend(_mutate_diff(self.tables, target.tables))
+        statements.extend(_mutate_diff(source.enums, target.enums))
+        statements.extend(_mutate_diff(source.structs, target.structs))
+        statements.extend(_mutate_diff(source.tables, target.tables))
 
-        statements.extend(_drop_diff(self.tables, target.tables))
-        statements.extend(_drop_diff(self.structs, target.structs))
-        statements.extend(_drop_diff(self.enums, target.enums))
+        statements.extend(_drop_diff(source.tables, target.tables))
+        statements.extend(_drop_diff(source.structs, target.structs))
+        statements.extend(_drop_diff(source.enums, target.enums))
 
+        return "\n".join(statements)
+
+    def __str__(self) -> str:
+        return self.create_stmt()
+
+
+@dataclass
+class Catalog(MutableObject):
+    namespaces: ObjectDict[Namespace]
+
+    def __init__(
+        self,
+        namespaces: list[Namespace],
+    ) -> None:
+        self.namespaces = ObjectDict(namespaces)
+
+    def create_stmt(self) -> str:
+        return "\n".join(n.create_stmt() for n in self.namespaces.values())
+
+    def drop_stmt(self) -> str:
+        return "\n".join(n.drop_stmt() for n in self.namespaces.values())
+
+    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
+        source = typing.cast(Catalog, src)
+        target = self
+
+        statements: list[str] = []
+        statements.extend(_create_diff(source.namespaces, target.namespaces))
+        statements.extend(_mutate_diff(source.namespaces, target.namespaces))
+        statements.extend(_drop_diff(source.namespaces, target.namespaces))
         return "\n".join(statements)
 
     def __str__(self) -> str:

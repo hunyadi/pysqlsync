@@ -2,9 +2,9 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from strong_typing.auxiliary import MaxLength, Precision, TimePrecision
+from strong_typing.auxiliary import MaxLength, Precision, Storage, TimePrecision
 
-from .id_types import QualifiedId
+from .id_types import SupportsQualifiedId
 
 
 @dataclass
@@ -84,10 +84,57 @@ class SqlDecimalType(SqlDataType):
 
 
 @dataclass
-class SqlCharacterType(SqlDataType):
-    limit: Optional[int] = None
+class SqlFixedBinaryType(SqlDataType):
+    storage: Optional[int] = None
 
     def __str__(self) -> str:
+        if self.storage is not None:
+            storage = f"({self.storage})"
+        else:
+            storage = ""
+        return f"binary{storage}"
+
+
+@dataclass
+class SqlVariableBinaryType(SqlDataType):
+    storage: Optional[int] = None
+
+    def __str__(self) -> str:
+        if self.storage is not None:
+            if self.storage < 65536:
+                return f"varbinary({self.storage})"
+            elif self.storage < 16777216:
+                return "mediumblob"  # MySQL-specific
+            elif self.storage < 4294967296:
+                return "longblob"  # MySQL-specific
+            else:
+                raise ValueError(f"storage size exceeds maximum: {self.storage}")
+
+        return "varbinary"
+
+    def parse_meta(self, meta: Any) -> None:
+        if isinstance(meta, Storage):
+            self.storage = meta.bytes
+        else:
+            super().parse_meta(meta)
+
+
+@dataclass
+class SqlCharacterType(SqlDataType):
+    limit: Optional[int] = None
+    storage: Optional[int] = None
+
+    def __str__(self) -> str:
+        if self.storage is not None:
+            if self.storage < 65536:
+                return f"varchar({self.storage})"
+            elif self.storage < 16777216:
+                return "mediumtext"  # MySQL-specific
+            elif self.storage < 4294967296:
+                return "longtext"  # MySQL-specific
+            else:
+                raise ValueError(f"storage size exceeds maximum: {self.storage}")
+
         if self.limit is not None:
             return f"varchar({self.limit})"
         else:
@@ -96,6 +143,8 @@ class SqlCharacterType(SqlDataType):
     def parse_meta(self, meta: Any) -> None:
         if isinstance(meta, MaxLength):
             self.limit = meta.value
+        elif isinstance(meta, Storage):
+            self.storage = meta.bytes
         else:
             super().parse_meta(meta)
 
@@ -111,10 +160,10 @@ class SqlTimestampType(SqlDataType):
         else:
             precision = ""
         if self.with_time_zone:
-            time_zone = "with time zone"
+            time_zone = " with time zone"
         else:
-            time_zone = "without time zone"
-        return f"timestamp{precision} {time_zone}"
+            time_zone = ""  # PostgreSQL: " without time zone"
+        return f"timestamp{precision}{time_zone}"
 
     def parse_meta(self, meta: Any) -> None:
         if isinstance(meta, TimePrecision):
@@ -140,10 +189,10 @@ class SqlTimeType(SqlDataType):
         else:
             precision = ""
         if self.with_time_zone:
-            time_zone = "with time zone"
+            time_zone = " with time zone"
         else:
-            time_zone = "without time zone"
-        return f"time{precision} {time_zone}"
+            time_zone = ""  # PostgreSQL: " without time zone"
+        return f"time{precision}{time_zone}"
 
     def parse_meta(self, meta: Any) -> None:
         if isinstance(meta, TimePrecision):
@@ -166,10 +215,10 @@ class SqlJsonType(SqlDataType):
 
 @dataclass
 class SqlUserDefinedType(SqlDataType):
-    ref: QualifiedId
+    ref: SupportsQualifiedId
 
     def __str__(self) -> str:
-        return str(self.ref)
+        return self.ref.quoted_id
 
 
 def sql_data_type_from_spec(
@@ -205,10 +254,22 @@ def sql_data_type_from_spec(
     elif type_name == "time with time zone":
         return SqlTimeType(timestamp_precision, True)
     elif type_name == "varchar" or type_name == "character varying":
-        return SqlCharacterType(character_maximum_length)
+        return SqlCharacterType(limit=character_maximum_length)
     elif type_name == "text":
         return SqlCharacterType()
-    elif type_name == "uuid":
+    elif type_name == "mediumtext":  # MySQL-specific
+        return SqlCharacterType(storage=16777215)
+    elif type_name == "longtext":  # MySQL-specific
+        return SqlCharacterType(storage=4294967295)
+    elif type_name == "blob":  # MySQL-specific
+        return SqlVariableBinaryType(storage=65535)
+    elif type_name == "mediumblob":  # MySQL-specific
+        return SqlVariableBinaryType(storage=16777215)
+    elif type_name == "longblob":  # MySQL-specific
+        return SqlVariableBinaryType(storage=4294967295)
+    elif type_name == "bytea":  # PostgreSQL-specific
+        return SqlVariableBinaryType()
+    elif type_name == "uuid":  # PostgreSQL-specific
         return SqlUuidType()
     elif type_name == "json" or type_name == "jsonb":
         return SqlJsonType()

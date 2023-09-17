@@ -4,11 +4,11 @@ import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
-from strong_typing.inspection import is_dataclass_type
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from ..base import BaseConnection, BaseContext
+from pysqlsync.base import BaseConnection, BaseContext
 
-T = TypeVar("T")
+T = TypeVar("T", bound=DataclassInstance)
 
 
 class PostgreSQLConnection(BaseConnection):
@@ -42,6 +42,9 @@ class PostgreSQLContext(BaseContext):
         return typing.cast(PostgreSQLConnection, self.connection).native
 
     async def execute(self, statement: str) -> None:
+        if not statement:
+            raise ValueError("empty statement")
+
         await self.native_connection.execute(statement)
 
     async def execute_all(

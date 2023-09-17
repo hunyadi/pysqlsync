@@ -5,9 +5,9 @@ from datetime import date, datetime, time, timezone
 
 import tests.tables as tables
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.factory import get_engine
+from pysqlsync.factory import get_dialect
 
-Generator = get_engine("postgresql").get_generator_type()
+Generator = get_dialect("postgresql").get_generator_type()
 
 
 def get_generator(table: type) -> BaseGenerator:
@@ -65,10 +65,10 @@ class TestGenerator(unittest.TestCase):
         lines = [
             'CREATE TABLE "DateTimeTable" (',
             '"id" bigint NOT NULL,',
-            '"iso_date_time" timestamp without time zone NOT NULL,',
+            '"iso_date_time" timestamp NOT NULL,',
             '"iso_date" date NOT NULL,',
-            '"iso_time" time without time zone NOT NULL,',
-            '"optional_date_time" timestamp without time zone,',
+            '"iso_time" time NOT NULL,',
+            '"optional_date_time" timestamp,',
             'PRIMARY KEY ("id")',
             ");",
         ]
@@ -78,11 +78,11 @@ class TestGenerator(unittest.TestCase):
 
     def test_create_enum_table(self) -> None:
         lines = [
+            """CREATE TYPE "WorkflowState" AS ENUM ('active', 'inactive', 'deleted');""",
             'CREATE TABLE "EnumTable" (',
             '"id" bigint NOT NULL,',
-            '"state" text NOT NULL,',
-            'PRIMARY KEY ("id"),',
-            """CONSTRAINT "ch_EnumTable_state" CHECK ("state" IN ('active', 'inactive', 'deleted'))""",
+            '"state" "WorkflowState" NOT NULL,',
+            'PRIMARY KEY ("id")',
             ");",
         ]
         self.assertMultiLineEqual(get_create_stmt(tables.EnumTable), "\n".join(lines))
@@ -91,8 +91,8 @@ class TestGenerator(unittest.TestCase):
         lines = [
             'CREATE TABLE "IPAddressTable" (',
             '"id" bigint NOT NULL,',
-            '"ipv4" "inet" NOT NULL,',
-            '"ipv6" "inet" NOT NULL,',
+            '"ipv4" inet NOT NULL,',
+            '"ipv6" inet NOT NULL,',
             'PRIMARY KEY ("id")',
             ");",
         ]
@@ -112,12 +112,20 @@ class TestGenerator(unittest.TestCase):
 
     def test_create_table_with_description(self) -> None:
         lines = [
+            'CREATE TABLE "Address" (',
+            '"id" bigint NOT NULL,',
+            '"city" text NOT NULL,',
+            '"state" text,',
+            'PRIMARY KEY ("id")',
+            ");",
             'CREATE TABLE "Person" (',
             '"id" bigint NOT NULL,',
             '"address" bigint NOT NULL,',
-            'PRIMARY KEY ("id"),',
-            'CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")',
+            'PRIMARY KEY ("id")',
             ");",
+            'ALTER TABLE "Person"',
+            'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")',
+            ";",
             """COMMENT ON TABLE "Person" IS 'A person.';""",
             """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
         ]
@@ -129,11 +137,16 @@ class TestGenerator(unittest.TestCase):
             '"lat" double precision,',
             '"long" double precision',
             ");",
+            'CREATE TABLE "Location" (',
+            '"id" bigint NOT NULL,',
+            '"coords" "Coordinates" NOT NULL,',
+            'PRIMARY KEY ("id")',
+            ");",
             """COMMENT ON TYPE "Coordinates" IS 'Coordinates in the geographic coordinate system.';""",
             """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
             """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
         ]
-        self.assertMultiLineEqual(get_create_stmt(tables.Coordinates), "\n".join(lines))
+        self.assertMultiLineEqual(get_create_stmt(tables.Location), "\n".join(lines))
 
     def test_insert(self) -> None:
         lines = [
