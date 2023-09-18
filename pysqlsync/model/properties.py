@@ -2,7 +2,7 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from strong_typing.inspection import get_annotation, unwrap_annotated_type
+from strong_typing.inspection import TypeLike, get_annotation, unwrap_annotated_type
 
 from .key_types import PrimaryKey, PrimaryKeyTag
 
@@ -32,14 +32,25 @@ class FieldProperties:
     """
     Captures type information associated with a field type.
 
-    :param field_type: Type without constraint annotations such as identity, primary key, or unique.
+    :param plain_type: Unadorned type without any metadata.
     :param metadata: Any metadata that is not a constraint such as identity, primary key or unique.
     :param is_primary: True if the field is a primary key.
     """
 
-    field_type: type
+    plain_type: TypeLike
     metadata: tuple[Any, ...]
     is_primary: bool
+
+    @property
+    def field_type(self) -> TypeLike:
+        "Type without constraint annotations such as identity, primary key, or unique."
+
+        if self.metadata:
+            # type becomes Annotated[T, ...]
+            return Annotated[(self.plain_type, *self.metadata)]
+        else:
+            # type becomes a regular type
+            return self.plain_type
 
 
 def get_field_properties(field_type: type) -> FieldProperties:
@@ -49,7 +60,7 @@ def get_field_properties(field_type: type) -> FieldProperties:
         return FieldProperties(field_type, (), False)
 
     # field has a type of Annotated[T, ...]
-    inner_type = unwrap_annotated_type(field_type)
+    plain_type = unwrap_annotated_type(field_type)
 
     # check for constraints
     is_primary = is_primary_key_type(field_type)
@@ -57,11 +68,4 @@ def get_field_properties(field_type: type) -> FieldProperties:
     # filter annotations that represent constraints
     metadata = tuple(item for item in metadata if not is_constraint(item))
 
-    if metadata:
-        # type becomes Annotated[T, ...]
-        outer_type: type = Annotated[(inner_type, *metadata)]  # type: ignore
-    else:
-        # type becomes a regular type
-        outer_type = inner_type
-
-    return FieldProperties(outer_type, metadata, is_primary)
+    return FieldProperties(plain_type, metadata, is_primary)

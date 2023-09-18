@@ -7,7 +7,8 @@ from strong_typing.inspection import DataclassInstance
 
 from pysqlsync.base import BaseConnection, BaseContext
 
-T = TypeVar("T", bound=DataclassInstance)
+D = TypeVar("D", bound=DataclassInstance)
+T = TypeVar("T")
 
 
 class MySQLConnection(BaseConnection):

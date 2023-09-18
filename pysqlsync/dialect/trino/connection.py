@@ -3,11 +3,10 @@ import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiotrino
-from strong_typing.inspection import DataclassInstance
 
 from pysqlsync.base import BaseConnection, BaseContext
 
-T = TypeVar("T", bound=DataclassInstance)
+T = TypeVar("T")
 
 
 class TrinoConnection(BaseConnection):

@@ -8,7 +8,8 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 
-T = TypeVar("T", bound=DataclassInstance)
+D = TypeVar("D", bound=DataclassInstance)
+T = TypeVar("T")
 
 
 class PostgreSQLConnection(BaseConnection):
@@ -56,7 +57,7 @@ class PostgreSQLContext(BaseContext):
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
         return [tuple(record.values()) for record in records]  # type: ignore
 
-    async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
+    async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.create_generator(table)

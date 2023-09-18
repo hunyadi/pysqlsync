@@ -17,10 +17,10 @@ class SqlDataType:
 
 @dataclass
 class SqlArrayType(SqlDataType):
-    inner_type: SqlDataType
+    element_type: SqlDataType
 
     def __str__(self) -> str:
-        return f"{self.inner_type} ARRAY"
+        return f"{self.element_type} ARRAY"
 
 
 @dataclass

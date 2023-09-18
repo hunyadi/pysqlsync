@@ -6,6 +6,7 @@ from typing import Any, TypeGuard
 
 from strong_typing.inspection import (
     DataclassInstance,
+    TypeLike,
     dataclass_fields,
     is_dataclass_type,
     is_type_enum,
@@ -81,7 +82,7 @@ def dataclass_primary_key_name(typ: type[DataclassInstance]) -> str:
     raise TypeError(f"table {typ.__name__} lacks primary key")
 
 
-def dataclass_primary_key_type(typ: type[DataclassInstance]) -> type:
+def dataclass_primary_key_type(typ: type[DataclassInstance]) -> TypeLike:
     "Extracts the primary key data type from a dataclass."
 
     for field in dataclass_fields(typ):

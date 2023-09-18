@@ -7,7 +7,8 @@ from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
-T = TypeVar("T", bound=DataclassInstance)
+D = TypeVar("D", bound=DataclassInstance)
+T = TypeVar("T")
 
 
 def _get_extractor(field_name: str, field_type: type) -> Callable[[Any], Any]:
@@ -143,12 +144,12 @@ class BaseContext(abc.ABC):
         statement = generator.get_create_stmt()
         await self.execute(statement)
 
-    async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
+    async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts data in the database table corresponding to the dataclass type."
 
         return await self.upsert_data(table, data)
 
-    async def upsert_data(self, table: type[T], data: Iterable[T]) -> None:
+    async def upsert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
 
         generator = self.connection.create_generator(table)

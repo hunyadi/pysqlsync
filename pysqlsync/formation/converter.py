@@ -25,6 +25,7 @@ from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
     DataclassField,
     DataclassInstance,
+    TypeLike,
     dataclass_fields,
     enum_value_types,
     evaluate_member_type,
@@ -141,7 +142,7 @@ class DataclassConverter:
         else:
             return PrefixedId(mapped_name, object_name)
 
-    def simple_type_to_sql_data_type(self, typ: type) -> SqlDataType:
+    def simple_type_to_sql_data_type(self, typ: TypeLike) -> SqlDataType:
         if typ is bool:
             return SqlBooleanType()
         if typ is int:
@@ -212,14 +213,14 @@ class DataclassConverter:
 
         metadata = getattr(typ, "__metadata__", None)
         if metadata:
-            inner_type = unwrap_annotated_type(typ)
-            if inner_type is str:
+            unadorned_type = unwrap_annotated_type(typ)
+            if unadorned_type is str:
                 sql_type: SqlDataType = SqlCharacterType()
-            elif inner_type is decimal.Decimal:
+            elif unadorned_type is decimal.Decimal:
                 sql_type = SqlDecimalType()
-            elif inner_type is datetime.datetime:
+            elif unadorned_type is datetime.datetime:
                 sql_type = SqlTimestampType()
-            elif inner_type is datetime.time:
+            elif unadorned_type is datetime.time:
                 sql_type = SqlTimeType()
             else:
                 raise TypeError(f"unsupported annotated Python type: {typ}")
@@ -247,7 +248,7 @@ class DataclassConverter:
 
         raise TypeError(f"not a simple type: {typ}")
 
-    def member_to_sql_data_type(self, typ: type, cls: type) -> SqlDataType:
+    def member_to_sql_data_type(self, typ: TypeLike, cls: type) -> SqlDataType:
         """
         Maps a native Python type into a SQL data type.
 
