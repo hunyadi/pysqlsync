@@ -7,7 +7,6 @@ from pysqlsync.formation.converter import (
     NamespaceMapping,
 )
 from pysqlsync.formation.object_types import Table
-from pysqlsync.model.id_types import QualifiedId
 from pysqlsync.model.properties import get_primary_key_name
 
 

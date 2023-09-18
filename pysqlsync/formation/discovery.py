@@ -80,7 +80,7 @@ class Reflection:
                         numeric_scale=numeric_scale,
                         timestamp_precision=timestamp_precision,
                     ),
-                    nullable,
+                    bool(nullable),
                 )
             )
 

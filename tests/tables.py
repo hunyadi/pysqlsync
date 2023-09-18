@@ -30,11 +30,15 @@ class WorkflowState(enum.Enum):
 
 
 @dataclass(slots=True)
-class NumericTable:
+class BooleanTable:
     id: PrimaryKey[int]
-
     boolean: bool
     nullable_boolean: Optional[bool]
+
+
+@dataclass(slots=True)
+class NumericTable:
+    id: PrimaryKey[int]
 
     signed_integer_8: int8
     signed_integer_16: int16
@@ -45,11 +49,15 @@ class NumericTable:
     unsigned_integer_32: uint32
     unsigned_integer_64: uint64
 
-    float_32: float32
-    float_64: float64
-
     integer: int
     nullable_integer: Optional[int]
+
+
+@dataclass(slots=True)
+class FloatTable:
+    id: PrimaryKey[int]
+    float_32: float32
+    float_64: float64
 
 
 @dataclass(slots=True)

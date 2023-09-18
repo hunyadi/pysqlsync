@@ -1,6 +1,6 @@
 import unittest
 
-import tests.case.connection as testcase
+import tests.cases.case_connection as testcase
 from tests.params import MySQLBase, PostgreSQLBase
 
 

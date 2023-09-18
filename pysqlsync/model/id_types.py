@@ -42,6 +42,11 @@ class SupportsQualifiedId(Protocol):
         ...
 
     @abc.abstractproperty
+    def compact_id(self) -> str:
+        "An unquoted identifier."
+        ...
+
+    @abc.abstractproperty
     def quoted_id(self) -> str:
         "A fully-quoted identifier."
         ...
@@ -88,6 +93,10 @@ class PrefixedId:
         return f"{self.namespace}__{self.id}"
 
     @property
+    def compact_id(self) -> str:
+        return self.local_id
+
+    @property
     def quoted_id(self) -> str:
         if self.namespace is not None:
             return (
@@ -120,6 +129,13 @@ class QualifiedId:
         return self.id
 
     @property
+    def compact_id(self) -> str:
+        if self.namespace is not None:
+            return f"{self.namespace}.{self.id}"
+        else:
+            return self.id
+
+    @property
     def quoted_id(self) -> str:
         if self.namespace is not None:
             return (
@@ -148,6 +164,10 @@ class GlobalId:
 
     @property
     def local_id(self) -> str:
+        return self.id
+
+    @property
+    def compact_id(self) -> str:
         return self.id
 
     @property

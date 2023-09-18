@@ -52,6 +52,31 @@ class SqlIntegerType(SqlDataType):
 
 @dataclass
 class SqlFloatType(SqlDataType):
+    """
+    Floating-point numeric type.
+
+    :param precision: Numeric precision in base 2.
+    """
+
+    precision: Optional[int] = None
+
+    def __str__(self) -> str:
+        if self.precision is not None:
+            precision = self.precision
+        else:
+            precision = 53
+
+        return f"float({precision})"
+
+    def parse_meta(self, meta: Any) -> None:
+        if isinstance(meta, Precision):
+            self.precision = meta.significant_digits
+        else:
+            super().parse_meta(meta)
+
+
+@dataclass
+class SqlRealType(SqlDataType):
     def __str__(self) -> str:
         return "real"
 
@@ -64,6 +89,13 @@ class SqlDoubleType(SqlDataType):
 
 @dataclass
 class SqlDecimalType(SqlDataType):
+    """
+    Fixed-point numeric type.
+
+    :param precision: Numeric precision in base 10.
+    :param scale: Scale in base 10.
+    """
+
     precision: Optional[int] = None
     scale: Optional[int] = None
 
@@ -231,18 +263,28 @@ def sql_data_type_from_spec(
 ) -> SqlDataType:
     if type_name == "boolean":
         return SqlBooleanType()
+    elif type_name == "tinyint":
+        return SqlIntegerType(1)
     elif type_name == "smallint":
         return SqlIntegerType(2)
-    elif type_name == "integer":
+    elif type_name == "int" or type_name == "integer":
         return SqlIntegerType(4)
     elif type_name == "bigint":
         return SqlIntegerType(8)
-    elif type_name == "real":
-        return SqlFloatType()
-    elif type_name == "double precision":
-        return SqlDoubleType()
     elif type_name == "numeric" or type_name == "decimal":
-        return SqlDecimalType(numeric_precision, numeric_scale)
+        return SqlDecimalType(numeric_precision, numeric_scale)  # precision in base 10
+    elif type_name == "real":
+        if numeric_precision is None or numeric_precision == 24:
+            return SqlRealType()
+        else:
+            return SqlFloatType(numeric_precision)  # precision in base 2
+    elif type_name == "double" or type_name == "double precision":
+        if numeric_precision is None or numeric_precision == 53:
+            return SqlDoubleType()
+        else:
+            return SqlFloatType(numeric_precision)  # precision in base 2
+    elif type_name == "float":
+        return SqlFloatType(numeric_precision)  # precision in base 2
     elif type_name == "timestamp" or type_name == "timestamp without time zone":
         return SqlTimestampType(timestamp_precision, False)
     elif type_name == "timestamp with time zone":

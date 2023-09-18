@@ -190,7 +190,7 @@ class DataclassConverter:
             else:
                 return SqlIntegerType(8)
         if typ is float32:
-            return SqlFloatType()
+            return SqlRealType()
         if typ is float64:
             return SqlDoubleType()
         if typ is str:

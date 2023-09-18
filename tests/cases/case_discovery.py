@@ -17,6 +17,10 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(namespaces={tables: None})
 
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.execute('DROP TABLE IF EXISTS "NumericTable";')
+
     async def test_tables(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             options = DataclassConverterOptions(
@@ -30,4 +34,4 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
 
             await conn.drop_table(tables.NumericTable)
 
-            self.assertEqual(table_def, table_ref)
+            self.assertMultiLineEqual(str(table_def), str(table_ref))

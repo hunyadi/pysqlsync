@@ -23,12 +23,23 @@ def get_insert_stmt(table: type) -> str:
 
 
 class TestGenerator(unittest.TestCase):
+    def test_create_boolean_table(self) -> None:
+        lines = [
+            'CREATE TABLE "BooleanTable" (',
+            '"id" bigint NOT NULL,',
+            '"boolean" boolean NOT NULL,',
+            '"nullable_boolean" boolean,',
+            'PRIMARY KEY ("id")',
+            ");",
+        ]
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.BooleanTable), "\n".join(lines)
+        )
+
     def test_create_numeric_table(self) -> None:
         lines = [
             'CREATE TABLE "NumericTable" (',
             '"id" bigint NOT NULL,',
-            '"boolean" boolean NOT NULL,',
-            '"nullable_boolean" boolean,',
             '"signed_integer_8" smallint NOT NULL,',
             '"signed_integer_16" smallint NOT NULL,',
             '"signed_integer_32" integer NOT NULL,',
@@ -37,8 +48,6 @@ class TestGenerator(unittest.TestCase):
             '"unsigned_integer_16" smallint NOT NULL,',
             '"unsigned_integer_32" integer NOT NULL,',
             '"unsigned_integer_64" bigint NOT NULL,',
-            '"float_32" real NOT NULL,',
-            '"float_64" double precision NOT NULL,',
             '"integer" bigint NOT NULL,',
             '"nullable_integer" bigint,',
             'PRIMARY KEY ("id")',
@@ -47,6 +56,17 @@ class TestGenerator(unittest.TestCase):
         self.assertMultiLineEqual(
             get_create_stmt(tables.NumericTable), "\n".join(lines)
         )
+
+    def test_create_float_table(self) -> None:
+        lines = [
+            'CREATE TABLE "FloatTable" (',
+            '"id" bigint NOT NULL,',
+            '"float_32" real NOT NULL,',
+            '"float_64" double precision NOT NULL,',
+            'PRIMARY KEY ("id")',
+            ");",
+        ]
+        self.assertMultiLineEqual(get_create_stmt(tables.FloatTable), "\n".join(lines))
 
     def test_create_string_table(self) -> None:
         lines = [

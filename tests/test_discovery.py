@@ -1,6 +1,6 @@
 import unittest
 
-import tests.case.discovery as testcase
+import tests.cases.case_discovery as testcase
 from tests.params import MySQLBase, PostgreSQLBase
 
 
