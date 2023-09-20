@@ -3,7 +3,7 @@ import enum
 import typing
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from ..model.data_types import SqlDataType
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
@@ -141,6 +141,7 @@ class Column(MutableObject):
     name: LocalId
     data_type: SqlDataType
     nullable: bool
+    default: Optional[Any] = None
     description: Optional[str] = None
 
     def __str__(self) -> str:

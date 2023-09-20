@@ -2,6 +2,7 @@ import abc
 import dataclasses
 import ipaddress
 import types
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
@@ -117,7 +118,7 @@ class BaseContext(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
         ...
 
     @abc.abstractmethod
@@ -170,11 +171,18 @@ class BaseEngine(abc.ABC):
         ...
 
     def create_connection(
-        self, params: ConnectionParameters, options: GeneratorOptions
+        self, params: ConnectionParameters, options: Optional[GeneratorOptions] = None
     ) -> BaseConnection:
+        "Opens a connection to a database server."
+
+        generator_options = options if options is not None else GeneratorOptions()
         connection_type = self.get_connection_type()
-        return connection_type(lambda cls: self.create_generator(cls, options), params)
+        return connection_type(
+            lambda cls: self.create_generator(cls, generator_options), params
+        )
 
     def create_generator(self, cls: type, options: GeneratorOptions) -> BaseGenerator:
+        "Instantiates a generator that can emit SQL statements."
+
         generator_type = self.get_generator_type()
         return generator_type(cls, options)

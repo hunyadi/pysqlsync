@@ -1,5 +1,6 @@
 import types
 import typing
+from collections.abc import Sequence
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiotrino
@@ -51,7 +52,7 @@ class TrinoContext(BaseContext):
     ) -> None:
         raise NotImplementedError()
 
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
         cur = await self.native_connection.cursor()
         await cur.execute(statement)
         records = await cur.fetchall()
