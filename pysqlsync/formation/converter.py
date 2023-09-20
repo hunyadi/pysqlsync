@@ -85,11 +85,11 @@ def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
+        data_type = unwrap_optional_type(field.type) if is_type_optional(field.type) else field.type
+        ref = evaluate_member_type(data_type, cls)
         yield DataclassField(
             field.name,
-            unwrap_optional_type(field.type)
-            if is_type_optional(field.type)
-            else field.type,
+            ref
         )
 
 
