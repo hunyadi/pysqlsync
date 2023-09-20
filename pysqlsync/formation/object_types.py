@@ -178,6 +178,12 @@ class Column(MutableObject):
 
 
 @dataclass
+class ConstraintReference:
+    table: SupportsQualifiedId
+    column: LocalId
+
+
+@dataclass
 class Constraint:
     name: LocalId
 
@@ -186,14 +192,12 @@ class Constraint:
 
 
 @dataclass
-class ConstraintReference:
-    table: SupportsQualifiedId
-    column: LocalId
+class ReferenceConstraint(Constraint):
+    foreign_column: LocalId
 
 
 @dataclass
-class ForeignConstraint(Constraint):
-    foreign_column: LocalId
+class ForeignConstraint(ReferenceConstraint):
     reference: ConstraintReference
 
     def is_alter_table(self) -> bool:
@@ -204,8 +208,7 @@ class ForeignConstraint(Constraint):
 
 
 @dataclass
-class DiscriminatedConstraint(Constraint):
-    foreign_column: LocalId
+class DiscriminatedConstraint(ReferenceConstraint):
     references: list[ConstraintReference]
 
 

@@ -1,7 +1,7 @@
 import copy
-import sys
 import unittest
 
+import tests.empty as empty
 import tests.tables as tables
 from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.formation.py_to_sql import (
@@ -11,7 +11,7 @@ from pysqlsync.formation.py_to_sql import (
     dataclass_to_table,
     module_to_catalog,
 )
-from pysqlsync.formation.sql_to_py import table_to_dataclass
+from pysqlsync.formation.sql_to_py import SqlConverterOptions, table_to_dataclass
 from pysqlsync.model.data_types import (
     SqlCharacterType,
     SqlDoubleType,
@@ -105,7 +105,7 @@ class TestConverter(unittest.TestCase):
             ),
         )
         for table in catalog.namespaces["public"].tables.values():
-            cls = table_to_dataclass(table, sys.modules[self.__module__])
+            cls = table_to_dataclass(table, SqlConverterOptions({"public": empty}))
             print(dataclass_to_code(cls))
 
     def test_mutate(self) -> None:
