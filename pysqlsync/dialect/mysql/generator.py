@@ -1,12 +1,12 @@
 import dataclasses
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.converter import (
+from pysqlsync.formation.object_types import Table
+from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
     NamespaceMapping,
 )
-from pysqlsync.formation.object_types import Table
 from pysqlsync.model.properties import get_primary_key_name
 
 

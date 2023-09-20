@@ -1,15 +1,17 @@
 import copy
+import sys
 import unittest
 
 import tests.tables as tables
-from pysqlsync.formation.converter import (
+from pysqlsync.formation.object_types import Column, StructMember
+from pysqlsync.formation.py_to_sql import (
     DataclassConverterOptions,
     NamespaceMapping,
     dataclass_to_struct,
     dataclass_to_table,
     module_to_catalog,
 )
-from pysqlsync.formation.object_types import Column, StructMember
+from pysqlsync.formation.sql_to_py import table_to_dataclass
 from pysqlsync.model.data_types import (
     SqlCharacterType,
     SqlDoubleType,
@@ -18,6 +20,7 @@ from pysqlsync.model.data_types import (
     SqlUuidType,
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId
+from pysqlsync.python_types import dataclass_to_code
 
 
 class TestConverter(unittest.TestCase):
@@ -45,7 +48,7 @@ class TestConverter(unittest.TestCase):
                     LocalId("address"),
                     SqlIntegerType(8),
                     False,
-                    "The address of the person's permanent residence.",
+                    description="The address of the person's permanent residence.",
                 ),
             ],
         )
@@ -95,9 +98,15 @@ class TestConverter(unittest.TestCase):
     def test_module(self) -> None:
         catalog = module_to_catalog(
             tables,
-            options=DataclassConverterOptions(enum_as_type=False, struct_as_type=False),
+            options=DataclassConverterOptions(
+                enum_as_type=False,
+                struct_as_type=False,
+                namespaces=NamespaceMapping({tables: "public"}),
+            ),
         )
-        print(catalog)
+        for table in catalog.namespaces["public"].tables.values():
+            cls = table_to_dataclass(table, sys.modules[self.__module__])
+            print(dataclass_to_code(cls))
 
     def test_mutate(self) -> None:
         source = module_to_catalog(

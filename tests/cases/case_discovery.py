@@ -2,13 +2,13 @@ import unittest
 
 import tests.tables as tables
 from pysqlsync.base import GeneratorOptions
-from pysqlsync.formation.converter import (
+from pysqlsync.formation.discovery import Reflection
+from pysqlsync.formation.object_types import QualifiedId
+from pysqlsync.formation.py_to_sql import (
     DataclassConverterOptions,
     NamespaceMapping,
     dataclass_to_table,
 )
-from pysqlsync.formation.discovery import Reflection
-from pysqlsync.formation.object_types import QualifiedId
 from tests.params import TestEngineBase
 
 
