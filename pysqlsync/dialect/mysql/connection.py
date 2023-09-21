@@ -59,4 +59,4 @@ class MySQLContext(BaseContext):
         cur = await self.native_connection.cursor()
         await cur.execute(statement)
         records = await cur.fetchall()
-        return [tuple(record) for record in records]  # type: ignore
+        return self._resultset_unwrap(signature, records)

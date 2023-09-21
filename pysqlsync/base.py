@@ -2,11 +2,15 @@ import abc
 import dataclasses
 import ipaddress
 import types
+import typing
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
+
+from .formation.object_types import Table
+from .model.id_types import LocalId, QualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -119,7 +123,21 @@ class BaseContext(abc.ABC):
 
     @abc.abstractmethod
     async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
+        "Run a query to produce a result-set of multiple columns."
+
         ...
+
+    def _resultset_unwrap(
+        self, signature: type[T], records: Iterable[tuple[Any, ...]]
+    ) -> Sequence[T]:
+        if signature in [bool, int, float, str]:
+            return [row[0] for row in records]
+
+        origin_type = typing.get_origin(signature)
+        if origin_type is tuple:
+            return [tuple(row) for row in records]  # type: ignore
+
+        raise TypeError(f"illegal resultset signature: {signature}")
 
     @abc.abstractmethod
     async def execute_all(
@@ -159,6 +177,29 @@ class BaseContext(abc.ABC):
         await self.execute_all(statement, records)
 
 
+class Explorer(abc.ABC):
+    conn: BaseContext
+
+    def __init__(self, conn: BaseContext) -> None:
+        self.conn = conn
+
+    @abc.abstractmethod
+    async def get_table_names(self) -> list[QualifiedId]:
+        ...
+
+    @abc.abstractmethod
+    async def has_table(self, table_id: QualifiedId) -> bool:
+        ...
+
+    @abc.abstractmethod
+    async def has_column(self, table_id: QualifiedId, column_id: LocalId) -> bool:
+        ...
+
+    @abc.abstractmethod
+    async def get_table_meta(self, table_id: QualifiedId) -> Table:
+        ...
+
+
 class BaseEngine(abc.ABC):
     "Represents a specific database server type."
 
@@ -168,6 +209,10 @@ class BaseEngine(abc.ABC):
 
     @abc.abstractmethod
     def get_connection_type(self) -> type[BaseConnection]:
+        ...
+
+    @abc.abstractmethod
+    def get_explorer_type(self) -> type[Explorer]:
         ...
 
     def create_connection(
@@ -186,3 +231,7 @@ class BaseEngine(abc.ABC):
 
         generator_type = self.get_generator_type()
         return generator_type(cls, options)
+
+    def create_explorer(self, conn: BaseContext) -> Explorer:
+        explorer_type = self.get_explorer_type()
+        return explorer_type(conn)

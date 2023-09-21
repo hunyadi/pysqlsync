@@ -56,7 +56,9 @@ class PostgreSQLContext(BaseContext):
 
     async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
-        return [tuple(record.values()) for record in records]  # type: ignore
+        return self._resultset_unwrap(
+            signature, (tuple(record.values()) for record in records)
+        )
 
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         if not is_dataclass_type(table):

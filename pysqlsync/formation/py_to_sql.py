@@ -86,15 +86,22 @@ def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
-        data_type = unwrap_optional_type(field.type) if is_type_optional(field.type) else field.type
-        ref = evaluate_member_type(data_type, cls)
-        yield DataclassField(
-            field.name,
-            ref
+        data_type = (
+            unwrap_optional_type(field.type)
+            if is_type_optional(field.type)
+            else field.type
         )
+        ref = evaluate_member_type(data_type, cls)
+        yield DataclassField(field.name, ref)
 
 
 class NamespaceMapping:
+    """
+    Associates Python modules with SQL namespaces (schemas).
+
+    :param dictionary: Maps a Python module to a SQL namespace, or `None` to use the default namespace.
+    """
+
     dictionary: dict[types.ModuleType, Optional[str]]
 
     def __init__(
@@ -112,6 +119,17 @@ class NamespaceMapping:
 
 @dataclass
 class DataclassConverterOptions:
+    """
+    Configuration options for generating a SQL table definition from a Python dataclass.
+
+    :param enum_as_type: Whether to use CREATE TYPE ... AS ENUM ( ... ) for enumeration types.
+    :param struct_as_type: Whether to use CREATE TYPE ... AS ( ... ) for non-table structure types.
+    :param extra_numeric_types: Whether to use extra numeric types like `int1` or `uint4`.
+    :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
+    :param namespaces: Maps Python modules to SQL namespaces (schemas).
+    :param user_defined_annotation_classes: Annotation classes to ignore on table column types.
+    """
+
     enum_as_type: bool = True
     struct_as_type: bool = True
     extra_numeric_types: bool = False
@@ -357,7 +375,7 @@ class DataclassConverter:
         "Converts a data-class with a primary key into a SQL table type."
 
         if not is_dataclass_type(cls):
-            raise TypeError("expected: dataclass type")
+            raise TypeError(f"expected: dataclass type; got: {cls}")
 
         doc = parse_type(cls)
 
@@ -454,7 +472,7 @@ class DataclassConverter:
         "Converts a data-class without a primary key into a SQL struct type."
 
         if not is_dataclass_type(cls):
-            raise TypeError("expected: dataclass type")
+            raise TypeError(f"expected: dataclass type; got: {cls}")
 
         doc = parse_type(cls)
 

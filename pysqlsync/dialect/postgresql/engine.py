@@ -1,6 +1,7 @@
-from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator
+from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator, Explorer
 
 from .connection import PostgreSQLConnection
+from .discovery import PostgreSQLExplorer
 from .generator import PostgreSQLGenerator
 
 
@@ -10,3 +11,6 @@ class PostgreSQLEngine(BaseEngine):
 
     def get_connection_type(self) -> type[BaseConnection]:
         return PostgreSQLConnection
+
+    def get_explorer_type(self) -> type[Explorer]:
+        return PostgreSQLExplorer

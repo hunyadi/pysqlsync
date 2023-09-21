@@ -263,13 +263,13 @@ def sql_data_type_from_spec(
 ) -> SqlDataType:
     if type_name == "boolean":
         return SqlBooleanType()
-    elif type_name == "tinyint":
+    elif type_name in ["tinyint", "int1"]:
         return SqlIntegerType(1)
-    elif type_name == "smallint":
+    elif type_name in ["smallint", "int2"]:
         return SqlIntegerType(2)
-    elif type_name == "int" or type_name == "integer":
+    elif type_name in ["integer", "int", "int4"]:
         return SqlIntegerType(4)
-    elif type_name == "bigint":
+    elif type_name in ["bigint", "int8"]:
         return SqlIntegerType(8)
     elif type_name == "numeric" or type_name == "decimal":
         return SqlDecimalType(numeric_precision, numeric_scale)  # precision in base 10

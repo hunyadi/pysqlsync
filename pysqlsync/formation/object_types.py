@@ -355,9 +355,9 @@ class Namespace(MutableObject):
 
     def drop_stmt(self) -> str:
         items: list[str] = []
-        items.extend(t.drop_stmt() for t in self.tables.values())
-        items.extend(s.drop_stmt() for s in self.structs.values())
-        items.extend(e.drop_stmt() for e in self.enums.values())
+        items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
+        items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
+        items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
         if self.name.local_id:
             items.append(f"DROP SCHEMA {self.name};")
         return "\n".join(items)
