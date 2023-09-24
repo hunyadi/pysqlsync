@@ -70,6 +70,8 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_table(UserTable)
             await conn.insert_data(UserTable, data)
+            rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(rows[0], len(data))
             await conn.drop_table(UserTable)
 
     async def test_dataclass_upsert(self) -> None:
@@ -78,4 +80,6 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_table(UserTable)
             await conn.upsert_data(UserTable, data)
+            rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(rows[0], len(data))
             await conn.drop_table(UserTable)
