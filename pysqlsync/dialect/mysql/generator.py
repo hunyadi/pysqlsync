@@ -1,4 +1,6 @@
 import dataclasses
+import uuid
+from typing import Any, Callable
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Table
@@ -7,6 +9,7 @@ from pysqlsync.formation.py_to_sql import (
     DataclassConverterOptions,
     NamespaceMapping,
 )
+from pysqlsync.model.data_types import SqlFixedBinaryType
 from pysqlsync.model.properties import get_primary_key_name
 
 
@@ -27,6 +30,7 @@ class MySQLGenerator(BaseGenerator):
                 struct_as_type=False,
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
+                substitutions={uuid.UUID: SqlFixedBinaryType(16)},
             )
         )
         self.table = self.converter.dataclass_to_table(self.cls)
@@ -59,3 +63,9 @@ class MySQLGenerator(BaseGenerator):
         ]
         statements.append(",\n".join(defs))
         return "\n".join(statements)
+
+    def get_extractor(self, field_name: str, field_type: type) -> Callable[[Any], Any]:
+        if field_type is uuid.UUID:
+            return lambda obj: getattr(obj, field_name).bytes
+
+        return super().get_extractor(field_name, field_type)

@@ -16,22 +16,6 @@ D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
 
 
-def _get_extractor(field_name: str, field_type: type) -> Callable[[Any], Any]:
-    if is_type_enum(field_type):
-        return lambda obj: getattr(obj, field_name).value
-    elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
-        return lambda obj: str(getattr(obj, field_name))
-    else:
-        return lambda obj: getattr(obj, field_name)
-
-
-def _get_extractors(class_type: type) -> tuple[Callable[[Any], Any], ...]:
-    return tuple(
-        _get_extractor(field.name, field.type)
-        for field in dataclasses.fields(class_type)
-    )
-
-
 @dataclass
 class GeneratorOptions:
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
@@ -62,12 +46,26 @@ class BaseGenerator(abc.ABC):
         ...
 
     def get_record_as_tuple(self, obj: Any) -> tuple:
-        extractors = _get_extractors(self.cls)
+        extractors = self.get_extractors(self.cls)
         return tuple(extractor(obj) for extractor in extractors)
 
     def get_records_as_tuples(self, items: Iterable[Any]) -> list[tuple]:
-        extractors = _get_extractors(self.cls)
+        extractors = self.get_extractors(self.cls)
         return [tuple(extractor(item) for extractor in extractors) for item in items]
+
+    def get_extractor(self, field_name: str, field_type: type) -> Callable[[Any], Any]:
+        if is_type_enum(field_type):
+            return lambda obj: getattr(obj, field_name).value
+        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+            return lambda obj: str(getattr(obj, field_name))
+        else:
+            return lambda obj: getattr(obj, field_name)
+
+    def get_extractors(self, class_type: type) -> tuple[Callable[[Any], Any], ...]:
+        return tuple(
+            self.get_extractor(field.name, field.type)
+            for field in dataclasses.fields(class_type)
+        )
 
 
 @dataclass

@@ -350,8 +350,17 @@ class Namespace(MutableObject):
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
-        items.extend(filter(None, (t.constraints_stmt() for t in self.tables.values())))
         return "\n".join(items)
+
+    def constraints_stmt(self) -> Optional[str]:
+        items: list[str] = []
+        for table in self.tables.values():
+            constraints = table.constraints_stmt()
+            if constraints is None:
+                continue
+            items.append(constraints)
+
+        return "\n".join(items) if items else None
 
     def drop_stmt(self) -> str:
         items: list[str] = []
@@ -402,6 +411,16 @@ class Catalog(MutableObject):
     def create_stmt(self) -> str:
         return "\n".join(n.create_stmt() for n in self.namespaces.values())
 
+    def constraints_stmt(self) -> Optional[str]:
+        items: list[str] = []
+        for namespace in self.namespaces.values():
+            constraints = namespace.constraints_stmt()
+            if constraints is None:
+                continue
+            items.append(constraints)
+
+        return "\n".join(items) if items else None
+
     def drop_stmt(self) -> str:
         return "\n".join(n.drop_stmt() for n in self.namespaces.values())
 
@@ -416,4 +435,9 @@ class Catalog(MutableObject):
         return "\n".join(statements)
 
     def __str__(self) -> str:
-        return self.create_stmt()
+        statements: list[str] = []
+        statements.append(self.create_stmt())
+        constraints = self.constraints_stmt()
+        if constraints is not None:
+            statements.append(constraints)
+        return "\n".join(statements)

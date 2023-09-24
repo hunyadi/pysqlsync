@@ -42,6 +42,7 @@ from strong_typing.inspection import (
     unwrap_optional_type,
     unwrap_union_types,
 )
+from strong_typing.topological import type_topological_sort
 
 from ..model.data_types import *
 from ..model.id_types import GlobalId, LocalId, PrefixedId, QualifiedId
@@ -127,6 +128,7 @@ class DataclassConverterOptions:
     :param extra_numeric_types: Whether to use extra numeric types like `int1` or `uint4`.
     :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
+    :param substitutions: SQL type to be substituted for a specific Python type.
     :param user_defined_annotation_classes: Annotation classes to ignore on table column types.
     """
 
@@ -135,6 +137,7 @@ class DataclassConverterOptions:
     extra_numeric_types: bool = False
     qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
+    substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     user_defined_annotation_classes: tuple[type, ...] = ()
 
 
@@ -273,6 +276,10 @@ class DataclassConverter:
         :param typ: The type to convert, typically a dataclass member type.
         :param cls: The context for the type, typically the dataclass in which the member is defined.
         """
+
+        substitute = self.options.substitutions.get(typ)
+        if substitute is not None:
+            return substitute
 
         if is_simple_type(typ):
             return self.simple_type_to_sql_data_type(typ)
@@ -516,12 +523,14 @@ class DataclassConverter:
         structs: dict[str, list[StructType]] = {}
         if self.options.struct_as_type:
             struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
-            struct_types.sort(
-                key=lambda obj: (not _has_user_defined_members(obj), obj.__name__)
-            )
-            for struct_type in struct_types:
-                struct_defs = structs.setdefault(struct_type.__module__, [])
-                struct_defs.append(self.dataclass_to_struct(struct_type))
+            struct_types.sort(key=lambda s: s.__name__)
+            depend_types = type_topological_sort(struct_types)
+            for depend_type in depend_types:
+                if depend_type not in struct_types:
+                    continue
+
+                struct_defs = structs.setdefault(depend_type.__module__, [])
+                struct_defs.append(self.dataclass_to_struct(depend_type))
 
         # create tables
         tables: dict[str, list[Table]] = {}
@@ -541,18 +550,16 @@ class DataclassConverter:
                 if not is_entity_type(item_type):
                     continue
 
-                table_left = entity.__name__
-                table_right = item_type.__name__
                 primary_key_left = LocalId(dataclass_primary_key_name(entity))
                 primary_key_right = LocalId(dataclass_primary_key_name(item_type))
-                column_left = f"{table_left}_{field.name}"
-                column_right = f"{table_right}_{primary_key_right.id}"
+                column_left = f"{entity.__name__}_{field.name}"
+                column_right = f"{item_type.__name__}_{primary_key_right.id}"
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
                     Table(
                         self.create_qualified_id(
                             entity.__module__,
-                            f"{column_left}_{table_right}",
+                            f"{column_left}_{item_type.__name__}",
                         ),
                         [
                             Column(
@@ -583,7 +590,7 @@ class DataclassConverter:
                                 ConstraintReference(
                                     self.create_qualified_id(
                                         entity.__module__,
-                                        table_left,
+                                        entity.__name__,
                                     ),
                                     primary_key_left,
                                 ),
@@ -593,8 +600,8 @@ class DataclassConverter:
                                 LocalId(column_right),
                                 ConstraintReference(
                                     self.create_qualified_id(
-                                        entity.__module__,
-                                        table_right,
+                                        item_type.__module__,
+                                        item_type.__name__,
                                     ),
                                     primary_key_right,
                                 ),
@@ -671,10 +678,3 @@ def modules_to_catalog(
 
     converter = DataclassConverter(options=options)
     return converter.dataclasses_to_catalog(entity_types)
-
-
-def _has_user_defined_members(cls: type) -> bool:
-    for field in dataclass_fields(cls):
-        if not is_simple_type(field.type):
-            return True
-    return False

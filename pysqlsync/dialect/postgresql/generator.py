@@ -58,6 +58,9 @@ class PostgreSQLGenerator(BaseGenerator):
 
         for namespace in self.catalog.namespaces.values():
             statements.append(namespace.create_stmt())
+            constraints = namespace.constraints_stmt()
+            if constraints is not None:
+                statements.append(constraints)
 
             for table in namespace.tables.values():
                 # output comments for table and column objects
