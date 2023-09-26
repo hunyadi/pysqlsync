@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional
 
 from pysqlsync.base import Explorer
@@ -11,6 +12,16 @@ from pysqlsync.formation.object_types import (
 )
 from pysqlsync.model.data_types import sql_data_type_from_spec
 from pysqlsync.model.id_types import LocalId, QualifiedId
+
+
+@dataclass
+class PostgreSQLConstraint:
+    constraint_type: str
+    constraint_name: str
+    source_column: str
+    target_namespace: str
+    target_table: str
+    target_column: str
 
 
 class PostgreSQLExplorer(Explorer):
@@ -86,7 +97,7 @@ class PostgreSQLExplorer(Explorer):
             )
 
         constraint_records = await self.conn.query_all(
-            tuple[str, str, str, str, str, str],
+            PostgreSQLConstraint,
             "SELECT\n"
             "    cons.contype AS constraint_type,\n"
             "    cons.conname AS constraint_name,\n"
@@ -116,32 +127,24 @@ class PostgreSQLExplorer(Explorer):
 
         primary_key: Optional[LocalId] = None
         constraints: dict[str, Constraint] = {}
-        for constraint_record in constraint_records:
-            (
-                constraint_type,
-                constraint_name,
-                source_column,
-                target_namespace,
-                target_table,
-                target_column,
-            ) = constraint_record
-            if constraint_type == b"p":
+        for c in constraint_records:
+            if c.constraint_type == b"p":
                 if primary_key is not None:
                     raise NotImplementedError(
                         f"composite primary key in table: {table_id}"
                     )
-                primary_key = LocalId(source_column)
-            elif constraint_type == b"f":
-                if constraint_name in constraints:
+                primary_key = LocalId(c.source_column)
+            elif c.constraint_type == b"f":
+                if c.constraint_name in constraints:
                     raise NotImplementedError(
                         f"composite foreign key in table: {table_id}"
                     )
-                constraints[constraint_name] = ForeignConstraint(
-                    LocalId(constraint_name),
-                    LocalId(source_column),
+                constraints[c.constraint_name] = ForeignConstraint(
+                    LocalId(c.constraint_name),
+                    LocalId(c.source_column),
                     ConstraintReference(
-                        QualifiedId(target_namespace, target_table),
-                        LocalId(target_column),
+                        QualifiedId(c.target_namespace, c.target_table),
+                        LocalId(c.target_column),
                     ),
                 )
 

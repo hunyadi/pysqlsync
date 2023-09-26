@@ -3,7 +3,6 @@ import dataclasses
 import ipaddress
 import types
 import typing
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
@@ -120,16 +119,29 @@ class BaseContext(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
         "Run a query to produce a result-set of multiple columns."
 
         ...
 
-    def _resultset_unwrap(
+    def _resultset_unwrap_dict(
+        self, signature: D, records: Iterable[dict[str, Any]]
+    ) -> list[D]:
+        if is_dataclass_type(signature):
+            return [signature(**{name: value for name, value in record.items()}) for record in records]  # type: ignore
+
+        raise TypeError(f"illegal resultset signature: {signature}")
+
+    def _resultset_unwrap_tuple(
         self, signature: type[T], records: Iterable[tuple[Any, ...]]
-    ) -> Sequence[T]:
+    ) -> list[T]:
         if signature in [bool, int, float, str]:
             return [row[0] for row in records]
+
+        if is_dataclass_type(signature):
+            raise TypeError(
+                f"data-class type expects dictionary of records: {signature}"
+            )
 
         origin_type = typing.get_origin(signature)
         if origin_type is tuple:

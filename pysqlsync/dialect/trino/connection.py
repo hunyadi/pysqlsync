@@ -1,9 +1,9 @@
 import types
 import typing
-from collections.abc import Sequence
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiotrino
+from strong_typing.inspection import is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 
@@ -52,11 +52,14 @@ class TrinoContext(BaseContext):
     ) -> None:
         raise NotImplementedError()
 
-    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        if is_dataclass_type(signature):
+            raise NotImplementedError()
+
         cur = await self.native_connection.cursor()
         await cur.execute(statement)
         records = await cur.fetchall()
-        return self._resultset_unwrap(signature, records)
+        return self._resultset_unwrap_tuple(signature, records)
 
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
         raise NotImplementedError()

@@ -1,10 +1,9 @@
 import types
 import typing
-from collections.abc import Sequence
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiomysql
-from strong_typing.inspection import DataclassInstance
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 
@@ -55,8 +54,14 @@ class MySQLContext(BaseContext):
         async with self.native_connection.cursor() as cur:
             await cur.executemany(statement, args)
 
-    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
-        cur = await self.native_connection.cursor()
-        await cur.execute(statement)
-        records = await cur.fetchall()
-        return self._resultset_unwrap(signature, records)
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        if is_dataclass_type(signature):
+            cur = await self.native_connection.cursor(aiomysql.cursors.DictCursor)
+            await cur.execute(statement)
+            records = await cur.fetchall()
+            return self._resultset_unwrap_dict(signature, records)  # type: ignore
+        else:
+            cur = await self.native_connection.cursor()
+            await cur.execute(statement)
+            records = await cur.fetchall()
+            return self._resultset_unwrap_tuple(signature, records)

@@ -1,7 +1,6 @@
 import dataclasses
 import types
 import typing
-from collections.abc import Sequence
 from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
@@ -54,11 +53,12 @@ class PostgreSQLContext(BaseContext):
     ) -> None:
         await self.native_connection.executemany(statement, args)
 
-    async def query_all(self, signature: type[T], statement: str) -> Sequence[T]:
+    async def query_all(self, signature: type[T], statement: str) -> list[T]:
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
-        return self._resultset_unwrap(
-            signature, (tuple(record.values()) for record in records)
-        )
+        if is_dataclass_type(signature):
+            return self._resultset_unwrap_dict(signature, records)  # type: ignore
+        else:
+            return self._resultset_unwrap_tuple(signature, records)  # type: ignore
 
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         if not is_dataclass_type(table):
