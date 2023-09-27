@@ -22,30 +22,26 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
 
     async def test_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            generator = self.engine.create_generator(DataTable, self.options)
-            statement = generator.get_create_stmt()
-            await conn.execute(statement)
-            statement = generator.get_upsert_stmt()
-            records = generator.get_records_as_tuples(
+            await conn.create_objects([DataTable])
+            generator = self.engine.create_generator(self.options)
+            statement = generator.get_upsert_stmt(DataTable)
+            records = generator.get_dataclasses_as_records(
                 [DataTable(1, "a"), DataTable(2, "b"), DataTable(3, "c")]
             )
             await conn.execute_all(statement, records)
-            await conn.drop_table(DataTable)
+            await conn.drop_objects()
 
     async def test_bulk_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            generator = self.engine.create_generator(
-                DataTable, GeneratorOptions(namespaces={tests.tables: None})
-            )
-            statement = generator.get_create_stmt()
-            await conn.execute(statement)
-            statement = generator.get_upsert_stmt()
+            await conn.create_objects([DataTable])
+            generator = self.engine.create_generator(self.options)
+            statement = generator.get_upsert_stmt(DataTable)
             for i in range(10):
-                records = generator.get_records_as_tuples(
+                records = generator.get_dataclasses_as_records(
                     [DataTable(i * 1000 + j, str(i * 1000 + j)) for j in range(1000)]
                 )
                 await conn.execute_all(statement, records)
-            await conn.drop_table(DataTable)
+            await conn.drop_objects()
 
     def get_user_data(self) -> list[UserTable]:
         return [
@@ -68,18 +64,18 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
         data = self.get_user_data()
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_table(UserTable)
+            await conn.create_objects([UserTable])
             await conn.insert_data(UserTable, data)
             rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(rows[0], len(data))
-            await conn.drop_table(UserTable)
+            await conn.drop_objects()
 
     async def test_dataclass_upsert(self) -> None:
         data = self.get_user_data()
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_table(UserTable)
+            await conn.create_objects([UserTable])
             await conn.upsert_data(UserTable, data)
             rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(rows[0], len(data))
-            await conn.drop_table(UserTable)
+            await conn.drop_objects()

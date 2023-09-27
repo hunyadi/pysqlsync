@@ -85,6 +85,8 @@ class EnumType(QualifiedObject, MutableObject):
 
 @dataclass
 class StructMember:
+    "A member of a struct type."
+
     name: LocalId
     data_type: SqlDataType
     description: Optional[str] = None
@@ -95,6 +97,8 @@ class StructMember:
 
 @dataclass
 class StructType(QualifiedObject, MutableObject):
+    "A struct type, i.e. a nested type without a primary key."
+
     members: ObjectDict[StructMember]
     description: Optional[str]
 
@@ -138,6 +142,16 @@ class StructType(QualifiedObject, MutableObject):
 
 @dataclass
 class Column(MutableObject):
+    """
+    A column in a database table.
+
+    :param name: The name of the column within its host table.
+    :param data_type: The SQL data type of the column.
+    :param nullable: True if the column can be NULL.
+    :param default: The default value the column takes if no explicit value is set.
+    :param description: The textual description of the column.
+    """
+
     name: LocalId
     data_type: SqlDataType
     nullable: bool
@@ -179,12 +193,25 @@ class Column(MutableObject):
 
 @dataclass
 class ConstraintReference:
+    """
+    A reference that a constraint points to.
+
+    :param table: The table that the constraint points to.
+    :param column: The column in the table that the constraint points to.
+    """
+
     table: SupportsQualifiedId
     column: LocalId
 
 
 @dataclass
 class Constraint:
+    """
+    A table constraint, such as a primary, foreign or check constraint.
+
+    :param name: The name of the constraint.
+    """
+
     name: LocalId
 
     def is_alter_table(self) -> bool:
@@ -193,11 +220,15 @@ class Constraint:
 
 @dataclass
 class ReferenceConstraint(Constraint):
+    "A constraint that references another table, such as a foreign or discriminated key constraint."
+
     foreign_column: LocalId
 
 
 @dataclass
 class ForeignConstraint(ReferenceConstraint):
+    "A foreign key constraint."
+
     reference: ConstraintReference
 
     def is_alter_table(self) -> bool:
@@ -209,11 +240,19 @@ class ForeignConstraint(ReferenceConstraint):
 
 @dataclass
 class DiscriminatedConstraint(ReferenceConstraint):
+    """
+    A discriminated key constraint whose value references one of several tables.
+
+    :param references: The list of tables either of which the constraint can point to.
+    """
+
     references: list[ConstraintReference]
 
 
 @dataclass
 class CheckConstraint(Constraint):
+    "A check constraint."
+
     condition: str
 
     def is_alter_table(self) -> bool:
@@ -225,6 +264,15 @@ class CheckConstraint(Constraint):
 
 @dataclass
 class Table(QualifiedObject, MutableObject):
+    """
+    A database table.
+
+    :param columns: The columns that the table consists of.
+    :param primary_key: The primary key of the table.
+    :param constraints: Any constraints applied to the table.
+    :param description: A textual description of the table.
+    """
+
     columns: ObjectDict[Column]
     primary_key: LocalId
     constraints: Optional[list[Constraint]]
@@ -282,6 +330,17 @@ class Table(QualifiedObject, MutableObject):
                 statement = target_column.mutate_stmt(source_column)
                 if statement:
                     statements.append(statement)
+
+        if source.constraints and not target.constraints:
+            for constraint in source.constraints:
+                statements.append(f"DROP CONSTRAINT {constraint.name}")
+        elif not source.constraints and target.constraints:
+            for constraint in target.constraints:
+                statements.append(f"ADD {str(constraint)}")
+        elif source.constraints and target.constraints:
+            for target_constraint in target.constraints:
+                ...
+
         if statements:
             return f"ALTER TABLE {source.name}\n" + ",\n".join(statements) + ";"
         else:
@@ -326,6 +385,8 @@ def _mutate_diff(
 
 @dataclass
 class Namespace(MutableObject):
+    "A namespace that multiple objects can share. Typically corresponds to a database schema."
+
     name: LocalId
     enums: ObjectDict[EnumType]
     structs: ObjectDict[StructType]
@@ -384,6 +445,12 @@ class Namespace(MutableObject):
         statements.extend(_create_diff(source.structs, target.structs))
         statements.extend(_create_diff(source.tables, target.tables))
 
+        for id in target.tables.keys():
+            if id not in source.tables.keys():
+                statement = target.tables[id].constraints_stmt()
+                if statement:
+                    statements.append(statement)
+
         statements.extend(_mutate_diff(source.enums, target.enums))
         statements.extend(_mutate_diff(source.structs, target.structs))
         statements.extend(_mutate_diff(source.tables, target.tables))
@@ -400,6 +467,8 @@ class Namespace(MutableObject):
 
 @dataclass
 class Catalog(MutableObject):
+    "A collection of database objects. Typically corresponds to a complete database."
+
     namespaces: ObjectDict[Namespace]
 
     def __init__(
@@ -430,6 +499,12 @@ class Catalog(MutableObject):
 
         statements: list[str] = []
         statements.extend(_create_diff(source.namespaces, target.namespaces))
+        for id in target.namespaces.keys():
+            if id not in source.namespaces.keys():
+                statement = target.namespaces[id].constraints_stmt()
+                if statement:
+                    statements.append(statement)
+
         statements.extend(_mutate_diff(source.namespaces, target.namespaces))
         statements.extend(_drop_diff(source.namespaces, target.namespaces))
         return "\n".join(statements)

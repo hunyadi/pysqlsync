@@ -63,8 +63,8 @@ class PostgreSQLContext(BaseContext):
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
-        generator = self.connection.create_generator(table)
-        records = generator.get_records_as_tuples(data)
+        generator = self.connection.generator
+        records = generator.get_dataclasses_as_records(data)
         await self.native_connection.copy_records_to_table(
             table_name=table.__name__,
             columns=tuple(field.name for field in dataclasses.fields(table)),

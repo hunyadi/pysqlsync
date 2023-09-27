@@ -7,19 +7,21 @@ import tests.tables as tables
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.factory import get_dialect
 
-Generator = get_dialect("postgresql").get_generator_type()
 
-
-def get_generator(table: type) -> BaseGenerator:
-    return Generator(table, GeneratorOptions(namespaces={tables: None}))
+def get_generator() -> BaseGenerator:
+    return get_dialect("postgresql").create_generator(
+        GeneratorOptions(namespaces={tables: None})
+    )
 
 
 def get_create_stmt(table: type) -> str:
-    return get_generator(table).get_create_stmt()
+    statement = get_generator().create([table])
+    return statement or ""
 
 
 def get_insert_stmt(table: type) -> str:
-    return get_generator(table).get_upsert_stmt()
+    statement = get_generator().get_upsert_stmt(table)
+    return statement or ""
 
 
 class TestGenerator(unittest.TestCase):
@@ -191,28 +193,26 @@ class TestGenerator(unittest.TestCase):
         )
 
     def test_table_data(self) -> None:
-        generator = get_generator(tables.DataTable)
-        self.assertEqual(
-            generator.get_record_as_tuple(tables.DataTable(123, "abc")), (123, "abc")
-        )
+        generator = get_generator()
 
-        generator = get_generator(tables.StringTable)
         self.assertEqual(
-            generator.get_record_as_tuple(
+            generator.get_dataclass_as_record(tables.DataTable(123, "abc")),
+            (123, "abc"),
+        )
+        self.assertEqual(
+            generator.get_dataclass_as_record(
                 tables.StringTable(1, "abc", None, "def", None)
             ),
             (1, "abc", None, "def", None),
         )
         self.assertEqual(
-            generator.get_record_as_tuple(
+            generator.get_dataclass_as_record(
                 tables.StringTable(2, "abc", "def", "ghi", "jkl")
             ),
             (2, "abc", "def", "ghi", "jkl"),
         )
-
-        generator = get_generator(tables.DateTimeTable)
         self.assertEqual(
-            generator.get_record_as_tuple(
+            generator.get_dataclass_as_record(
                 tables.DateTimeTable(
                     1,
                     datetime(1982, 10, 23, 23, 59, 59, tzinfo=timezone.utc),
@@ -229,18 +229,14 @@ class TestGenerator(unittest.TestCase):
                 None,
             ),
         )
-
-        generator = get_generator(tables.EnumTable)
         self.assertEqual(
-            generator.get_record_as_tuple(
+            generator.get_dataclass_as_record(
                 tables.EnumTable(1, tables.WorkflowState.active)
             ),
             (1, "active"),
         )
-
-        generator = get_generator(tables.IPAddressTable)
         self.assertEqual(
-            generator.get_record_as_tuple(
+            generator.get_dataclass_as_record(
                 tables.IPAddressTable(
                     1,
                     typing.cast(

@@ -3,12 +3,14 @@ import dataclasses
 import ipaddress
 import types
 import typing
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
-from .formation.object_types import Table
+from .formation.object_types import Catalog, Table
+from .formation.py_to_sql import DataclassConverter
 from .model.id_types import LocalId, QualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -17,42 +19,85 @@ T = TypeVar("T")
 
 @dataclass
 class GeneratorOptions:
+    """
+    Database-agnostic generator options.
+
+    :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
+    """
+
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
 
 
 class BaseGenerator(abc.ABC):
-    "Generates SQL statements for creating or dropping tables, and inserting, updating or deleting data."
+    """
+    Generates SQL statements for creating or dropping tables, and inserting, updating or deleting data.
 
-    cls: type
+    :param options: Database-agnostic generator options.
+    :param converter: A converter that maps a set of data-class types into a database state.
+    :param state: A current database state based on which statements are generated.
+    """
+
     options: GeneratorOptions
+    converter: DataclassConverter
+    state: Catalog
 
-    def __init__(self, cls: type, options: GeneratorOptions) -> None:
-        self.cls = cls
+    def __init__(self, options: GeneratorOptions) -> None:
         self.options = options
+        self.catalog = Catalog([])
+
+    def create(self, tables: list[type[DataclassInstance]]) -> Optional[str]:
+        target = self.converter.dataclasses_to_catalog(tables)
+        statement = self.get_mutate_stmt(target)
+        self.catalog = target
+        return statement
+
+    def drop(self) -> Optional[str]:
+        target = Catalog([])
+        statement = self.get_mutate_stmt(target)
+        self.catalog = target
+        return statement
+
+    def get_mutate_stmt(self, target: Catalog) -> Optional[str]:
+        "Returns a SQL statement to mutate a source state into a target state."
+
+        return target.mutate_stmt(self.catalog)
 
     @abc.abstractmethod
-    def get_create_stmt(self) -> str:
+    def get_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+        "Returns a SQL statement to insert records into a database table."
+
         ...
 
-    @abc.abstractmethod
-    def get_drop_stmt(self) -> str:
-        ...
+    def get_dataclass_as_record(self, item: DataclassInstance) -> tuple:
+        "Converts a data-class object into a record to insert into a database table."
 
-    @abc.abstractmethod
-    def get_upsert_stmt(self) -> str:
-        ...
+        extractors = self.get_dataclass_extractors(item.__class__)
+        return tuple(extractor(item) for extractor in extractors)
 
-    def get_record_as_tuple(self, obj: Any) -> tuple:
-        extractors = self.get_extractors(self.cls)
-        return tuple(extractor(obj) for extractor in extractors)
+    def get_dataclasses_as_records(
+        self, items: Iterable[DataclassInstance]
+    ) -> list[tuple]:
+        "Converts a list of data-class objects into a list of records to insert into a database table."
 
-    def get_records_as_tuples(self, items: Iterable[Any]) -> list[tuple]:
-        extractors = self.get_extractors(self.cls)
-        return [tuple(extractor(item) for extractor in extractors) for item in items]
+        it = iter(items)
+        item = next(it)
+        extractors = self.get_dataclass_extractors(item.__class__)
 
-    def get_extractor(self, field_name: str, field_type: type) -> Callable[[Any], Any]:
+        results = [tuple(extractor(item) for extractor in extractors)]
+        while True:
+            try:
+                item = next(it)
+            except StopIteration:
+                return results
+            results.append(tuple(extractor(item) for extractor in extractors))
+
+    def get_field_extractor(
+        self, field_name: str, field_type: type
+    ) -> Callable[[Any], Any]:
+        "Returns a callable function object that extracts a single field of a data-class."
+
         if is_type_enum(field_type):
             return lambda obj: getattr(obj, field_name).value
         elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
@@ -60,9 +105,13 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_extractors(self, class_type: type) -> tuple[Callable[[Any], Any], ...]:
+    def get_dataclass_extractors(
+        self, class_type: type
+    ) -> tuple[Callable[[Any], Any], ...]:
+        "Returns a tuple of callable function objects that extracts each field of a data-class."
+
         return tuple(
-            self.get_extractor(field.name, field.type)
+            self.get_field_extractor(field.name, field.type)
             for field in dataclasses.fields(class_type)
         )
 
@@ -81,15 +130,15 @@ class ConnectionParameters:
 class BaseConnection(abc.ABC):
     "An active connection to a database."
 
-    create_generator: Callable[[type], BaseGenerator]
+    generator: BaseGenerator
     params: ConnectionParameters
 
     def __init__(
         self,
-        create_generator: Callable[[type], BaseGenerator],
+        generator: BaseGenerator,
         params: ConnectionParameters,
     ) -> None:
-        self.create_generator = create_generator
+        self.generator = generator
         self.params = params
 
     @abc.abstractmethod
@@ -116,38 +165,99 @@ class BaseContext(abc.ABC):
 
     @abc.abstractmethod
     async def execute(self, statement: str) -> None:
+        "Executes one or more SQL statements."
+
         ...
+
+    async def query_one(self, signature: type[T], statement: str) -> T:
+        "Runs a query to produce a result-set of one or more columns, and a single row."
+
+        rows = await self.query_all(signature, statement)
+        return rows[0]
 
     @abc.abstractmethod
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
-        "Run a query to produce a result-set of multiple columns."
+        "Runs a query to produce a result-set of one or more columns, and multiple rows."
 
         ...
 
     def _resultset_unwrap_dict(
-        self, signature: D, records: Iterable[dict[str, Any]]
+        self, signature: type[D], records: Iterable[dict[str, Any]]
     ) -> list[D]:
+        """Converts a result-set into a list of data-class instances.
+
+        :param signature: A data-class type.
+        :param records: The result-set whose rows to convert.
+        """
+
         if is_dataclass_type(signature):
             return [signature(**{name: value for name, value in record.items()}) for record in records]  # type: ignore
 
-        raise TypeError(f"illegal resultset signature: {signature}")
+        raise TypeError(
+            f"expected: data-class type as result-set signature; got: {signature}"
+        )
 
     def _resultset_unwrap_tuple(
-        self, signature: type[T], records: Iterable[tuple[Any, ...]]
+        self, signature: type[T], records: Iterable[Sequence[Any]]
     ) -> list[T]:
-        if signature in [bool, int, float, str]:
-            return [row[0] for row in records]
+        """
+        Converts a result-set into a list of tuples, or a list of simple types (as appropriate).
 
-        if is_dataclass_type(signature):
-            raise TypeError(
-                f"data-class type expects dictionary of records: {signature}"
-            )
+        :param signature: A tuple type, or a simple type (e.g. `bool` or `str`).
+        :param records: The result-set whose rows to convert.
+        """
+
+        if signature in [bool, int, float, str]:
+            scalar_results: list[T] = []
+
+            # check result shape
+            it = iter(records)
+            item = next(it)
+            if len(item) != 1:
+                raise ValueError(
+                    f"invalid number of columns, expected: 1; got: {len(item)}"
+                )
+            scalar_results.append(item[0])
+            while True:
+                try:
+                    item = next(it)
+                except StopIteration:
+                    return scalar_results
+                scalar_results.append(item[0])
 
         origin_type = typing.get_origin(signature)
         if origin_type is tuple:
-            return [tuple(row) for row in records]  # type: ignore
+            origin_args = typing.get_args(signature)
+            results: list[T] = []
 
-        raise TypeError(f"illegal resultset signature: {signature}")
+            # check result shape
+            it = iter(records)
+            item = next(it)
+            if len(item) != len(origin_args):
+                raise ValueError(
+                    f"invalid number of columns, expected: {len(origin_args)}; got: {len(item)}"
+                )
+
+            if isinstance(item, tuple):
+                results.append(item)  # type: ignore
+                while True:
+                    try:
+                        item = next(it)
+                    except StopIteration:
+                        return results
+                    results.append(item)  # type: ignore
+            else:
+                results.append(tuple(item))  # type: ignore
+                while True:
+                    try:
+                        item = next(it)
+                    except StopIteration:
+                        return results
+                    results.append(tuple(item))  # type: ignore
+
+        raise TypeError(
+            f"expected: tuple or simple type as result-set signature; got: {signature}"
+        )
 
     @abc.abstractmethod
     async def execute_all(
@@ -155,23 +265,17 @@ class BaseContext(abc.ABC):
     ) -> None:
         ...
 
-    async def drop_table(self, table: type[DataclassInstance]) -> None:
-        "Drops a database table corresponding to the dataclass type."
+    async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
+        generator = self.connection.generator
+        statement = generator.create(tables)
+        if statement:
+            await self.execute(statement)
 
-        if not is_dataclass_type(table):
-            raise TypeError(f"expected dataclass type, got: {table}")
-        generator = self.connection.create_generator(table)
-        statement = generator.get_drop_stmt()
-        await self.execute(statement)
-
-    async def create_table(self, table: type[DataclassInstance]) -> None:
-        "Creates a database table for storing data encapsulated in the dataclass type."
-
-        if not is_dataclass_type(table):
-            raise TypeError(f"expected dataclass type, got: {table}")
-        generator = self.connection.create_generator(table)
-        statement = generator.get_create_stmt()
-        await self.execute(statement)
+    async def drop_objects(self) -> None:
+        generator = self.connection.generator
+        statement = generator.drop()
+        if statement:
+            await self.execute(statement)
 
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts data in the database table corresponding to the dataclass type."
@@ -181,9 +285,9 @@ class BaseContext(abc.ABC):
     async def upsert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
 
-        generator = self.connection.create_generator(table)
-        statement = generator.get_upsert_stmt()
-        records = generator.get_records_as_tuples(data)
+        generator = self.connection.generator
+        statement = generator.get_upsert_stmt(table)
+        records = generator.get_dataclasses_as_records(data)
         await self.execute_all(statement, records)
 
 
@@ -232,15 +336,13 @@ class BaseEngine(abc.ABC):
 
         generator_options = options if options is not None else GeneratorOptions()
         connection_type = self.get_connection_type()
-        return connection_type(
-            lambda cls: self.create_generator(cls, generator_options), params
-        )
+        return connection_type(self.create_generator(generator_options), params)
 
-    def create_generator(self, cls: type, options: GeneratorOptions) -> BaseGenerator:
+    def create_generator(self, options: GeneratorOptions) -> BaseGenerator:
         "Instantiates a generator that can emit SQL statements."
 
         generator_type = self.get_generator_type()
-        return generator_type(cls, options)
+        return generator_type(options)
 
     def create_explorer(self, conn: BaseContext) -> Explorer:
         explorer_type = self.get_explorer_type()

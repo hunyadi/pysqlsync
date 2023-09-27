@@ -1,3 +1,4 @@
+import typing
 from typing import Optional
 
 from ..base import Explorer
@@ -142,7 +143,18 @@ class AnsiReflection(Explorer):
                     numeric_precision,
                     numeric_scale,
                     timestamp_precision,
-                ) = column_record
+                ) = typing.cast(
+                    tuple[
+                        str,
+                        str,
+                        bool,
+                        Optional[int],
+                        Optional[int],
+                        Optional[int],
+                        Optional[int],
+                    ],
+                    column_record,
+                )
                 columns.append(
                     Column(
                         LocalId(column_name),
@@ -166,7 +178,10 @@ class AnsiReflection(Explorer):
             )
 
             for column_record in column_records:
-                (column_name, data_type, nullable) = column_record
+                column_name, data_type, nullable = typing.cast(
+                    tuple[str, str, bool],
+                    column_record,
+                )
                 columns.append(
                     Column(
                         LocalId(column_name),
@@ -197,7 +212,7 @@ class AnsiReflection(Explorer):
                     referenced_table_schema,
                     referenced_table_name,
                     referenced_column_name,
-                ) = constraint_record
+                ) = typing.cast(tuple[str, str, str, str, str, str], constraint_record)
 
                 if constraint_type == "PRIMARY KEY":
                     if primary_key is not None:
