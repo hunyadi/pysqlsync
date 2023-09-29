@@ -2,18 +2,23 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from strong_typing.inspection import TypeLike, get_annotation, unwrap_annotated_type
+from strong_typing.inspection import (
+    DataclassInstance,
+    TypeLike,
+    get_annotation,
+    unwrap_annotated_type,
+)
 
 from .key_types import PrimaryKey, PrimaryKeyTag
 
 
-def is_primary_key_type(field_type: type) -> bool:
+def is_primary_key_type(field_type: TypeLike) -> bool:
     "Checks if the field type is marked as the primary key of a table."
 
     return get_annotation(field_type, PrimaryKeyTag) is not None
 
 
-def get_primary_key_name(class_type: type) -> str:
+def get_primary_key_name(class_type: type[DataclassInstance]) -> str:
     "Fetches the primary key of the table."
 
     for field in dataclasses.fields(class_type):
@@ -53,7 +58,7 @@ class FieldProperties:
             return self.plain_type
 
 
-def get_field_properties(field_type: type) -> FieldProperties:
+def get_field_properties(field_type: TypeLike) -> FieldProperties:
     metadata = getattr(field_type, "__metadata__", None)
     if metadata is None:
         # field has a type without annotations or constraints
