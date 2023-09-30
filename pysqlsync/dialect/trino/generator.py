@@ -19,5 +19,5 @@ class TrinoGenerator(BaseGenerator):
             )
         )
 
-    def get_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+    def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
         raise NotImplementedError()

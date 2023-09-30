@@ -1,7 +1,7 @@
 import unittest
 
 import tests.tables as tables
-from pysqlsync.base import GeneratorOptions
+from pysqlsync.base import BaseContext, GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import (
     DataclassConverterOptions,
@@ -16,6 +16,9 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(namespaces={tables: None})
 
+    async def get_current_namespace(self, conn: BaseContext) -> str:
+        raise NotImplementedError()
+
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.execute('DROP TABLE IF EXISTS "NumericTable";')
@@ -24,15 +27,16 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
 
     async def test_table(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
+            current_namespace = await self.get_current_namespace(conn)
             options = DataclassConverterOptions(
-                namespaces=NamespaceMapping({tables: None})
+                namespaces=NamespaceMapping({tables: current_namespace})
             )
             table_def = dataclass_to_table(tables.NumericTable, options=options)
             await conn.execute(str(table_def))
 
             ref = self.engine.create_explorer(conn)
             table_ref = await ref.get_table_meta(
-                QualifiedId(None, tables.NumericTable.__name__)
+                QualifiedId(current_namespace, tables.NumericTable.__name__)
             )
 
             await conn.execute(table_def.drop_stmt())
@@ -41,8 +45,9 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
 
     async def test_relation(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
+            current_namespace = await self.get_current_namespace(conn)
             options = DataclassConverterOptions(
-                namespaces=NamespaceMapping({tables: None})
+                namespaces=NamespaceMapping({tables: current_namespace})
             )
             address_def = dataclass_to_table(tables.Address, options=options)
             await conn.execute(str(address_def))
@@ -51,10 +56,10 @@ class TestDiscovery(unittest.IsolatedAsyncioTestCase, TestEngineBase):
 
             ref = self.engine.create_explorer(conn)
             address_ref = await ref.get_table_meta(
-                QualifiedId(None, tables.Address.__name__)
+                QualifiedId(current_namespace, tables.Address.__name__)
             )
             person_ref = await ref.get_table_meta(
-                QualifiedId(None, tables.Person.__name__)
+                QualifiedId(current_namespace, tables.Person.__name__)
             )
 
             await conn.execute(person_def.drop_stmt())

@@ -19,11 +19,6 @@ def get_create_stmt(table: type) -> str:
     return statement or ""
 
 
-def get_insert_stmt(table: type) -> str:
-    statement = get_generator().get_upsert_stmt(table)
-    return statement or ""
-
-
 class TestGenerator(unittest.TestCase):
     def test_create_boolean_table(self) -> None:
         lines = [
@@ -170,26 +165,35 @@ class TestGenerator(unittest.TestCase):
         ]
         self.assertMultiLineEqual(get_create_stmt(tables.Location), "\n".join(lines))
 
-    def test_insert(self) -> None:
+    def test_insert_single(self) -> None:
+        generator = get_generator()
+        generator.create([tables.DataTable])
+
         lines = [
             'INSERT INTO "DataTable"',
             '("id", "data") VALUES ($1, $2)',
-            'ON CONFLICT("id") DO UPDATE SET',
+            'ON CONFLICT ("id") DO UPDATE SET',
             '"data" = EXCLUDED."data"',
         ]
-        self.assertMultiLineEqual(get_insert_stmt(tables.DataTable), "\n".join(lines))
+        self.assertMultiLineEqual(
+            generator.get_dataclass_upsert_stmt(tables.DataTable), "\n".join(lines)
+        )
+
+    def test_insert_multiple(self) -> None:
+        generator = get_generator()
+        generator.create([tables.DateTimeTable])
 
         lines = [
             'INSERT INTO "DateTimeTable"',
             '("id", "iso_date_time", "iso_date", "iso_time", "optional_date_time") VALUES ($1, $2, $3, $4, $5)',
-            'ON CONFLICT("id") DO UPDATE SET',
+            'ON CONFLICT ("id") DO UPDATE SET',
             '"iso_date_time" = EXCLUDED."iso_date_time",',
             '"iso_date" = EXCLUDED."iso_date",',
             '"iso_time" = EXCLUDED."iso_time",',
             '"optional_date_time" = EXCLUDED."optional_date_time"',
         ]
         self.assertMultiLineEqual(
-            get_insert_stmt(tables.DateTimeTable), "\n".join(lines)
+            generator.get_dataclass_upsert_stmt(tables.DateTimeTable), "\n".join(lines)
         )
 
     def test_table_data(self) -> None:

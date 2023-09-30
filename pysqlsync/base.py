@@ -11,7 +11,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_ty
 
 from .formation.object_types import Catalog, Table
 from .formation.py_to_sql import DataclassConverter
-from .model.id_types import LocalId, QualifiedId
+from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -65,10 +65,19 @@ class BaseGenerator(abc.ABC):
         return target.mutate_stmt(self.catalog)
 
     @abc.abstractmethod
-    def get_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+    def get_table_upsert_stmt(self, table: Table) -> str:
         "Returns a SQL statement to insert records into a database table."
 
         ...
+
+    def get_qualified_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
+        return self.converter.create_qualified_id(table.__module__, table.__name__)
+
+    def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+        "Returns a SQL statement to insert records into a database table."
+
+        table_object = self.catalog.get_table(self.get_qualified_id(table))
+        return self.get_table_upsert_stmt(table_object)
 
     def get_dataclass_as_record(self, item: DataclassInstance) -> tuple:
         "Converts a data-class object into a record to insert into a database table."
@@ -93,6 +102,16 @@ class BaseGenerator(abc.ABC):
                 return results
             results.append(tuple(extractor(item) for extractor in extractors))
 
+    def get_dataclass_extractors(
+        self, class_type: type
+    ) -> tuple[Callable[[Any], Any], ...]:
+        "Returns a tuple of callable function objects that extracts each field of a data-class."
+
+        return tuple(
+            self.get_field_extractor(field.name, field.type)
+            for field in dataclasses.fields(class_type)
+        )
+
     def get_field_extractor(
         self, field_name: str, field_type: type
     ) -> Callable[[Any], Any]:
@@ -105,15 +124,17 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_dataclass_extractors(
-        self, class_type: type
-    ) -> tuple[Callable[[Any], Any], ...]:
-        "Returns a tuple of callable function objects that extracts each field of a data-class."
+    def get_tuple_extractor(
+        self, field_index: int, field_type: type
+    ) -> Callable[[Any], Any]:
+        "Returns a callable function object that extracts a single field of a data-class."
 
-        return tuple(
-            self.get_field_extractor(field.name, field.type)
-            for field in dataclasses.fields(class_type)
-        )
+        if is_type_enum(field_type):
+            return lambda record: record[field_index].value
+        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+            return lambda record: str(record[field_index])
+        else:
+            return lambda record: record[field_index]
 
 
 @dataclass
@@ -286,7 +307,7 @@ class BaseContext(abc.ABC):
         "Inserts or updates data in the database table corresponding to the dataclass type."
 
         generator = self.connection.generator
-        statement = generator.get_upsert_stmt(table)
+        statement = generator.get_dataclass_upsert_stmt(table)
         records = generator.get_dataclasses_as_records(data)
         await self.execute_all(statement, records)
 

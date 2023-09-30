@@ -23,8 +23,8 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
     async def test_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([DataTable])
-            generator = self.engine.create_generator(self.options)
-            statement = generator.get_upsert_stmt(DataTable)
+            generator = conn.connection.generator
+            statement = generator.get_dataclass_upsert_stmt(DataTable)
             records = generator.get_dataclasses_as_records(
                 [DataTable(1, "a"), DataTable(2, "b"), DataTable(3, "c")]
             )
@@ -34,8 +34,8 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
     async def test_bulk_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([DataTable])
-            generator = self.engine.create_generator(self.options)
-            statement = generator.get_upsert_stmt(DataTable)
+            generator = conn.connection.generator
+            statement = generator.get_dataclass_upsert_stmt(DataTable)
             for i in range(10):
                 records = generator.get_dataclasses_as_records(
                     [DataTable(i * 1000 + j, str(i * 1000 + j)) for j in range(1000)]

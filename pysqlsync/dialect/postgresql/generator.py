@@ -1,23 +1,13 @@
-import dataclasses
 import re
 from typing import Optional
 
-from strong_typing.inspection import DataclassInstance
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import Catalog
+from pysqlsync.formation.object_types import Catalog, Table
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
     NamespaceMapping,
 )
-from pysqlsync.model.properties import get_primary_key_name
-
-
-def sql_quoted_id(name: str) -> str:
-    escaped_name = name.replace('"', '""')
-    return f'"{escaped_name}"'
-
 
 _sql_quoted_str_table = str.maketrans(
     {
@@ -86,27 +76,18 @@ class PostgreSQLGenerator(BaseGenerator):
 
         return "\n".join(statements)
 
-    def get_quoted_id(self, table: type[DataclassInstance]) -> str:
-        return self.converter.create_qualified_id(
-            table.__module__, table.__name__
-        ).quoted_id
-
-    def get_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+    def get_table_upsert_stmt(self, table: Table) -> str:
         statements: list[str] = []
-        statements.append(f"INSERT INTO {self.get_quoted_id(table)}")
-        field_names = [field.name for field in dataclasses.fields(table)]
-        field_list = ", ".join(sql_quoted_id(field_name) for field_name in field_names)
-        value_list = ", ".join(f"${index}" for index in range(1, len(field_names) + 1))
-        statements.append(f"({field_list}) VALUES ({value_list})")
-
-        primary_key_name = get_primary_key_name(table)
-        statements.append(
-            f"ON CONFLICT({sql_quoted_id(primary_key_name)}) DO UPDATE SET"
+        statements.append(f"INSERT INTO {table.name}")
+        column_list = ", ".join(str(column.name) for column in table.columns.values())
+        value_list = ", ".join(
+            f"${index}" for index in range(1, len(table.columns) + 1)
         )
+        statements.append(f"({column_list}) VALUES ({value_list})")
+        statements.append(f"ON CONFLICT ({table.primary_key}) DO UPDATE SET")
         defs = [
-            f"{sql_quoted_id(field_name)} = EXCLUDED.{sql_quoted_id(field_name)}"
-            for field_name in field_names
-            if field_name != primary_key_name
+            f"{column.name} = EXCLUDED.{column.name}"
+            for column in table.get_value_columns()
         ]
         statements.append(",\n".join(defs))
         return "\n".join(statements)

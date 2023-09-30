@@ -17,6 +17,7 @@ class TestMySQLConnection(testcase.TestConnection, MySQLBase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.execute('DROP TABLE IF EXISTS "DataTable";')
             await conn.execute('DROP TABLE IF EXISTS "UserTable";')
+            await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
 
 
 if __name__ == "__main__":

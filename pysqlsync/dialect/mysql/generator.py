@@ -1,23 +1,15 @@
-import dataclasses
 import uuid
 from typing import Any, Callable
 
-from strong_typing.inspection import DataclassInstance
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import Catalog, quote
+from pysqlsync.formation.object_types import Catalog, Table, quote
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
     NamespaceMapping,
 )
 from pysqlsync.model.data_types import SqlFixedBinaryType
-from pysqlsync.model.properties import get_primary_key_name
-
-
-def sql_quoted_id(name: str) -> str:
-    escaped_name = name.replace('"', '""')
-    return f'"{escaped_name}"'
+from pysqlsync.model.id_types import LocalId
 
 
 class MySQLGenerator(BaseGenerator):
@@ -54,24 +46,15 @@ class MySQLGenerator(BaseGenerator):
                     )
         return "\n".join(statements)
 
-    def get_quoted_id(self, table: type[DataclassInstance]) -> str:
-        return self.converter.create_qualified_id(
-            table.__module__, table.__name__
-        ).quoted_id
-
-    def get_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+    def get_table_upsert_stmt(self, table: Table) -> str:
         statements: list[str] = []
-        statements.append(f"INSERT INTO {self.get_quoted_id(table)}")
-        field_names = [field.name for field in dataclasses.fields(table)]
-        statements.append(_field_list(field_names))
+        statements.append(f"INSERT INTO {table.name}")
+        statements.append(
+            _field_list([column.name for column in table.columns.values()])
+        )
 
-        primary_key_name = get_primary_key_name(table)
         statements.append(f"ON DUPLICATE KEY UPDATE")
-        defs = [
-            _field_update(field_name)
-            for field_name in field_names
-            if field_name != primary_key_name
-        ]
+        defs = [_field_update(column.name) for column in table.get_value_columns()]
         statements.append(",\n".join(defs))
         return "\n".join(statements)
 
@@ -84,9 +67,9 @@ class MySQLGenerator(BaseGenerator):
         return super().get_field_extractor(field_name, field_type)
 
 
-def _field_list(field_names: list[str]) -> str:
-    field_list = ", ".join(sql_quoted_id(field_name) for field_name in field_names)
-    value_list = ", ".join(f"%s" for field_name in field_names)
+def _field_list(field_ids: list[LocalId]) -> str:
+    field_list = ", ".join(str(field_id) for field_id in field_ids)
+    value_list = ", ".join(f"%s" for _ in field_ids)
     if False:
         # compatible with MySQL 8.0.19 and later, slow with aiomysql 0.2.0 and earlier
         return f"({field_list}) VALUES ({value_list}) AS EXCLUDED"
@@ -95,10 +78,10 @@ def _field_list(field_names: list[str]) -> str:
         return f"({field_list}) VALUES ({value_list})"
 
 
-def _field_update(field_name: str) -> str:
+def _field_update(field_id: LocalId) -> str:
     if False:
         # compatible with MySQL 8.0.19 and later, slow with aiomysql 0.2.0 and earlier
-        return f"{sql_quoted_id(field_name)} = EXCLUDED.{sql_quoted_id(field_name)}"
+        return f"{field_id} = EXCLUDED.{field_id}"
     else:
         # emits a warning with MySQL 8.0.20 and later
-        return f"{sql_quoted_id(field_name)} = VALUES({sql_quoted_id(field_name)})"
+        return f"{field_id} = VALUES({field_id})"

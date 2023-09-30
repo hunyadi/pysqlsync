@@ -302,6 +302,20 @@ class Table(QualifiedObject, MutableObject):
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
+    def get_primary_column(self) -> Column:
+        for column in self.columns.values():
+            if column.name == self.primary_key:
+                return column
+
+        raise KeyError(f"no primary column in table: {self.name}")
+
+    def get_value_columns(self) -> list[Column]:
+        return [
+            column
+            for column in self.columns.values()
+            if column.name != self.primary_key
+        ]
+
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
@@ -476,6 +490,9 @@ class Catalog(MutableObject):
         namespaces: list[Namespace],
     ) -> None:
         self.namespaces = ObjectDict(namespaces)
+
+    def get_table(self, table_id: SupportsQualifiedId) -> Table:
+        return self.namespaces[table_id.scope_id or ""].tables[table_id.local_id]
 
     def create_stmt(self) -> str:
         return "\n".join(n.create_stmt() for n in self.namespaces.values())
