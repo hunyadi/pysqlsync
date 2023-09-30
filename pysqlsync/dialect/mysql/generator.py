@@ -2,7 +2,7 @@ import uuid
 from typing import Any, Callable
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import Catalog, Table, quote
+from pysqlsync.formation.object_types import Catalog, Column, Table, constant, quote
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
@@ -14,7 +14,33 @@ from pysqlsync.model.data_types import SqlFixedBinaryType
 from pysqlsync.model.id_types import LocalId
 
 
+class MySQLColumn(Column):
+    @property
+    def data_spec(self) -> str:
+        nullable = " NOT NULL" if not self.nullable else ""
+        default = (
+            f" DEFAULT {constant(self.default)}" if self.default is not None else ""
+        )
+        identity = " AUTO_INCREMENT" if self.identity else ""
+        return f"{self.data_type}{nullable}{default}{identity}"
+
+    def mutate_column_stmt(target: Column, source: Column) -> list[str]:
+        statements: list[str] = []
+        if (
+            source.data_type != target.data_type
+            or source.nullable != target.nullable
+            or source.default != target.default
+            or source.identity != target.identity
+        ):
+            statements.append(f"MODIFY COLUMN {source.name} {target.data_spec}")
+        return statements
+
+
 class MySQLGenerator(BaseGenerator):
+    @property
+    def column_class(self) -> type[Column]:
+        return MySQLColumn
+
     def __init__(self, options: GeneratorOptions) -> None:
         super().__init__(options)
         self.converter = DataclassConverter(
@@ -24,6 +50,7 @@ class MySQLGenerator(BaseGenerator):
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
                 substitutions={uuid.UUID: SqlFixedBinaryType(16)},
+                column_class=MySQLColumn,
             )
         )
 
@@ -48,13 +75,20 @@ class MySQLGenerator(BaseGenerator):
                     )
         return "\n".join(statements)
 
+    def get_table_insert_stmt(self, table: Table) -> str:
+        statements: list[str] = []
+        statements.append(f"INSERT IGNORE INTO {table.name}")
+        columns = [column for column in table.columns.values() if not column.identity]
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join(f"%s" for column in columns)
+        statements.append(f"({column_list}) VALUES ({value_list})")
+        return "\n".join(statements)
+
     def get_table_upsert_stmt(self, table: Table) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        statements.append(
-            _field_list([column.name for column in table.columns.values()])
-        )
-
+        columns = [column for column in table.columns.values() if not column.identity]
+        statements.append(_field_list([column.name for column in columns]))
         statements.append(f"ON DUPLICATE KEY UPDATE")
         defs = [_field_update(column.name) for column in table.get_value_columns()]
         statements.append(",\n".join(defs))

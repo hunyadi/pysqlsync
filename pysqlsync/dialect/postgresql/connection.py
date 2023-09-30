@@ -1,12 +1,13 @@
 import dataclasses
 import types
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import Any, Callable, Iterable, Optional, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.formation.object_types import Table
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")

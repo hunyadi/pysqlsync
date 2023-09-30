@@ -1,6 +1,7 @@
 from strong_typing.inspection import DataclassInstance
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
+from pysqlsync.formation.object_types import Table
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
@@ -21,5 +22,8 @@ class TrinoGenerator(BaseGenerator):
             )
         )
 
-    def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
+    def get_table_insert_stmt(self, table: Table) -> str:
+        raise NotImplementedError()
+
+    def get_table_upsert_stmt(self, table: Table) -> str:
         raise NotImplementedError()

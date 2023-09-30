@@ -103,7 +103,7 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(enum_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(4), False),
+                Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
                 Column(LocalId("value"), SqlCharacterType(ENUM_NAME_LENGTH), False),
             ],
         )

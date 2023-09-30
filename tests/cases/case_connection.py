@@ -1,17 +1,23 @@
 import uuid
 from datetime import datetime
 
-import tests.tables
 from pysqlsync.base import GeneratorOptions
+from pysqlsync.formation.py_to_sql import (
+    DataclassConverter,
+    DataclassConverterOptions,
+    EnumMode,
+    NamespaceMapping,
+)
+from pysqlsync.model.id_types import QualifiedId
+from tests import tables
 from tests.params import TestEngineBase
-from tests.tables import DataTable, UserTable, WorkflowState
 from tests.timed_test import TimedAsyncioTestCase
 
 
 class TestConnection(TimedAsyncioTestCase, TestEngineBase):
     @property
     def options(self) -> GeneratorOptions:
-        return GeneratorOptions(namespaces={tests.tables: None})
+        return GeneratorOptions(namespaces={tables: None})
 
     async def test_connection(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -22,35 +28,42 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
 
     async def test_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([DataTable])
+            await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
-            statement = generator.get_dataclass_upsert_stmt(DataTable)
+            statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
             records = generator.get_dataclasses_as_records(
-                [DataTable(1, "a"), DataTable(2, "b"), DataTable(3, "c")]
+                [
+                    tables.DataTable(1, "a"),
+                    tables.DataTable(2, "b"),
+                    tables.DataTable(3, "c"),
+                ]
             )
             await conn.execute_all(statement, records)
             await conn.drop_objects()
 
     async def test_bulk_insert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([DataTable])
+            await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
-            statement = generator.get_dataclass_upsert_stmt(DataTable)
+            statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
             for i in range(10):
                 records = generator.get_dataclasses_as_records(
-                    [DataTable(i * 1000 + j, str(i * 1000 + j)) for j in range(1000)]
+                    [
+                        tables.DataTable(i * 1000 + j, str(i * 1000 + j))
+                        for j in range(1000)
+                    ]
                 )
                 await conn.execute_all(statement, records)
             await conn.drop_objects()
 
-    def get_user_data(self) -> list[UserTable]:
+    def get_user_data(self) -> list[tables.UserTable]:
         return [
-            UserTable(
+            tables.UserTable(
                 id=k,
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
                 deleted_at=datetime.now(),
-                workflow_state=WorkflowState.inactive,
+                workflow_state=tables.WorkflowState.inactive,
                 uuid=uuid.uuid4(),
                 name="Dr. Levente Hunyadi",
                 short_name="Levente",
@@ -64,8 +77,8 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
         data = self.get_user_data()
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([UserTable])
-            await conn.insert_data(UserTable, data)
+            await conn.create_objects([tables.UserTable])
+            await conn.insert_data(tables.UserTable, data)
             rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(rows[0], len(data))
             await conn.drop_objects()
@@ -74,8 +87,47 @@ class TestConnection(TimedAsyncioTestCase, TestEngineBase):
         data = self.get_user_data()
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([UserTable])
-            await conn.upsert_data(UserTable, data)
+            await conn.create_objects([tables.UserTable])
+            await conn.upsert_data(tables.UserTable, data)
             rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(rows[0], len(data))
             await conn.drop_objects()
+
+    async def test_rows_upsert(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            options = DataclassConverterOptions(
+                enum_mode=EnumMode.RELATION,
+                namespaces=NamespaceMapping({tables: None}),
+                column_class=conn.connection.generator.column_class,
+            )
+            converter = DataclassConverter(options=options)
+            catalog = converter.dataclasses_to_catalog([tables.EnumTable])
+            await conn.execute(str(catalog))
+            conn.connection.generator.catalog = catalog
+            table = catalog.get_table(QualifiedId(None, tables.EnumTable.__name__))
+            state_table = catalog.get_table(
+                QualifiedId(None, tables.WorkflowState.__name__)
+            )
+            await conn.upsert_rows(
+                table,
+                (int, str),
+                [(1, "active"), (2, "inactive"), (3, "deleted")],
+            )
+            await conn.upsert_rows(
+                table,
+                (int, str),
+                [(4, "active"), (5, "inactive"), (6, "inactive")],
+            )
+            await conn.upsert_rows(
+                table,
+                (int, str),
+                [(7, "deleted"), (8, "deleted"), (9, "deleted")],
+            )
+            self.assertEqual(
+                await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable";'), 9
+            )
+            self.assertEqual(
+                await conn.query_one(int, 'SELECT COUNT(*) FROM "WorkflowState";'), 3
+            )
+            await conn.execute(table.drop_stmt())
+            await conn.execute(state_table.drop_stmt())

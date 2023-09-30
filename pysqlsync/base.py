@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
-from .formation.object_types import Catalog, Table
+from .formation.object_types import Catalog, Column, Table
 from .formation.py_to_sql import DataclassConverter
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
@@ -47,6 +47,10 @@ class BaseGenerator(abc.ABC):
         self.options = options
         self.catalog = Catalog([])
 
+    @property
+    def column_class(self) -> type[Column]:
+        return Column
+
     def create(self, tables: list[type[DataclassInstance]]) -> Optional[str]:
         target = self.converter.dataclasses_to_catalog(tables)
         statement = self.get_mutate_stmt(target)
@@ -65,8 +69,14 @@ class BaseGenerator(abc.ABC):
         return target.mutate_stmt(self.catalog)
 
     @abc.abstractmethod
+    def get_table_insert_stmt(self, table: Table) -> str:
+        "Returns a SQL statement to insert or ignore records in a database table."
+
+        ...
+
+    @abc.abstractmethod
     def get_table_upsert_stmt(self, table: Table) -> str:
-        "Returns a SQL statement to insert records into a database table."
+        "Returns a SQL statement to insert or update records in a database table."
 
         ...
 
@@ -310,6 +320,65 @@ class BaseContext(abc.ABC):
         statement = generator.get_dataclass_upsert_stmt(table)
         records = generator.get_dataclasses_as_records(data)
         await self.execute_all(statement, records)
+
+    async def upsert_rows(
+        self,
+        table: Table,
+        signature: tuple[type, ...],
+        records: Iterable[tuple[Any, ...]],
+    ) -> None:
+        """
+        Inserts or updates rows in a database table.
+
+        :param table: The table to be updated.
+        :param signature: The data types of the items in a row record.
+        :param records: The rows to be inserted into or updated in the database table.
+        """
+
+        generator = self.connection.generator
+
+        extractors: list[Callable[[Any], Any]] = []
+        for index, column, value_type in zip(
+            range(len(table.columns)), table.columns.values(), signature
+        ):
+            extractor = generator.get_tuple_extractor(index, value_type)
+            if value_type is str and table.is_relation(column.name):
+                relation = generator.catalog.get_referenced_table(
+                    table.name, column.name
+                )
+                if relation.is_lookup_table():
+                    enum_dict: dict[Any, int] = await self._merge_lookup_table(
+                        relation, set(record[index] for record in records)
+                    )
+                    extractor = lambda record: enum_dict[record[index]]
+            extractors.append(extractor)
+
+        statement = generator.get_table_upsert_stmt(table)
+        await self.execute_all(
+            statement,
+            (
+                tuple(extractor(record) for extractor in extractors)
+                for record in records
+            ),
+        )
+
+    async def _merge_lookup_table(
+        self, table: Table, values: Iterable[str]
+    ) -> dict[Any, int]:
+        "Merges new values into a lookup table and returns the entire updated table."
+
+        await self.execute_all(
+            self.connection.generator.get_table_insert_stmt(table),
+            list((value,) for value in values),
+        )
+        column_names = ", ".join(  # join on one element
+            str(column.name) for column in table.get_value_columns()
+        )
+        results = await self.query_all(
+            tuple[str, int],
+            f"SELECT {column_names}, {table.get_primary_column().name} FROM {table.name}",
+        )
+        return dict(results)  # type: ignore
 
 
 class Explorer(abc.ABC):

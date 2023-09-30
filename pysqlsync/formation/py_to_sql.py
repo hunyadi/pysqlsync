@@ -159,6 +159,7 @@ class DataclassConverterOptions:
     :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param substitutions: SQL type to be substituted for a specific Python type.
+    :param column_class: The object type instantiated for table columns. Must derive from `Column`.
     :param user_defined_annotation_classes: Annotation classes to ignore on table column types.
     """
 
@@ -168,6 +169,7 @@ class DataclassConverterOptions:
     qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
+    column_class: type[Column] = Column
     user_defined_annotation_classes: tuple[type, ...] = ()
 
 
@@ -403,7 +405,7 @@ class DataclassConverter:
             doc.params[field.name].description if field.name in doc.params else None
         )
 
-        return Column(
+        return self.options.column_class(
             name=LocalId(field.name),
             data_type=data_type,
             nullable=nullable,
@@ -602,12 +604,13 @@ class DataclassConverter:
                                 enum_type.__module__, enum_type.__name__
                             ),
                             [
-                                Column(
+                                self.options.column_class(
                                     LocalId("id"),
                                     SqlIntegerType(4),
                                     False,
+                                    identity=True,
                                 ),
-                                Column(
+                                self.options.column_class(
                                     LocalId("value"),
                                     SqlCharacterType(ENUM_NAME_LENGTH),
                                     False,
@@ -616,7 +619,8 @@ class DataclassConverter:
                             primary_key=LocalId("id"),
                             constraints=[
                                 UniqueConstraint(
-                                    LocalId(f"unique_value"), LocalId("value")
+                                    LocalId(f"uq_{enum_type.__name__}"),
+                                    LocalId("value"),
                                 )
                             ],
                         )
@@ -643,19 +647,19 @@ class DataclassConverter:
                             f"{column_left}_{item_type.__name__}",
                         ),
                         [
-                            Column(
+                            self.options.column_class(
                                 LocalId("uuid"),
                                 self.member_to_sql_data_type(uuid.UUID, entity),
                                 False,
                             ),
-                            Column(
+                            self.options.column_class(
                                 LocalId(column_left),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
                                 ),
                                 False,
                             ),
-                            Column(
+                            self.options.column_class(
                                 LocalId(column_right),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(item_type), item_type
