@@ -5,8 +5,12 @@ import tests.empty as empty
 import tests.tables as tables
 from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.formation.py_to_sql import (
+    ENUM_NAME_LENGTH,
+    DataclassConverter,
     DataclassConverterOptions,
+    EnumMode,
     NamespaceMapping,
+    StructMode,
     dataclass_to_struct,
     dataclass_to_table,
     module_to_catalog,
@@ -64,6 +68,46 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
+    def test_enum_type(self) -> None:
+        options = DataclassConverterOptions(
+            enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None})
+        )
+        table_def = dataclass_to_table(tables.EnumTable, options=options)
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(
+                    LocalId("state"),
+                    SqlUserDefinedType(QualifiedId(None, "WorkflowState")),
+                    False,
+                ),
+            ],
+        )
+
+    def test_enum_relation(self) -> None:
+        options = DataclassConverterOptions(
+            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({tables: None})
+        )
+        converter = DataclassConverter(options=options)
+        catalog = converter.dataclasses_to_catalog([tables.EnumTable])
+        table_def = catalog.get_table(QualifiedId(None, tables.EnumTable.__name__))
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(LocalId("state"), SqlIntegerType(4), False),
+            ],
+        )
+        enum_def = catalog.get_table(QualifiedId(None, tables.WorkflowState.__name__))
+        self.assertListEqual(
+            list(enum_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(4), False),
+                Column(LocalId("value"), SqlCharacterType(ENUM_NAME_LENGTH), False),
+            ],
+        )
+
     def test_struct_definition(self) -> None:
         struct_def = dataclass_to_struct(tables.Coordinates)
         self.assertEqual(
@@ -79,7 +123,8 @@ class TestConverter(unittest.TestCase):
 
     def test_struct_reference(self) -> None:
         table_def = dataclass_to_table(
-            tables.Location, options=DataclassConverterOptions(struct_as_type=True)
+            tables.Location,
+            options=DataclassConverterOptions(struct_mode=StructMode.TYPE),
         )
         self.assertListEqual(
             list(table_def.columns.values()),
@@ -99,21 +144,21 @@ class TestConverter(unittest.TestCase):
         catalog = module_to_catalog(
             tables,
             options=DataclassConverterOptions(
-                enum_as_type=False,
-                struct_as_type=False,
+                enum_mode=EnumMode.CHECK,
+                struct_mode=StructMode.JSON,
                 namespaces=NamespaceMapping({tables: "public"}),
             ),
         )
         for table in catalog.namespaces["public"].tables.values():
             cls = table_to_dataclass(table, SqlConverterOptions({"public": empty}))
-            print(dataclass_to_code(cls))
+            str(dataclass_to_code(cls))
 
     def test_mutate(self) -> None:
         source = module_to_catalog(
             tables,
             options=DataclassConverterOptions(
-                enum_as_type=True,
-                struct_as_type=True,
+                enum_mode=EnumMode.TYPE,
+                struct_mode=StructMode.TYPE,
                 namespaces=NamespaceMapping({tables: "public"}),
             ),
         )

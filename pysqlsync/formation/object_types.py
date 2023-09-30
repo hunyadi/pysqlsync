@@ -215,7 +215,22 @@ class Constraint:
     name: LocalId
 
     def is_alter_table(self) -> bool:
+        "True if the constraint is to be applied with an ALTER TABLE statement."
+
         return False
+
+
+@dataclass
+class UniqueConstraint(Constraint):
+    "A unique constraint."
+
+    unique_column: LocalId
+
+    def is_alter_table(self) -> bool:
+        return True
+
+    def __str__(self) -> str:
+        return f"CONSTRAINT {self.name} UNIQUE ({self.unique_column})"
 
 
 @dataclass
@@ -302,7 +317,14 @@ class Table(QualifiedObject, MutableObject):
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
+    def is_primary_column(self, column_id: LocalId) -> bool:
+        "True if the specified column is a primary key."
+
+        return column_id == self.primary_key
+
     def get_primary_column(self) -> Column:
+        "Returns the primary key column."
+
         for column in self.columns.values():
             if column.name == self.primary_key:
                 return column
@@ -310,11 +332,67 @@ class Table(QualifiedObject, MutableObject):
         raise KeyError(f"no primary column in table: {self.name}")
 
     def get_value_columns(self) -> list[Column]:
+        "Returns all columns that are not part of the primary key."
+
         return [
             column
             for column in self.columns.values()
             if column.name != self.primary_key
         ]
+
+    def is_unique_column(self, column_id: LocalId) -> bool:
+        "True if a unique constraint is applied to the specified column."
+
+        if self.constraints is not None:
+            for constraint in self.constraints:
+                if not isinstance(constraint, UniqueConstraint):
+                    continue
+                if column_id != constraint.unique_column:
+                    continue
+                return True
+
+        return False
+
+    def is_lookup_table(self) -> bool:
+        "Checks whether the table maps a primary key to a unique value."
+
+        if len(self.columns) != 2:
+            return False
+
+        for column in self.columns.values():
+            if self.is_primary_column(column.name):
+                continue
+            if self.is_unique_column(column.name):
+                continue
+            return False
+
+        return True
+
+    def is_relation(self, column_id: LocalId) -> bool:
+        "Checks whether the column is a foreign key relation."
+
+        if self.constraints is not None:
+            for constraint in self.constraints:
+                if not isinstance(constraint, ForeignConstraint):
+                    continue
+                if column_id != constraint.foreign_column:
+                    continue
+                return True
+
+        return False
+
+    def get_reference(self, column_id: LocalId) -> ConstraintReference:
+        "Returns a reference that a column points to."
+
+        if self.constraints is not None:
+            for constraint in self.constraints:
+                if not isinstance(constraint, ForeignConstraint):
+                    continue
+                if column_id != constraint.foreign_column:
+                    continue
+                return constraint.reference
+
+        raise KeyError(f"foreign constraint not found for column: {column_id}")
 
     def create_stmt(self) -> str:
         defs: list[str] = []
@@ -492,7 +570,29 @@ class Catalog(MutableObject):
         self.namespaces = ObjectDict(namespaces)
 
     def get_table(self, table_id: SupportsQualifiedId) -> Table:
+        """
+        Looks up a table by its qualified name.
+
+        :param table_id: Identifies the table in the catalog.
+        :returns: The table identified by the qualified name.
+        """
+
         return self.namespaces[table_id.scope_id or ""].tables[table_id.local_id]
+
+    def get_referenced_table(
+        self, table_id: SupportsQualifiedId, column_id: LocalId
+    ) -> Table:
+        """
+        Looks up a table referenced by a foreign key column.
+
+        :param table_id: Identifies the table in the catalog.
+        :param column_id: Identifies the foreign key column.
+        :returns: The table in which the referenced primary key is.
+        """
+
+        table = self.get_table(table_id)
+        reference = table.get_reference(column_id)
+        return self.get_table(reference.table)
 
     def create_stmt(self) -> str:
         return "\n".join(n.create_stmt() for n in self.namespaces.values())

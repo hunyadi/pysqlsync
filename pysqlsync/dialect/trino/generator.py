@@ -4,7 +4,9 @@ from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
+    EnumMode,
     NamespaceMapping,
+    StructMode,
 )
 
 
@@ -13,8 +15,8 @@ class TrinoGenerator(BaseGenerator):
         super().__init__(options)
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_as_type=False,
-                struct_as_type=False,
+                enum_mode=EnumMode.CHECK,
+                struct_mode=StructMode.JSON,
                 namespaces=NamespaceMapping(self.options.namespaces),
             )
         )

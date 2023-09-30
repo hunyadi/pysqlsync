@@ -6,7 +6,9 @@ from pysqlsync.formation.object_types import Catalog, Table
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
+    EnumMode,
     NamespaceMapping,
+    StructMode,
 )
 
 _sql_quoted_str_table = str.maketrans(
@@ -38,8 +40,8 @@ class PostgreSQLGenerator(BaseGenerator):
         super().__init__(options)
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_as_type=True,
-                struct_as_type=True,
+                enum_mode=EnumMode.TYPE,
+                struct_mode=StructMode.TYPE,
                 namespaces=NamespaceMapping(self.options.namespaces),
             )
         )

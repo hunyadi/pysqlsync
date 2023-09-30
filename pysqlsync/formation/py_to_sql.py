@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import decimal
+import enum
 import inspect
 import ipaddress
 import sys
@@ -67,10 +68,14 @@ from .object_types import (
     StructMember,
     StructType,
     Table,
+    UniqueConstraint,
     quote,
 )
 
 T = TypeVar("T")
+
+ENUM_NAME_LENGTH: int = 64
+"Maximum length for an enumeration string value."
 
 
 def is_unique(items: Iterable[T]) -> bool:
@@ -118,13 +123,38 @@ class NamespaceMapping:
             return module.__name__
 
 
+@enum.unique
+class EnumMode(enum.Enum):
+    "Determines whether enumeration types are converted as SQL ENUM, a foreign/primary key relation, or a CHECK constraint."
+
+    TYPE = "type"
+    "Enumeration types are converted to SQL ENUM types with CREATE TYPE ... AS ENUM ( ... )."
+
+    RELATION = "relation"
+    "Enumeration types are converted into foreign/primary key relations, and reference a lookup table."
+
+    CHECK = "check"
+    "Enumeration types are converted into their value type, with a CHECK constraint on the column."
+
+
+@enum.unique
+class StructMode(enum.Enum):
+    "Determines how to convert structure types that are not mapped into SQL tables."
+
+    TYPE = "type"
+    "Dataclass types are converted into SQL types with CREATE TYPE ... AS ( ... )."
+
+    JSON = "json"
+    "Dataclass types are converted into SQL JSON type (or text)."
+
+
 @dataclass
 class DataclassConverterOptions:
     """
     Configuration options for generating a SQL table definition from a Python dataclass.
 
-    :param enum_as_type: Whether to use CREATE TYPE ... AS ENUM ( ... ) for enumeration types.
-    :param struct_as_type: Whether to use CREATE TYPE ... AS ( ... ) for non-table structure types.
+    :param enum_mode: Conversion mode for enumeration types.
+    :param struct_mode: Conversion mode for structure types that are not entities.
     :param extra_numeric_types: Whether to use extra numeric types like `int1` or `uint4`.
     :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
@@ -132,8 +162,8 @@ class DataclassConverterOptions:
     :param user_defined_annotation_classes: Annotation classes to ignore on table column types.
     """
 
-    enum_as_type: bool = True
-    struct_as_type: bool = True
+    enum_mode: EnumMode = EnumMode.TYPE
+    struct_mode: StructMode = StructMode.TYPE
     extra_numeric_types: bool = False
     qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
@@ -260,11 +290,13 @@ class DataclassConverter:
                 )
             value_type = value_types.pop()
 
-            if self.options.enum_as_type:
+            if self.options.enum_mode is EnumMode.TYPE:
                 return SqlUserDefinedType(
                     self.create_qualified_id(typ.__module__, typ.__name__)
                 )
-            else:
+            elif self.options.enum_mode is EnumMode.RELATION:
+                return SqlIntegerType(4)
+            elif self.options.enum_mode is EnumMode.CHECK:
                 return self.simple_type_to_sql_data_type(value_type)
 
         raise TypeError(f"not a simple type: {typ}")
@@ -289,11 +321,11 @@ class DataclassConverter:
             return self.member_to_sql_data_type(key_field_type, typ)
         if is_dataclass_type(typ):
             # an embedded user-defined type
-            if self.options.struct_as_type:
+            if self.options.struct_mode is StructMode.TYPE:
                 return SqlUserDefinedType(
                     self.create_qualified_id(typ.__module__, typ.__name__)
                 )
-            else:
+            elif self.options.struct_mode is StructMode.JSON:
                 return SqlJsonType()
         if isinstance(typ, typing.ForwardRef):
             return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
@@ -435,7 +467,22 @@ class DataclassConverter:
                     )
 
         # checks
-        if not self.options.enum_as_type:
+        if self.options.enum_mode is EnumMode.RELATION:
+            for field in dataclass_fields_as_required(cls):
+                if is_type_enum(field.type):
+                    constraints.append(
+                        ForeignConstraint(
+                            LocalId(f"fk_{cls.__name__}_{field.name}"),
+                            LocalId(field.name),
+                            ConstraintReference(
+                                self.create_qualified_id(
+                                    field.type.__module__, field.type.__name__
+                                ),
+                                LocalId("id"),
+                            ),
+                        ),
+                    )
+        elif self.options.enum_mode is EnumMode.CHECK:
             for field in dataclass_fields_as_required(cls):
                 if is_type_enum(field.type):
                     enum_values = ", ".join(quote(e.value) for e in field.type)
@@ -507,7 +554,7 @@ class DataclassConverter:
 
         # collect all enumeration types in alphabetical order
         enums: dict[str, list[EnumType]] = {}
-        if self.options.enum_as_type:
+        if self.options.enum_mode is EnumMode.TYPE:
             enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
             enum_types.sort(key=lambda e: e.__name__)
             for enum_type in enum_types:
@@ -521,7 +568,7 @@ class DataclassConverter:
 
         # collect all struct types in alphabetical order
         structs: dict[str, list[StructType]] = {}
-        if self.options.struct_as_type:
+        if self.options.struct_mode is StructMode.TYPE:
             struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
             struct_types.sort(key=lambda s: s.__name__)
             depend_types = type_topological_sort(struct_types)
@@ -540,6 +587,40 @@ class DataclassConverter:
             table_defs = tables.setdefault(table_type.__module__, [])
             table_defs.append(self.dataclass_to_table(table_type))
 
+        # create tables for enumerations
+        if self.options.enum_mode is EnumMode.RELATION:
+            for entity in table_types:
+                for field in dataclass_fields_as_required(entity):
+                    if not is_type_enum(field.type):
+                        continue
+
+                    enum_type = field.type
+                    table_defs = tables.setdefault(enum_type.__module__, [])
+                    table_defs.append(
+                        Table(
+                            self.create_qualified_id(
+                                enum_type.__module__, enum_type.__name__
+                            ),
+                            [
+                                Column(
+                                    LocalId("id"),
+                                    SqlIntegerType(4),
+                                    False,
+                                ),
+                                Column(
+                                    LocalId("value"),
+                                    SqlCharacterType(ENUM_NAME_LENGTH),
+                                    False,
+                                ),
+                            ],
+                            primary_key=LocalId("id"),
+                            constraints=[
+                                UniqueConstraint(
+                                    LocalId(f"unique_value"), LocalId("value")
+                                )
+                            ],
+                        )
+                    )
         # create join tables for one-to-many relationships
         for entity in table_types:
             for field in dataclass_fields(entity):
@@ -631,7 +712,7 @@ def dataclass_to_table(
     "Converts a data-class with a primary key into a SQL table type."
 
     if options is None:
-        options = DataclassConverterOptions(enum_as_type=True)
+        options = DataclassConverterOptions()
 
     converter = DataclassConverter(options=options)
     return converter.dataclass_to_table(cls)
@@ -645,7 +726,7 @@ def dataclass_to_struct(
     "Converts a data-class without a primary key into a SQL struct type."
 
     if options is None:
-        options = DataclassConverterOptions(enum_as_type=True)
+        options = DataclassConverterOptions()
 
     converter = DataclassConverter(options=options)
     return converter.dataclass_to_struct(cls)
@@ -667,7 +748,7 @@ def modules_to_catalog(
     "Converts the entire contents of a Python module into a SQL namespace (schema)."
 
     if options is None:
-        options = DataclassConverterOptions(enum_as_type=True, struct_as_type=True)
+        options = DataclassConverterOptions()
 
     # collect all entity types defined in this module
     entity_types: list[type[DataclassInstance]] = []
