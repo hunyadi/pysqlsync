@@ -22,6 +22,7 @@ from strong_typing.auxiliary import (
     uint32,
     uint64,
 )
+from strong_typing.core import JsonType
 from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
     DataclassField,
@@ -261,6 +262,8 @@ class DataclassConverter:
             return SqlIntervalType()
         if typ is uuid.UUID:
             return SqlUuidType()
+        if typ is JsonType:
+            return SqlJsonType()
         if typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
             return SqlUserDefinedType(GlobalId("inet"))  # PostgreSQL only
 
@@ -328,7 +331,7 @@ class DataclassConverter:
                     self.create_qualified_id(typ.__module__, typ.__name__)
                 )
             elif self.options.struct_mode is StructMode.JSON:
-                return SqlJsonType()
+                return self.member_to_sql_data_type(JsonType, cls)
         if isinstance(typ, typing.ForwardRef):
             return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_type_literal(typ):

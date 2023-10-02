@@ -4,6 +4,7 @@ import ipaddress
 import uuid
 from typing import Any, Optional, TypeGuard
 
+from strong_typing.core import JsonType
 from strong_typing.inspection import (
     DataclassInstance,
     TypeLike,
@@ -37,6 +38,7 @@ def is_simple_type(typ: Any) -> bool:
         or typ is datetime.time
         or typ is datetime.timedelta
         or typ is uuid.UUID
+        or typ is JsonType
         or typ is ipaddress.IPv4Address  # PostgreSQL only
         or typ is ipaddress.IPv6Address  # PostgreSQL only
     ):

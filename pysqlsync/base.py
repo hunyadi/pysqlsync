@@ -134,17 +134,18 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_tuple_extractor(
-        self, field_index: int, field_type: type
-    ) -> Callable[[Any], Any]:
+    def get_value_extractor(self, field_type: type) -> Optional[Callable[[Any], Any]]:
         "Returns a callable function object that extracts a single field of a data-class."
 
         if is_type_enum(field_type):
-            return lambda record: record[field_index].value
+            return lambda field: field.value
         elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
-            return lambda record: str(record[field_index])
+            return lambda field: str(field)
         else:
-            return lambda record: record[field_index]
+            return None
+
+    def get_enum_extractor(self, enum_dict: dict[Any, int]) -> Callable[[Any], Any]:
+        return lambda field: enum_dict[field]
 
 
 @dataclass
@@ -337,11 +338,11 @@ class BaseContext(abc.ABC):
 
         generator = self.connection.generator
 
-        extractors: list[Callable[[Any], Any]] = []
+        extractors: list[Optional[Callable[[Any], Any]]] = []
         for index, column, value_type in zip(
             range(len(table.columns)), table.columns.values(), signature
         ):
-            extractor = generator.get_tuple_extractor(index, value_type)
+            extractor = generator.get_value_extractor(value_type)
             if value_type is str and table.is_relation(column.name):
                 relation = generator.catalog.get_referenced_table(
                     table.name, column.name
@@ -350,14 +351,17 @@ class BaseContext(abc.ABC):
                     enum_dict: dict[Any, int] = await self._merge_lookup_table(
                         relation, set(record[index] for record in records)
                     )
-                    extractor = lambda record: enum_dict[record[index]]
+                    extractor = generator.get_enum_extractor(enum_dict)
             extractors.append(extractor)
 
         statement = generator.get_table_upsert_stmt(table)
         await self.execute_all(
             statement,
             (
-                tuple(extractor(record) for extractor in extractors)
+                tuple(
+                    (extractor(field) if extractor is not None else field)
+                    for extractor, field in zip(extractors, record)
+                )
                 for record in records
             ),
         )

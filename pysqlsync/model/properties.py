@@ -5,7 +5,9 @@ from typing import Annotated, Any
 from strong_typing.inspection import (
     DataclassInstance,
     TypeLike,
+    enum_value_types,
     get_annotation,
+    is_type_enum,
     unwrap_annotated_type,
 )
 
@@ -57,12 +59,26 @@ class FieldProperties:
             # type becomes a regular type
             return self.plain_type
 
+    @property
+    def tsv_type(self) -> type:
+        "Python type that represents the TSV storage type for this data."
+
+        if is_type_enum(self.plain_type):
+            value_types = set(enum_value_types(self.plain_type))
+            if len(value_types) != 1:
+                raise TypeError("inconsistent enumeration value types")
+            return value_types.pop()
+        elif isinstance(self.plain_type, type):
+            return self.plain_type
+        else:
+            raise TypeError("unsupported TSV value type")
+
 
 def get_field_properties(field_type: TypeLike) -> FieldProperties:
     metadata = getattr(field_type, "__metadata__", None)
     if metadata is None:
         # field has a type without annotations or constraints
-        return FieldProperties(field_type, (), False)
+        return FieldProperties(plain_type=field_type, metadata=(), is_primary=False)
 
     # field has a type of Annotated[T, ...]
     plain_type = unwrap_annotated_type(field_type)
@@ -73,4 +89,8 @@ def get_field_properties(field_type: TypeLike) -> FieldProperties:
     # filter annotations that represent constraints
     metadata = tuple(item for item in metadata if not is_constraint(item))
 
-    return FieldProperties(plain_type, metadata, is_primary)
+    return FieldProperties(
+        plain_type=plain_type,
+        metadata=metadata,
+        is_primary=is_primary,
+    )
