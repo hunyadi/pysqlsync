@@ -12,7 +12,13 @@ from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.properties import get_class_properties
 from tests import tables
-from tests.datagen import random_alphanumeric_str, random_datetime, random_enum
+from tests.datagen import (
+    random_alphanumeric_str,
+    random_date,
+    random_datetime,
+    random_enum,
+    random_ipv4address,
+)
 from tests.measure import Timer
 
 
@@ -26,26 +32,24 @@ def create_randomized_object(index: int) -> tables.EventRecord:
         ),
         user_id=random.randint(1, 1000000),
         real_user_id=random.randint(1, 1000000),
-        # expires_on=random_date(datetime.date(1982, 10, 23), datetime.date(2022, 9, 25)),
+        expires_on=random_date(datetime.date(1982, 10, 23), datetime.date(2022, 9, 25)),
         interaction_duration=random.uniform(0.0, 1.0),
         url="https://example.com/" + random_alphanumeric_str(1, 128),
         user_agent=f"Mozilla/5.0 (platform; rv:0.{random.randint(0, 9)}) Gecko/{random.randint(1, 99)} Firefox/{random.randint(1, 99)}",
         http_method=random_enum(tables.HTTPMethod),
         http_status=random_enum(tables.HTTPStatus),
         http_version=random_enum(tables.HTTPVersion),
-        # remote_ip=random_ipv4address(),
+        remote_ip=random_ipv4address(),
         participated=random.uniform(0.0, 1.0) > 0.5,
     )
 
 
-def generate_input_file() -> None:
+def generate_input_file(data_file_path: str, record_count: int) -> None:
     "Generates data and writes a file to be used as input for performance testing."
 
     generator = Generator()
-    with open(
-        os.path.join(os.path.dirname(__file__), "performance_test.tsv"), "wb"
-    ) as f:
-        for k in range(1, 1000000):
+    with open(data_file_path, "wb") as f:
+        for k in range(0, record_count):
             f.write(
                 generator.generate_line(
                     dataclasses.astuple(create_randomized_object(k))
@@ -55,11 +59,19 @@ def generate_input_file() -> None:
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
+    RECORD_COUNT = 100000
+
     @property
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(
             enum_mode=EnumMode.RELATION, namespaces={tables: "performance_test"}
         )
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        data_file_path = os.path.join(os.path.dirname(__file__), "performance_test.tsv")
+        if not os.path.exists(data_file_path):
+            generate_input_file(data_file_path, cls.RECORD_COUNT)
 
     async def test_rows_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -76,12 +88,12 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 ) as f:
                     data = parser.parse_file(f)
 
-            with Timer("insert into database table"):
+            with Timer(f"insert into {self.engine.name} database table"):
                 await conn.upsert_rows(table, column_types, data)
 
             self.assertEqual(
                 await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};"),
-                999,
+                self.__class__.RECORD_COUNT,
             )
 
             await conn.drop_objects()

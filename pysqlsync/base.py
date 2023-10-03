@@ -423,6 +423,10 @@ class Explorer(abc.ABC):
 class BaseEngine(abc.ABC):
     "Represents a specific database server type."
 
+    @abc.abstractproperty
+    def name(self) -> str:
+        ...
+
     @abc.abstractmethod
     def get_generator_type(self) -> type[BaseGenerator]:
         ...

@@ -1,3 +1,4 @@
+import ipaddress
 import uuid
 from typing import Any, Callable, Optional
 
@@ -62,7 +63,11 @@ class MySQLGenerator(BaseGenerator):
                 struct_mode=StructMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
-                substitutions={uuid.UUID: SqlFixedBinaryType(16)},
+                substitutions={
+                    uuid.UUID: SqlFixedBinaryType(16),
+                    ipaddress.IPv4Address: SqlFixedBinaryType(4),
+                    ipaddress.IPv6Address: SqlFixedBinaryType(16),
+                },
                 column_class=MySQLColumn,
             )
         )
@@ -118,6 +123,8 @@ class MySQLGenerator(BaseGenerator):
     def get_value_extractor(self, field_type: type) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
+        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+            return lambda field: field.packed
 
         return super().get_value_extractor(field_type)
 

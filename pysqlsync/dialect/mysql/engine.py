@@ -6,6 +6,10 @@ from .generator import MySQLGenerator
 
 
 class MySQLEngine(BaseEngine):
+    @property
+    def name(self) -> str:
+        return "mysql"
+
     def get_generator_type(self) -> type[BaseGenerator]:
         return MySQLGenerator
 

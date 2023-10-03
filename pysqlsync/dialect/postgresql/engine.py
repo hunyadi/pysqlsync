@@ -6,6 +6,10 @@ from .generator import PostgreSQLGenerator
 
 
 class PostgreSQLEngine(BaseEngine):
+    @property
+    def name(self) -> str:
+        return "postgresql"
+
     def get_generator_type(self) -> type[BaseGenerator]:
         return PostgreSQLGenerator
 

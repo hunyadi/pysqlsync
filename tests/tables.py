@@ -204,12 +204,12 @@ class EventRecord:
     timestamp: datetime
     user_id: int64
     real_user_id: int64
-    # expires_on: date
+    expires_on: date
     interaction_duration: float
     url: str
     user_agent: str
     http_method: HTTPMethod
     http_status: HTTPStatus
     http_version: HTTPVersion
-    # remote_ip: ipaddress.IPv4Address
+    remote_ip: ipaddress.IPv4Address
     participated: bool

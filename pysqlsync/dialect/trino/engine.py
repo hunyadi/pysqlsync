@@ -6,6 +6,10 @@ from .generator import TrinoGenerator
 
 
 class TrinoEngine(BaseEngine):
+    @property
+    def name(self) -> str:
+        return "trino"
+
     def get_generator_type(self) -> type[BaseGenerator]:
         return TrinoGenerator
 
