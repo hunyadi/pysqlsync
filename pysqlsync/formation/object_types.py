@@ -86,10 +86,16 @@ class EnumType(QualifiedObject, MutableObject):
                 "operation not permitted; cannot drop values in an enumeration"
             )
 
+        diff_values = list(target_values - source_values)
+        diff_values.sort()
         return (
-            f"ALTER TYPE {source.name}\n"
-            + ",\n".join(f"ADD VALUE {quote(v)}" for v in target_values - source_values)
-            + ";"
+            (
+                f"ALTER TYPE {source.name}\n"
+                + ",\n".join(f"ADD VALUE {quote(v)}" for v in diff_values)
+                + ";"
+            )
+            if diff_values
+            else None
         )
 
     def __str__(self) -> str:
@@ -479,11 +485,25 @@ class Table(QualifiedObject, MutableObject):
         else:
             return None
 
-    def constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> Optional[str]:
         if self.constraints and any(c.is_alter_table() for c in self.constraints):
             return (
                 f"ALTER TABLE {self.name}\n"
                 + ",\n".join(f"ADD {c}" for c in self.constraints if c.is_alter_table())
+                + "\n;"
+            )
+        else:
+            return None
+
+    def drop_constraints_stmt(self) -> Optional[str]:
+        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+            return (
+                f"ALTER TABLE {self.name}\n"
+                + ",\n".join(
+                    f"DROP CONSTRAINT {c.name}"
+                    for c in self.constraints
+                    if c.is_alter_table()
+                )
                 + "\n;"
             )
         else:
@@ -546,10 +566,20 @@ class Namespace(MutableObject):
         items.extend(t.create_stmt() for t in self.tables.values())
         return "\n".join(items)
 
-    def constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> Optional[str]:
         items: list[str] = []
         for table in self.tables.values():
-            constraints = table.constraints_stmt()
+            constraints = table.add_constraints_stmt()
+            if constraints is None:
+                continue
+            items.append(constraints)
+
+        return "\n".join(items) if items else None
+
+    def drop_constraints_stmt(self) -> Optional[str]:
+        items: list[str] = []
+        for table in self.tables.values():
+            constraints = table.drop_constraints_stmt()
             if constraints is None:
                 continue
             items.append(constraints)
@@ -580,7 +610,7 @@ class Namespace(MutableObject):
 
         for id in target.tables.keys():
             if id not in source.tables.keys():
-                statement = target.tables[id].constraints_stmt()
+                statement = target.tables[id].add_constraints_stmt()
                 if statement:
                     statements.append(statement)
 
@@ -638,10 +668,10 @@ class Catalog(MutableObject):
     def create_stmt(self) -> str:
         return "\n".join(n.create_stmt() for n in self.namespaces.values())
 
-    def constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> Optional[str]:
         items: list[str] = []
         for namespace in self.namespaces.values():
-            constraints = namespace.constraints_stmt()
+            constraints = namespace.add_constraints_stmt()
             if constraints is None:
                 continue
             items.append(constraints)
@@ -659,18 +689,24 @@ class Catalog(MutableObject):
         statements.extend(_create_diff(source.namespaces, target.namespaces))
         for id in target.namespaces.keys():
             if id not in source.namespaces.keys():
-                statement = target.namespaces[id].constraints_stmt()
+                statement = target.namespaces[id].add_constraints_stmt()
                 if statement:
                     statements.append(statement)
 
         statements.extend(_mutate_diff(source.namespaces, target.namespaces))
+
+        for id in source.namespaces.keys():
+            if id not in target.namespaces.keys():
+                statement = source.namespaces[id].drop_constraints_stmt()
+                if statement:
+                    statements.append(statement)
         statements.extend(_drop_diff(source.namespaces, target.namespaces))
         return "\n".join(statements)
 
     def __str__(self) -> str:
         statements: list[str] = []
         statements.append(self.create_stmt())
-        constraints = self.constraints_stmt()
+        constraints = self.add_constraints_stmt()
         if constraints is not None:
             statements.append(constraints)
         return "\n".join(statements)

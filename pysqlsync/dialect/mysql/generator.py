@@ -1,8 +1,15 @@
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import Catalog, Column, Table, constant, quote
+from pysqlsync.formation.object_types import (
+    Catalog,
+    Column,
+    FormationError,
+    Table,
+    constant,
+    quote,
+)
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
@@ -43,9 +50,15 @@ class MySQLGenerator(BaseGenerator):
 
     def __init__(self, options: GeneratorOptions) -> None:
         super().__init__(options)
+
+        if options.enum_mode is EnumMode.TYPE:
+            raise FormationError(
+                f"unsupported enumeration conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+            )
+
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=EnumMode.CHECK,
+                enum_mode=options.enum_mode or EnumMode.CHECK,
                 struct_mode=StructMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
@@ -101,6 +114,12 @@ class MySQLGenerator(BaseGenerator):
             return lambda obj: getattr(obj, field_name).bytes
 
         return super().get_field_extractor(field_name, field_type)
+
+    def get_value_extractor(self, field_type: type) -> Optional[Callable[[Any], Any]]:
+        if field_type is uuid.UUID:
+            return lambda field: field.bytes
+
+        return super().get_value_extractor(field_type)
 
 
 def _field_list(field_ids: list[LocalId]) -> str:

@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable, Optional, TypeVar
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
 from .formation.object_types import Catalog, Column, Table
-from .formation.py_to_sql import DataclassConverter
+from .formation.py_to_sql import DataclassConverter, EnumMode
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -22,9 +22,11 @@ class GeneratorOptions:
     """
     Database-agnostic generator options.
 
+    :param enum_mode: Conversion mode for enumeration types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
     """
 
+    enum_mode: Optional[EnumMode] = None
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
@@ -297,6 +299,11 @@ class BaseContext(abc.ABC):
     ) -> None:
         ...
 
+    def get_table(self, table: type[DataclassInstance]) -> Table:
+        return self.connection.generator.catalog.get_table(
+            self.connection.generator.get_qualified_id(table)
+        )
+
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         generator = self.connection.generator
         statement = generator.create(tables)
@@ -354,16 +361,21 @@ class BaseContext(abc.ABC):
                     extractor = generator.get_enum_extractor(enum_dict)
             extractors.append(extractor)
 
-        statement = generator.get_table_upsert_stmt(table)
-        await self.execute_all(
-            statement,
-            (
+        if all(extractor is None for extractor in extractors):
+            record_generator = records
+        else:
+            record_generator = (
                 tuple(
                     (extractor(field) if extractor is not None else field)
                     for extractor, field in zip(extractors, record)
                 )
                 for record in records
-            ),
+            )
+
+        statement = generator.get_table_upsert_stmt(table)
+        await self.execute_all(
+            statement,
+            record_generator,
         )
 
     async def _merge_lookup_table(

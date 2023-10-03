@@ -5,18 +5,12 @@ import random
 import unittest
 import uuid
 
-from params import PostgreSQLBase
+from params import MySQLBase, PostgreSQLBase, TestEngineBase
 from tsv.helper import Generator, Parser
 
 from pysqlsync.base import GeneratorOptions
-from pysqlsync.formation.py_to_sql import (
-    DataclassConverter,
-    DataclassConverterOptions,
-    EnumMode,
-    NamespaceMapping,
-)
-from pysqlsync.model.id_types import QualifiedId
-from pysqlsync.model.properties import get_field_properties
+from pysqlsync.formation.py_to_sql import EnumMode
+from pysqlsync.model.properties import get_class_properties
 from tests import tables
 from tests.datagen import random_alphanumeric_str, random_datetime, random_enum
 from tests.measure import Timer
@@ -60,34 +54,20 @@ def generate_input_file() -> None:
             f.write(b"\n")
 
 
-class TestPostgreSQLConnection(unittest.IsolatedAsyncioTestCase, PostgreSQLBase):
+class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     @property
     def options(self) -> GeneratorOptions:
-        return GeneratorOptions(namespaces={tables: "performance_test"})
+        return GeneratorOptions(
+            enum_mode=EnumMode.RELATION, namespaces={tables: "performance_test"}
+        )
 
     async def test_rows_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            options = DataclassConverterOptions(
-                enum_mode=EnumMode.RELATION,
-                namespaces=NamespaceMapping({tables: "performance_test"}),
-                column_class=conn.connection.generator.column_class,
-            )
-            converter = DataclassConverter(options=options)
-            catalog = converter.dataclasses_to_catalog([tables.EventRecord])
+            await conn.create_objects([tables.EventRecord])
 
-            await conn.execute('DROP SCHEMA IF EXISTS "performance_test" CASCADE')
-            await conn.execute(str(catalog))
-            conn.connection.generator.catalog = catalog
-
-            column_types = tuple(
-                get_field_properties(field.type).tsv_type
-                for field in dataclasses.fields(tables.EventRecord)
-            )
+            table = conn.get_table(tables.EventRecord)
+            column_types = get_class_properties(tables.EventRecord).tsv_types
             parser = Parser(column_types)
-
-            table = catalog.get_table(
-                QualifiedId("performance_test", tables.EventRecord.__name__)
-            )
 
             with Timer("read file"):
                 with open(
@@ -100,13 +80,28 @@ class TestPostgreSQLConnection(unittest.IsolatedAsyncioTestCase, PostgreSQLBase)
                 await conn.upsert_rows(table, column_types, data)
 
             self.assertEqual(
-                await conn.query_one(
-                    int, 'SELECT COUNT(*) FROM "performance_test"."EventRecord";'
-                ),
-                999999,
+                await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};"),
+                999,
             )
-            # await conn.execute('DROP SCHEMA "performance_test" CASCADE')
 
+            await conn.drop_objects()
+
+
+class TestPostgreSQLConnection(PostgreSQLBase, TestPerformance):
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.execute('DROP SCHEMA IF EXISTS "performance_test" CASCADE;')
+
+
+class TestMySQLConnection(MySQLBase, TestPerformance):
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.execute(
+                'DROP TABLE IF EXISTS "performance_test__EventRecord", "performance_test__HTTPMethod", "performance_test__HTTPStatus", "performance_test__HTTPVersion";'
+            )
+
+
+del TestPerformance
 
 if __name__ == "__main__":
     unittest.main()

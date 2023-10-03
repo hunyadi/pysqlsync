@@ -94,3 +94,20 @@ def get_field_properties(field_type: TypeLike) -> FieldProperties:
         metadata=metadata,
         is_primary=is_primary,
     )
+
+
+@dataclass
+class ClassProperties:
+    fields: tuple[FieldProperties, ...]
+
+    @property
+    def tsv_types(self) -> tuple[type, ...]:
+        return tuple(prop.tsv_type for prop in self.fields)
+
+
+def get_class_properties(class_type: type[DataclassInstance]) -> ClassProperties:
+    return ClassProperties(
+        tuple(
+            get_field_properties(field.type) for field in dataclasses.fields(class_type)
+        )
+    )

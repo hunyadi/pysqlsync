@@ -40,7 +40,7 @@ class PostgreSQLGenerator(BaseGenerator):
         super().__init__(options)
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=EnumMode.TYPE,
+                enum_mode=options.enum_mode or EnumMode.TYPE,
                 struct_mode=StructMode.TYPE,
                 namespaces=NamespaceMapping(self.options.namespaces),
             )

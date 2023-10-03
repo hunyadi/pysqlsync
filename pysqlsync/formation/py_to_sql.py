@@ -701,7 +701,7 @@ class DataclassConverter:
         return Catalog(
             [
                 Namespace(
-                    name=LocalId(self.options.namespaces.get(module_name) or ""),
+                    name=self.module_to_namespace(module_name),
                     enums=enums.get(module_name, []),
                     structs=structs.get(module_name, []),
                     tables=table_defs,
@@ -709,6 +709,12 @@ class DataclassConverter:
                 for module_name, table_defs in tables.items()
             ]
         )
+
+    def module_to_namespace(self, module_name: str) -> LocalId:
+        if self.options.qualified_names:
+            return LocalId(self.options.namespaces.get(module_name) or "")
+        else:
+            return LocalId("")
 
 
 def dataclass_to_table(
