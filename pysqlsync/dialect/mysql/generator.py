@@ -69,6 +69,7 @@ class MySQLGenerator(BaseGenerator):
                     ipaddress.IPv6Address: SqlFixedBinaryType(16),
                 },
                 column_class=MySQLColumn,
+                skip_annotations=options.skip_annotations,
             )
         )
 

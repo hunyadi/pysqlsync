@@ -3,6 +3,8 @@ import typing
 import unittest
 from datetime import date, datetime, time, timezone
 
+from strong_typing.inspection import DataclassInstance
+
 import tests.tables as tables
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.factory import get_dialect
@@ -14,8 +16,8 @@ def get_generator() -> BaseGenerator:
     )
 
 
-def get_create_stmt(table: type) -> str:
-    statement = get_generator().create([table])
+def get_create_stmt(table: type[DataclassInstance]) -> str:
+    statement = get_generator().create(tables=[table])
     return statement or ""
 
 
@@ -167,7 +169,7 @@ class TestGenerator(unittest.TestCase):
 
     def test_insert_single(self) -> None:
         generator = get_generator()
-        generator.create([tables.DataTable])
+        generator.create(tables=[tables.DataTable])
 
         lines = [
             'INSERT INTO "DataTable"',
@@ -181,7 +183,7 @@ class TestGenerator(unittest.TestCase):
 
     def test_insert_multiple(self) -> None:
         generator = get_generator()
-        generator.create([tables.DateTimeTable])
+        generator.create(tables=[tables.DateTimeTable])
 
         lines = [
             'INSERT INTO "DateTimeTable"',

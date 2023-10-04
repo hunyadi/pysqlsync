@@ -43,6 +43,7 @@ class PostgreSQLGenerator(BaseGenerator):
                 enum_mode=options.enum_mode or EnumMode.TYPE,
                 struct_mode=StructMode.TYPE,
                 namespaces=NamespaceMapping(self.options.namespaces),
+                skip_annotations=options.skip_annotations,
             )
         )
 

@@ -41,6 +41,9 @@ Next, instantiate a database engine, open a connection, create the database stru
 
 ```python
 engine = get_dialect("postgresql")
+options = GeneratorOptions(
+    enum_mode=EnumMode.RELATION, namespaces={ ... }
+)
 parameters = ConnectionParameters(
     host="localhost",
     port=5432,
@@ -50,8 +53,8 @@ parameters = ConnectionParameters(
 )
 
 data = [ UserTable(...), ... ]
-async with engine.create_connection(parameters) as conn:
-    await conn.create_table(UserTable)
+async with engine.create_connection(parameters, options) as conn:
+    await conn.create_objects([UserTable])
     await conn.insert_data(UserTable, data)
 ```
 
@@ -59,7 +62,7 @@ Finally, keep the target database content synchronized with data from the source
 
 ```python
 data = [ UserTable(...), ... ]
-async with engine.create_connection(parameters) as conn:
+async with engine.create_connection(parameters, options) as conn:
     await conn.upsert_data(UserTable, data)
 ```
 

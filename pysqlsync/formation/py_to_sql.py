@@ -161,7 +161,7 @@ class DataclassConverterOptions:
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param substitutions: SQL type to be substituted for a specific Python type.
     :param column_class: The object type instantiated for table columns. Must derive from `Column`.
-    :param user_defined_annotation_classes: Annotation classes to ignore on table column types.
+    :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
     enum_mode: EnumMode = EnumMode.TYPE
@@ -171,7 +171,7 @@ class DataclassConverterOptions:
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     column_class: type[Column] = Column
-    user_defined_annotation_classes: tuple[type, ...] = ()
+    skip_annotations: tuple[type, ...] = ()
 
 
 class DataclassConverter:
@@ -282,7 +282,7 @@ class DataclassConverter:
                 raise TypeError(f"unsupported annotated Python type: {typ}")
 
             for meta in metadata:
-                if not isinstance(meta, self.options.user_defined_annotation_classes):
+                if not isinstance(meta, self.options.skip_annotations):
                     sql_type.parse_meta(meta)
 
             return sql_type
@@ -551,6 +551,8 @@ class DataclassConverter:
     def dataclasses_to_catalog(
         self, entity_types: list[type[DataclassInstance]]
     ) -> Catalog:
+        "Converts a list of Python data-class types into a database object catalog."
+
         # collect all dependent types
         referenced_types: set[type] = set(entity_types)
         for entity_type in entity_types:
@@ -710,6 +712,18 @@ class DataclassConverter:
             ]
         )
 
+    def modules_to_catalog(self, modules: list[types.ModuleType]) -> Catalog:
+        "Converts a list of Python modules into a database object catalog."
+
+        # collect all entity types defined in this module
+        entity_types: list[type[DataclassInstance]] = []
+        for module in modules:
+            for name, obj in inspect.getmembers(module, is_entity_type):
+                if sys.modules[obj.__module__] in modules:
+                    entity_types.append(obj)
+
+        return self.dataclasses_to_catalog(entity_types)
+
     def module_to_namespace(self, module_name: str) -> LocalId:
         if self.options.qualified_names:
             return LocalId(self.options.namespaces.get(module_name) or "")
@@ -763,12 +777,5 @@ def modules_to_catalog(
     if options is None:
         options = DataclassConverterOptions()
 
-    # collect all entity types defined in this module
-    entity_types: list[type[DataclassInstance]] = []
-    for module in modules:
-        for name, obj in inspect.getmembers(module, is_entity_type):
-            if sys.modules[obj.__module__] in modules:
-                entity_types.append(obj)
-
     converter = DataclassConverter(options=options)
-    return converter.dataclasses_to_catalog(entity_types)
+    return converter.modules_to_catalog(modules)

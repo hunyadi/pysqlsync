@@ -5,7 +5,7 @@ import types
 import typing
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, TypeVar
+from typing import Any, Callable, Iterable, Optional, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
@@ -24,12 +24,14 @@ class GeneratorOptions:
 
     :param enum_mode: Conversion mode for enumeration types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
+    :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
     enum_mode: Optional[EnumMode] = None
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
+    skip_annotations: tuple[type, ...] = ()
 
 
 class BaseGenerator(abc.ABC):
@@ -53,11 +55,37 @@ class BaseGenerator(abc.ABC):
     def column_class(self) -> type[Column]:
         return Column
 
-    def create(self, tables: list[type[DataclassInstance]]) -> Optional[str]:
-        target = self.converter.dataclasses_to_catalog(tables)
-        statement = self.get_mutate_stmt(target)
-        self.catalog = target
-        return statement
+    @overload
+    def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]:
+        ...
+
+    @overload
+    def create(self, *, modules: list[types.ModuleType]) -> Optional[str]:
+        ...
+
+    def create(
+        self,
+        *,
+        tables: Optional[list[type[DataclassInstance]]] = None,
+        modules: Optional[list[types.ModuleType]] = None,
+    ) -> Optional[str]:
+        if tables is not None and modules is not None:
+            raise TypeError("arguments `tables` and `modules` are exclusive")
+        if tables is None and modules is None:
+            raise TypeError("one of arguments `tables` and `modules` is required")
+
+        if tables:
+            target = self.converter.dataclasses_to_catalog(tables)
+            statement = self.get_mutate_stmt(target)
+            self.catalog = target
+            return statement
+        elif modules:
+            target = self.converter.modules_to_catalog(modules)
+            statement = self.get_mutate_stmt(target)
+            self.catalog = target
+            return statement
+        else:
+            raise NotImplementedError()
 
     def drop(self) -> Optional[str]:
         target = Catalog([])
@@ -306,7 +334,7 @@ class BaseContext(abc.ABC):
 
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         generator = self.connection.generator
-        statement = generator.create(tables)
+        statement = generator.create(tables=tables)
         if statement:
             await self.execute(statement)
 

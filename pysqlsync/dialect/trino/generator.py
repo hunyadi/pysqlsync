@@ -16,9 +16,10 @@ class TrinoGenerator(BaseGenerator):
         super().__init__(options)
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=EnumMode.CHECK,
+                enum_mode=options.enum_mode or EnumMode.CHECK,
                 struct_mode=StructMode.JSON,
                 namespaces=NamespaceMapping(self.options.namespaces),
+                skip_annotations=options.skip_annotations,
             )
         )
 
