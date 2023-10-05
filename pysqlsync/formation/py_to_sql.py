@@ -70,7 +70,7 @@ from .object_types import (
     StructType,
     Table,
     UniqueConstraint,
-    quote,
+    constant,
 )
 
 T = TypeVar("T")
@@ -378,9 +378,10 @@ class DataclassConverter:
             sql_member_types = [
                 self.member_to_sql_data_type(t, cls) for t in member_types
             ]
-            if not is_unique(sql_member_types):
+            try:
+                return compatible_type(sql_member_types)
+            except CompatibilityError:
                 raise TypeError(f"inconsistent union data types: {member_types}")
-            return sql_member_types[0]
         if isinstance(typ, type):
             return SqlUserDefinedType(
                 self.create_qualified_id(typ.__module__, typ.__name__)
@@ -490,7 +491,7 @@ class DataclassConverter:
         elif self.options.enum_mode is EnumMode.CHECK:
             for field in dataclass_fields_as_required(cls):
                 if is_type_enum(field.type):
-                    enum_values = ", ".join(quote(e.value) for e in field.type)
+                    enum_values = ", ".join(constant(e.value) for e in field.type)
                     constraints.append(
                         CheckConstraint(
                             LocalId(f"ch_{cls.__name__}_{field.name}"),
@@ -700,17 +701,30 @@ class DataclassConverter:
                     )
                 )
 
-        return Catalog(
-            [
+        if self.options.qualified_names:
+            namespaces = [
                 Namespace(
-                    name=self.module_to_namespace(module_name),
+                    name=LocalId(self.options.namespaces.get(module_name) or ""),
                     enums=enums.get(module_name, []),
                     structs=structs.get(module_name, []),
                     tables=table_defs,
                 )
                 for module_name, table_defs in tables.items()
             ]
-        )
+        else:
+            namespaces = [
+                Namespace(
+                    name=LocalId(""),
+                    enums=[item for enum_list in enums.values() for item in enum_list],
+                    structs=[
+                        item for struct_list in structs.values() for item in struct_list
+                    ],
+                    tables=[
+                        item for table_list in tables.values() for item in table_list
+                    ],
+                )
+            ]
+        return Catalog(namespaces=namespaces)
 
     def modules_to_catalog(self, modules: list[types.ModuleType]) -> Catalog:
         "Converts a list of Python modules into a database object catalog."
@@ -723,12 +737,6 @@ class DataclassConverter:
                     entity_types.append(obj)
 
         return self.dataclasses_to_catalog(entity_types)
-
-    def module_to_namespace(self, module_name: str) -> LocalId:
-        if self.options.qualified_names:
-            return LocalId(self.options.namespaces.get(module_name) or "")
-        else:
-            return LocalId("")
 
 
 def dataclass_to_table(

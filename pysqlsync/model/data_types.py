@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
-from typing import Any, Optional
+from functools import reduce
+from typing import Any, Optional, TypeVar
 
 from strong_typing.auxiliary import MaxLength, Precision, Storage, TimePrecision
 
@@ -251,6 +252,65 @@ class SqlUserDefinedType(SqlDataType):
 
     def __str__(self) -> str:
         return self.ref.quoted_id
+
+
+class CompatibilityError(TypeError):
+    "Raised when a list of types cannot be reduced into a single common type."
+
+
+def compatible_type(data_types: list[SqlDataType]) -> SqlDataType:
+    "Returns a single common type that all elements in a list of types can be converted into without data loss."
+
+    return reduce(_compatible_type, data_types)
+
+
+def max_or_none(left: Optional[int], right: Optional[int]) -> Optional[int]:
+    if left is None or right is None:
+        return None
+    else:
+        return max(left, right)
+
+
+def _compatible_type(left: SqlDataType, right: SqlDataType) -> SqlDataType:
+    if left == right:
+        return left
+
+    # integer types
+    if isinstance(left, SqlIntegerType) and isinstance(right, SqlIntegerType):
+        return SqlIntegerType(width=max(left.width, right.width))
+
+    # floating-point types
+    if isinstance(left, SqlRealType):
+        if isinstance(right, SqlRealType):
+            return SqlRealType()
+        elif isinstance(right, SqlDoubleType):
+            return SqlDoubleType()
+    elif isinstance(left, SqlDoubleType):
+        if isinstance(right, (SqlRealType, SqlDoubleType)):
+            return SqlDoubleType()
+
+    # character types
+    if isinstance(left, SqlCharacterType) and isinstance(right, SqlCharacterType):
+        return SqlCharacterType(
+            limit=max_or_none(left.limit, right.limit),
+            storage=max_or_none(left.storage, right.storage),
+        )
+
+    # binary types
+    if isinstance(left, SqlFixedBinaryType):
+        if isinstance(right, SqlFixedBinaryType):
+            return SqlFixedBinaryType(storage=max_or_none(left.storage, right.storage))
+        elif isinstance(right, SqlVariableBinaryType):
+            return SqlVariableBinaryType(
+                storage=max_or_none(left.storage, right.storage)
+            )
+    elif isinstance(left, SqlVariableBinaryType):
+        if isinstance(right, (SqlFixedBinaryType, SqlVariableBinaryType)):
+            return SqlVariableBinaryType(
+                storage=max_or_none(left.storage, right.storage)
+            )
+
+    raise CompatibilityError()
 
 
 def sql_data_type_from_spec(
