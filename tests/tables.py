@@ -207,7 +207,7 @@ class EventRecord:
     expires_on: date
     interaction_duration: float
     url: str
-    user_agent: str
+    user_agent: Optional[str]
     http_method: HTTPMethod
     http_status: HTTPStatus
     http_version: HTTPVersion

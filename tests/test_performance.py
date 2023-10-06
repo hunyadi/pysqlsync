@@ -1,61 +1,25 @@
 import dataclasses
-import datetime
 import os.path
-import random
 import unittest
-import uuid
 
 from params import MySQLBase, PostgreSQLBase, TestEngineBase
 from tsv.helper import Generator, Parser
 
 from pysqlsync.base import GeneratorOptions
+from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.properties import get_class_properties
 from tests import tables
-from tests.datagen import (
-    random_alphanumeric_str,
-    random_date,
-    random_datetime,
-    random_enum,
-    random_ipv4address,
-)
 from tests.measure import Timer
-
-
-def create_randomized_object(index: int) -> tables.EventRecord:
-    return tables.EventRecord(
-        id=index,
-        guid=uuid.uuid4(),
-        timestamp=random_datetime(
-            datetime.datetime(1982, 10, 23, 2, 30, 0, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2022, 9, 25, 18, 45, 0, tzinfo=datetime.timezone.utc),
-        ),
-        user_id=random.randint(1, 1000000),
-        real_user_id=random.randint(1, 1000000),
-        expires_on=random_date(datetime.date(1982, 10, 23), datetime.date(2022, 9, 25)),
-        interaction_duration=random.uniform(0.0, 1.0),
-        url="https://example.com/" + random_alphanumeric_str(1, 128),
-        user_agent=f"Mozilla/5.0 (platform; rv:0.{random.randint(0, 9)}) Gecko/{random.randint(1, 99)} Firefox/{random.randint(1, 99)}",
-        http_method=random_enum(tables.HTTPMethod),
-        http_status=random_enum(tables.HTTPStatus),
-        http_version=random_enum(tables.HTTPVersion),
-        remote_ip=random_ipv4address(),
-        participated=random.uniform(0.0, 1.0) > 0.5,
-    )
 
 
 def generate_input_file(data_file_path: str, record_count: int) -> None:
     "Generates data and writes a file to be used as input for performance testing."
 
     generator = Generator()
+    items = random_objects(tables.EventRecord, record_count)
     with open(data_file_path, "wb") as f:
-        for k in range(0, record_count):
-            f.write(
-                generator.generate_line(
-                    dataclasses.astuple(create_randomized_object(k))
-                )
-            )
-            f.write(b"\n")
+        generator.generate_file(f, (dataclasses.astuple(item) for item in items))
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):

@@ -8,7 +8,9 @@ from strong_typing.inspection import (
     enum_value_types,
     get_annotation,
     is_type_enum,
+    is_type_optional,
     unwrap_annotated_type,
+    unwrap_optional_type,
 )
 
 from .key_types import PrimaryKey, PrimaryKeyTag
@@ -32,6 +34,22 @@ def get_primary_key_name(class_type: type[DataclassInstance]) -> str:
 
 def is_constraint(item: Any) -> bool:
     return isinstance(item, PrimaryKeyTag)
+
+
+def tsv_type(plain_type: TypeLike) -> type:
+    "Python type that represents the TSV storage type for this data."
+
+    if is_type_enum(plain_type):
+        value_types = set(enum_value_types(plain_type))
+        if len(value_types) != 1:
+            raise TypeError("inconsistent enumeration value types")
+        return value_types.pop()
+    elif is_type_optional(plain_type):
+        return tsv_type(unwrap_optional_type(plain_type))
+    elif isinstance(plain_type, type):
+        return plain_type
+    else:
+        raise TypeError("unsupported TSV value type")
 
 
 @dataclass
@@ -63,15 +81,7 @@ class FieldProperties:
     def tsv_type(self) -> type:
         "Python type that represents the TSV storage type for this data."
 
-        if is_type_enum(self.plain_type):
-            value_types = set(enum_value_types(self.plain_type))
-            if len(value_types) != 1:
-                raise TypeError("inconsistent enumeration value types")
-            return value_types.pop()
-        elif isinstance(self.plain_type, type):
-            return self.plain_type
-        else:
-            raise TypeError("unsupported TSV value type")
+        return tsv_type(self.plain_type)
 
 
 def get_field_properties(field_type: TypeLike) -> FieldProperties:

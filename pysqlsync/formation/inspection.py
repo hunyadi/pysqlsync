@@ -1,6 +1,9 @@
 import datetime
 import decimal
+import inspect
 import ipaddress
+import sys
+import types
 import uuid
 from typing import Any, Optional, TypeGuard
 
@@ -94,6 +97,17 @@ def dataclass_primary_key_type(typ: type[DataclassInstance]) -> TypeLike:
             return props.field_type
 
     raise TypeError(f"table {typ.__name__} lacks primary key")
+
+
+def get_entity_types(modules: list[types.ModuleType]) -> list[type[DataclassInstance]]:
+    "Returns all entity types defined in one of the modules."
+
+    entity_types: list[type[DataclassInstance]] = []
+    for module in modules:
+        for name, obj in inspect.getmembers(module, is_entity_type):
+            if sys.modules[obj.__module__] in modules:
+                entity_types.append(obj)
+    return entity_types
 
 
 def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:

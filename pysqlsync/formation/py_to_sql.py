@@ -2,7 +2,6 @@ import dataclasses
 import datetime
 import decimal
 import enum
-import inspect
 import ipaddress
 import sys
 import types
@@ -52,6 +51,7 @@ from ..model.properties import get_field_properties
 from .inspection import (
     dataclass_primary_key_name,
     dataclass_primary_key_type,
+    get_entity_types,
     is_entity_type,
     is_simple_type,
     is_struct_type,
@@ -729,14 +729,7 @@ class DataclassConverter:
     def modules_to_catalog(self, modules: list[types.ModuleType]) -> Catalog:
         "Converts a list of Python modules into a database object catalog."
 
-        # collect all entity types defined in this module
-        entity_types: list[type[DataclassInstance]] = []
-        for module in modules:
-            for name, obj in inspect.getmembers(module, is_entity_type):
-                if sys.modules[obj.__module__] in modules:
-                    entity_types.append(obj)
-
-        return self.dataclasses_to_catalog(entity_types)
+        return self.dataclasses_to_catalog(get_entity_types(modules))
 
 
 def dataclass_to_table(
