@@ -2,7 +2,7 @@ import re
 from typing import Optional
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import Catalog, Table
+from pysqlsync.formation.object_types import Catalog, FormationError, Table
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
@@ -38,6 +38,12 @@ class PostgreSQLGenerator(BaseGenerator):
 
     def __init__(self, options: GeneratorOptions) -> None:
         super().__init__(options)
+
+        if options.enum_mode is EnumMode.INLINE:
+            raise FormationError(
+                f"unsupported enumeration conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+            )
+
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.TYPE,

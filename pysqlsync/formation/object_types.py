@@ -5,28 +5,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from ..model.data_types import SqlDataType
+from ..model.data_types import SqlDataType, constant, quote
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
-
-
-def quote(s: str) -> str:
-    "Quotes a string to be embedded in an SQL statement."
-
-    return "'" + s.replace("'", "''") + "'"
-
-
-def constant(v: Any) -> str:
-    "Outputs a constant value."
-
-    if isinstance(v, str):
-        return quote(v)
-    elif isinstance(v, (int, float)):
-        return str(v)
-    elif isinstance(v, bool):
-        return "TRUE" if v else "FALSE"
-    else:
-        raise NotImplementedError(f"unknown constant representation for value: {v}")
 
 
 class FormationError(RuntimeError):

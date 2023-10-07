@@ -1,11 +1,30 @@
 import re
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional
 
 from strong_typing.auxiliary import MaxLength, Precision, Storage, TimePrecision
 
 from .id_types import SupportsQualifiedId
+
+
+def quote(s: str) -> str:
+    "Quotes a string to be embedded in an SQL statement."
+
+    return "'" + s.replace("'", "''") + "'"
+
+
+def constant(v: Any) -> str:
+    "Outputs a constant value."
+
+    if isinstance(v, str):
+        return quote(v)
+    elif isinstance(v, (int, float)):
+        return str(v)
+    elif isinstance(v, bool):
+        return "TRUE" if v else "FALSE"
+    else:
+        raise NotImplementedError(f"unknown constant representation for value: {v}")
 
 
 @dataclass
@@ -244,6 +263,15 @@ class SqlIntervalType(SqlDataType):
 class SqlJsonType(SqlDataType):
     def __str__(self) -> str:
         return "json"
+
+
+@dataclass
+class SqlEnumType(SqlDataType):
+    values: list[str]
+
+    def __str__(self) -> str:
+        values = ", ".join(quote(val) for val in self.values)
+        return f"ENUM ({values})"
 
 
 @dataclass

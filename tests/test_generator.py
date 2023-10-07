@@ -10,124 +10,154 @@ from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.factory import get_dialect
 
 
-def get_generator() -> BaseGenerator:
-    return get_dialect("postgresql").create_generator(
+def get_generator(dialect: str) -> BaseGenerator:
+    return get_dialect(dialect).create_generator(
         GeneratorOptions(namespaces={tables: None})
     )
 
 
-def get_create_stmt(table: type[DataclassInstance]) -> str:
-    statement = get_generator().create(tables=[table])
+def get_create_stmt(table: type[DataclassInstance], dialect: str) -> str:
+    statement = get_generator(dialect=dialect).create(tables=[table])
     return statement or ""
 
 
 class TestGenerator(unittest.TestCase):
     def test_create_boolean_table(self) -> None:
-        lines = [
-            'CREATE TABLE "BooleanTable" (',
-            '"id" bigint NOT NULL,',
-            '"boolean" boolean NOT NULL,',
-            '"nullable_boolean" boolean,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
-        self.assertMultiLineEqual(
-            get_create_stmt(tables.BooleanTable), "\n".join(lines)
-        )
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.BooleanTable, dialect=dialect),
+                    'CREATE TABLE "BooleanTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"boolean" boolean NOT NULL,\n'
+                    '"nullable_boolean" boolean,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_numeric_table(self) -> None:
-        lines = [
-            'CREATE TABLE "NumericTable" (',
-            '"id" bigint NOT NULL,',
-            '"signed_integer_8" smallint NOT NULL,',
-            '"signed_integer_16" smallint NOT NULL,',
-            '"signed_integer_32" integer NOT NULL,',
-            '"signed_integer_64" bigint NOT NULL,',
-            '"unsigned_integer_8" smallint NOT NULL,',
-            '"unsigned_integer_16" smallint NOT NULL,',
-            '"unsigned_integer_32" integer NOT NULL,',
-            '"unsigned_integer_64" bigint NOT NULL,',
-            '"integer" bigint NOT NULL,',
-            '"nullable_integer" bigint,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
-        self.assertMultiLineEqual(
-            get_create_stmt(tables.NumericTable), "\n".join(lines)
-        )
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.NumericTable, dialect=dialect),
+                    'CREATE TABLE "NumericTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"signed_integer_8" smallint NOT NULL,\n'
+                    '"signed_integer_16" smallint NOT NULL,\n'
+                    '"signed_integer_32" integer NOT NULL,\n'
+                    '"signed_integer_64" bigint NOT NULL,\n'
+                    '"unsigned_integer_8" smallint NOT NULL,\n'
+                    '"unsigned_integer_16" smallint NOT NULL,\n'
+                    '"unsigned_integer_32" integer NOT NULL,\n'
+                    '"unsigned_integer_64" bigint NOT NULL,\n'
+                    '"integer" bigint NOT NULL,\n'
+                    '"nullable_integer" bigint,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_float_table(self) -> None:
-        lines = [
-            'CREATE TABLE "FloatTable" (',
-            '"id" bigint NOT NULL,',
-            '"float_32" real NOT NULL,',
-            '"float_64" double precision NOT NULL,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
-        self.assertMultiLineEqual(get_create_stmt(tables.FloatTable), "\n".join(lines))
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.FloatTable, dialect=dialect),
+                    'CREATE TABLE "FloatTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"float_32" real NOT NULL,\n'
+                    '"float_64" double precision NOT NULL,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_string_table(self) -> None:
-        lines = [
-            'CREATE TABLE "StringTable" (',
-            '"id" bigint NOT NULL,',
-            '"arbitrary_length_string" text NOT NULL,',
-            '"nullable_arbitrary_length_string" text,',
-            '"maximum_length_string" varchar(255) NOT NULL,',
-            '"nullable_maximum_length_string" varchar(255),',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
-        self.assertMultiLineEqual(get_create_stmt(tables.StringTable), "\n".join(lines))
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.StringTable, dialect=dialect),
+                    'CREATE TABLE "StringTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"arbitrary_length_string" text NOT NULL,\n'
+                    '"nullable_arbitrary_length_string" text,\n'
+                    '"maximum_length_string" varchar(255) NOT NULL,\n'
+                    '"nullable_maximum_length_string" varchar(255),\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_date_time_table(self) -> None:
-        lines = [
-            'CREATE TABLE "DateTimeTable" (',
-            '"id" bigint NOT NULL,',
-            '"iso_date_time" timestamp NOT NULL,',
-            '"iso_date" date NOT NULL,',
-            '"iso_time" time NOT NULL,',
-            '"optional_date_time" timestamp,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
         self.assertMultiLineEqual(
-            get_create_stmt(tables.DateTimeTable), "\n".join(lines)
+            get_create_stmt(tables.DateTimeTable, dialect="postgresql"),
+            'CREATE TABLE "DateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"iso_date_time" timestamp NOT NULL,\n'
+            '"iso_date" date NOT NULL,\n'
+            '"iso_time" time NOT NULL,\n'
+            '"optional_date_time" timestamp,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DateTimeTable, dialect="mysql"),
+            'CREATE TABLE "DateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"iso_date_time" datetime NOT NULL,\n'
+            '"iso_date" date NOT NULL,\n'
+            '"iso_time" time NOT NULL,\n'
+            '"optional_date_time" datetime,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
         )
 
     def test_create_enum_table(self) -> None:
-        lines = [
-            """CREATE TYPE "WorkflowState" AS ENUM ('active', 'inactive', 'deleted');""",
-            'CREATE TABLE "EnumTable" (',
-            '"id" bigint NOT NULL,',
-            '"state" "WorkflowState" NOT NULL,',
-            'PRIMARY KEY ("id")',
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.EnumTable, dialect="postgresql"),
+            """CREATE TYPE "WorkflowState" AS ENUM ('active', 'inactive', 'deleted');\n"""
+            'CREATE TABLE "EnumTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"state" "WorkflowState" NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
             ");",
-        ]
-        self.assertMultiLineEqual(get_create_stmt(tables.EnumTable), "\n".join(lines))
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.EnumTable, dialect="mysql"),
+            'CREATE TABLE "EnumTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            """"state" ENUM ('active', 'inactive', 'deleted') NOT NULL,\n"""
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
 
     def test_create_ipaddress_table(self) -> None:
-        lines = [
-            'CREATE TABLE "IPAddressTable" (',
-            '"id" bigint NOT NULL,',
-            '"ipv4" inet NOT NULL,',
-            '"ipv6" inet NOT NULL,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
         self.assertMultiLineEqual(
-            get_create_stmt(tables.IPAddressTable), "\n".join(lines)
+            get_create_stmt(tables.IPAddressTable, dialect="postgresql"),
+            'CREATE TABLE "IPAddressTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"ipv4" inet NOT NULL,\n'
+            '"ipv6" inet NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.IPAddressTable, dialect="mysql"),
+            'CREATE TABLE "IPAddressTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"ipv4" binary(4) NOT NULL,\n'
+            '"ipv6" binary(16) NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
         )
 
     def test_create_primary_key_table(self) -> None:
-        lines = [
-            'CREATE TABLE "DataTable" (',
-            '"id" bigint NOT NULL,',
-            '"data" text NOT NULL,',
-            'PRIMARY KEY ("id")',
-            ");",
-        ]
-        self.assertMultiLineEqual(get_create_stmt(tables.DataTable), "\n".join(lines))
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.DataTable, dialect=dialect),
+                    'CREATE TABLE "DataTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"data" text NOT NULL,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_table_with_description(self) -> None:
         lines = [
@@ -148,7 +178,9 @@ class TestGenerator(unittest.TestCase):
             """COMMENT ON TABLE "Person" IS 'A person.';""",
             """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
         ]
-        self.assertMultiLineEqual(get_create_stmt(tables.Person), "\n".join(lines))
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.Person, dialect="postgresql"), "\n".join(lines)
+        )
 
     def test_create_type_with_description(self) -> None:
         lines = [
@@ -165,10 +197,12 @@ class TestGenerator(unittest.TestCase):
             """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
             """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
         ]
-        self.assertMultiLineEqual(get_create_stmt(tables.Location), "\n".join(lines))
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.Location, dialect="postgresql"), "\n".join(lines)
+        )
 
     def test_insert_single(self) -> None:
-        generator = get_generator()
+        generator = get_generator(dialect="postgresql")
         generator.create(tables=[tables.DataTable])
 
         lines = [
@@ -182,7 +216,7 @@ class TestGenerator(unittest.TestCase):
         )
 
     def test_insert_multiple(self) -> None:
-        generator = get_generator()
+        generator = get_generator(dialect="postgresql")
         generator.create(tables=[tables.DateTimeTable])
 
         lines = [
@@ -199,7 +233,7 @@ class TestGenerator(unittest.TestCase):
         )
 
     def test_table_data(self) -> None:
-        generator = get_generator()
+        generator = get_generator(dialect="postgresql")
 
         self.assertEqual(
             generator.get_dataclass_as_record(tables.DataTable(123, "abc")),

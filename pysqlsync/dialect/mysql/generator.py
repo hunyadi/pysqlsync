@@ -1,3 +1,4 @@
+import datetime
 import ipaddress
 import uuid
 from typing import Any, Callable, Optional
@@ -18,7 +19,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType
+from pysqlsync.model.data_types import SqlFixedBinaryType, SqlTimestampType
 from pysqlsync.model.id_types import LocalId
 
 
@@ -27,6 +28,11 @@ def _description(description: str) -> str:
         description = description[: description.index("\n")]
 
     return quote(description)
+
+
+class MySQLDateTimeType(SqlTimestampType):
+    def __str__(self) -> str:
+        return "datetime"
 
 
 class MySQLColumn(Column):
@@ -87,11 +93,12 @@ class MySQLGenerator(BaseGenerator):
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=options.enum_mode or EnumMode.CHECK,
+                enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=StructMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
                 substitutions={
+                    datetime.datetime: MySQLDateTimeType(),
                     uuid.UUID: SqlFixedBinaryType(16),
                     ipaddress.IPv4Address: SqlFixedBinaryType(4),
                     ipaddress.IPv6Address: SqlFixedBinaryType(16),

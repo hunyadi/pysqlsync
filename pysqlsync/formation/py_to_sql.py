@@ -131,6 +131,9 @@ class EnumMode(enum.Enum):
     TYPE = "type"
     "Enumeration types are converted to SQL ENUM types with CREATE TYPE ... AS ENUM ( ... )."
 
+    INLINE = "inline"
+    "Enumeration types are converted into inline SQL ENUM definitions."
+
     RELATION = "relation"
     "Enumeration types are converted into foreign/primary key relations, and reference a lookup table."
 
@@ -299,6 +302,8 @@ class DataclassConverter:
                 return SqlUserDefinedType(
                     self.create_qualified_id(typ.__module__, typ.__name__)
                 )
+            elif self.options.enum_mode is EnumMode.INLINE:
+                return SqlEnumType([str(e.value) for e in typ])
             elif self.options.enum_mode is EnumMode.RELATION:
                 return SqlIntegerType(4)
             elif self.options.enum_mode is EnumMode.CHECK:
