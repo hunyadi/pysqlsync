@@ -32,6 +32,10 @@ T = TypeVar("T")
 E = TypeVar("E", bound=enum.Enum)
 
 
+class DataGeneratorError(RuntimeError):
+    pass
+
+
 def random_bool() -> bool:
     return random.uniform(0.0, 1.0) > 0.5
 
@@ -208,7 +212,7 @@ class RandomGenerator:
             elif plain_type is uuid.UUID:
                 return lambda _: uuid.uuid4()
 
-            raise TypeError(f"unknown key type: {plain_type}")
+            raise DataGeneratorError(f"unknown key type: {plain_type}")
 
         if is_type_optional(plain_type):
             optional_generator = self.create(unwrap_optional_type(plain_type), cls)
@@ -280,7 +284,7 @@ class RandomGenerator:
                 element_generator = self.create(element_type, cls)
                 return lambda k: object_to_json(call_repeat(element_generator, k, 5))
 
-        raise TypeError(f"unknown value type: {plain_type}")
+        raise DataGeneratorError(f"unknown value type: {plain_type}")
 
 
 D = TypeVar("D", bound=DataclassInstance)

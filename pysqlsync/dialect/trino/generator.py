@@ -1,5 +1,3 @@
-from strong_typing.inspection import DataclassInstance
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Table
 from pysqlsync.formation.py_to_sql import (
@@ -17,7 +15,7 @@ class TrinoGenerator(BaseGenerator):
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.CHECK,
-                struct_mode=StructMode.JSON,
+                struct_mode=options.struct_mode or StructMode.JSON,
                 namespaces=NamespaceMapping(self.options.namespaces),
                 skip_annotations=options.skip_annotations,
             )

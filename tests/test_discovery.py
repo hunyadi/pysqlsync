@@ -9,6 +9,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     dataclass_to_table,
 )
+from pysqlsync.model.id_types import LocalId
 from tests.params import MySQLBase, PostgreSQLBase, TestEngineBase
 
 
@@ -36,8 +37,8 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             table_def = dataclass_to_table(tables.NumericTable, options=options)
             await conn.execute(str(table_def))
 
-            ref = self.engine.create_explorer(conn)
-            table_ref = await ref.get_table_meta(
+            explorer = self.engine.create_explorer(conn)
+            table_ref = await explorer.get_table_meta(
                 QualifiedId(current_namespace, tables.NumericTable.__name__)
             )
 
@@ -56,11 +57,11 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             person_def = dataclass_to_table(tables.Person, options=options)
             await conn.execute(str(person_def))
 
-            ref = self.engine.create_explorer(conn)
-            address_ref = await ref.get_table_meta(
+            explorer = self.engine.create_explorer(conn)
+            address_ref = await explorer.get_table_meta(
                 QualifiedId(current_namespace, tables.Address.__name__)
             )
-            person_ref = await ref.get_table_meta(
+            person_ref = await explorer.get_table_meta(
                 QualifiedId(current_namespace, tables.Person.__name__)
             )
 
@@ -70,15 +71,51 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertMultiLineEqual(str(address_def), str(address_ref))
             self.assertMultiLineEqual(str(person_def), str(person_ref))
 
+    async def test_formation(self) -> None:
+        async with self.engine.create_connection(
+            self.parameters, GeneratorOptions(namespaces={tables: "sample"})
+        ) as conn:
+            generator = conn.connection.generator
+            create_stmt = generator.create(tables=[tables.UserTable])
+            if create_stmt is None:
+                self.fail()
+            await conn.execute(create_stmt)
+
+            catalog = conn.connection.generator.catalog
+            create_ns = (
+                catalog.namespaces["sample"]
+                if "sample" in catalog.namespaces
+                else catalog.namespaces[""]
+            )
+
+            explorer = self.engine.create_explorer(conn)
+            discover_ns = await explorer.get_namespace_meta(LocalId("sample"))
+            discover_stmt = str(discover_ns)
+
+            self.assertMultiLineEqual(create_stmt, discover_stmt)
+            self.assertEqual(create_ns, discover_ns)
+
+            await conn.drop_objects()
+
 
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
     async def get_current_namespace(self, conn: BaseContext) -> str:
         return await conn.query_one(str, "SELECT CURRENT_SCHEMA();")
 
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.drop_schema(LocalId("sample"))
+
 
 class TestMySQLDiscovery(MySQLBase, TestDiscovery):
     async def get_current_namespace(self, conn: BaseContext) -> str:
         return await conn.query_one(str, "SELECT DATABASE();")
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.drop_schema(LocalId("sample"))
 
 
 del TestDiscovery

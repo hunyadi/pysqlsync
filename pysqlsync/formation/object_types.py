@@ -41,11 +41,9 @@ class MutableObject(abc.ABC):
 class EnumType(QualifiedObject, MutableObject):
     values: list[str]
 
-    def __init__(
-        self, enum: type[enum.Enum], *, namespace: Optional[str] = None
-    ) -> None:
-        super().__init__(QualifiedId(namespace, enum.__name__))
-        self.values = [str(e.value) for e in enum]
+    def __init__(self, enum_id: QualifiedId, values: list[str]) -> None:
+        super().__init__(enum_id)
+        self.values = values
 
     def create_stmt(self) -> str:
         vals = ", ".join(quote(val) for val in self.values)

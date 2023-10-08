@@ -1,6 +1,7 @@
 import datetime
 import ipaddress
 import uuid
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
@@ -19,8 +20,10 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType, SqlTimestampType
+from pysqlsync.model.data_types import SqlFixedBinaryType
 from pysqlsync.model.id_types import LocalId
+
+from .data_types import MySQLDateTimeType
 
 
 def _description(description: str) -> str:
@@ -30,11 +33,7 @@ def _description(description: str) -> str:
     return quote(description)
 
 
-class MySQLDateTimeType(SqlTimestampType):
-    def __str__(self) -> str:
-        return "datetime"
-
-
+@dataclass(eq=True)
 class MySQLColumn(Column):
     @property
     def data_spec(self) -> str:
@@ -69,7 +68,7 @@ class MySQLColumn(Column):
             )
 
             if len(description) > 1024:
-                raise ValueError(
+                raise FormationError(
                     f"comment for column {self.name} too long, expected: maximum 1024; got: {len(description)}"
                 )
 
@@ -88,13 +87,17 @@ class MySQLGenerator(BaseGenerator):
 
         if options.enum_mode is EnumMode.TYPE:
             raise FormationError(
-                f"unsupported enumeration conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+                f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+            )
+        if options.struct_mode is StructMode.TYPE:
+            raise FormationError(
+                f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
             )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.INLINE,
-                struct_mode=StructMode.JSON,
+                struct_mode=options.struct_mode or StructMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(self.options.namespaces),
                 substitutions={

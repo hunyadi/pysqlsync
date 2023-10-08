@@ -41,13 +41,13 @@ class PostgreSQLGenerator(BaseGenerator):
 
         if options.enum_mode is EnumMode.INLINE:
             raise FormationError(
-                f"unsupported enumeration conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+                f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
             )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.TYPE,
-                struct_mode=StructMode.TYPE,
+                struct_mode=options.struct_mode or StructMode.TYPE,
                 namespaces=NamespaceMapping(self.options.namespaces),
                 skip_annotations=options.skip_annotations,
             )

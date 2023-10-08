@@ -6,6 +6,8 @@ import aiomysql
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.model.data_types import escape_like
+from pysqlsync.model.id_types import LocalId
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -15,7 +17,13 @@ class MySQLConnection(BaseConnection):
     native: aiomysql.Connection
 
     async def __aenter__(self) -> BaseContext:
-        sql_mode = ",".join(["ANSI_QUOTES", "STRICT_ALL_TABLES"])
+        sql_mode = ",".join(
+            [
+                "ANSI_QUOTES",
+                "NO_AUTO_VALUE_ON_ZERO",
+                "STRICT_ALL_TABLES",
+            ]
+        )
         self.native = await aiomysql.connect(
             host=self.params.host,
             port=self.params.port,
@@ -65,3 +73,13 @@ class MySQLContext(BaseContext):
             await cur.execute(statement)
             records = await cur.fetchall()
             return self._resultset_unwrap_tuple(signature, records)
+
+    async def drop_schema(self, namespace: LocalId) -> None:
+        statement = await self.query_one(
+            str,
+            "SELECT CONCAT('DROP TABLE IF EXISTS ', GROUP_CONCAT(table_name), ';') AS statement\n"
+            "FROM information_schema.tables\n"
+            f"WHERE table_schema = DATABASE() AND table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~';",
+        )
+        if statement:
+            await self.execute(statement)

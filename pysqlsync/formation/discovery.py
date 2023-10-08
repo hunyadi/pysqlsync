@@ -1,21 +1,46 @@
 import typing
+from dataclasses import dataclass
 from typing import Optional
 
-from ..base import Explorer
-from ..model.data_types import sql_data_type_from_spec
+from ..base import BaseContext, Explorer
+from ..model.data_types import escape_like, quote
+from ..model.id_types import SupportsQualifiedId
+from .data_types import SqlDiscovery
 from .object_types import (
     Column,
     Constraint,
     ConstraintReference,
     ForeignConstraint,
     LocalId,
+    Namespace,
     QualifiedId,
     Table,
-    quote,
 )
 
 
+class DiscoveryError(RuntimeError):
+    pass
+
+
+@dataclass
+class AnsiColumnMeta:
+    column_name: str
+    column_type: str
+    data_type: str
+    nullable: bool
+    character_maximum_length: Optional[int]
+    numeric_precision: Optional[int]
+    numeric_scale: Optional[int]
+    datetime_precision: Optional[int]
+
+
 class AnsiReflection(Explorer):
+    discovery: SqlDiscovery
+
+    def __init__(self, conn: BaseContext, discovery: SqlDiscovery) -> None:
+        super().__init__(conn)
+        self.discovery = discovery
+
     async def get_table_names(self) -> list[QualifiedId]:
         records = await self.conn.query_all(
             tuple[str, str],
@@ -56,7 +81,7 @@ class AnsiReflection(Explorer):
 
         return True
 
-    async def has_table(self, table_id: QualifiedId) -> bool:
+    async def has_table(self, table_id: SupportsQualifiedId) -> bool:
         "Checks if a table exists."
 
         conditions: list[str] = []
@@ -74,7 +99,9 @@ class AnsiReflection(Explorer):
         else:
             return False
 
-    async def has_column(self, table_id: QualifiedId, column_id: LocalId) -> bool:
+    async def has_column(
+        self, table_id: SupportsQualifiedId, column_id: LocalId
+    ) -> bool:
         "Checks if a table has the specified column."
 
         conditions: list[str] = []
@@ -94,82 +121,56 @@ class AnsiReflection(Explorer):
         else:
             return False
 
-    async def get_table_meta(self, table_id: QualifiedId) -> Table:
+    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
         conditions: list[str] = []
-        conditions.append(f"col.table_name = {quote(table_id.id)}")
-        if table_id.namespace is not None:
-            conditions.append(f"col.table_schema = {quote(table_id.namespace)}")
+        conditions.append(f"col.table_name = {quote(table_id.local_id)}")
+        if table_id.scope_id is not None:
+            conditions.append(f"col.table_schema = {quote(table_id.scope_id)}")
         condition = " AND ".join(f"({c})" for c in conditions)
 
         columns: list[Column] = []
         if await self.has_information_columns(
             "columns",
             [
+                "column_type",
                 "character_maximum_length",
                 "numeric_precision",
                 "numeric_scale",
                 "datetime_precision",
             ],
         ):
-            column_records = await self.conn.query_all(
-                tuple[
-                    str,
-                    str,
-                    bool,
-                    Optional[int],
-                    Optional[int],
-                    Optional[int],
-                    Optional[int],
-                ],
+            ansi_column_records = await self.conn.query_all(
+                AnsiColumnMeta,
                 "SELECT\n"
-                "    column_name,\n"
-                "    data_type,\n"
+                "    column_name AS column_name,\n"
+                "    column_type AS column_type,\n"
+                "    data_type AS data_type,\n"
                 "    is_nullable = 'YES' AS nullable,\n"
-                "    character_maximum_length,\n"
-                "    numeric_precision,\n"
-                "    numeric_scale,\n"
-                "    datetime_precision\n"
+                "    character_maximum_length AS character_maximum_length,\n"
+                "    numeric_precision AS numeric_precision,\n"
+                "    numeric_scale AS numeric_scale,\n"
+                "    datetime_precision AS datetime_precision\n"
                 "FROM information_schema.columns col\n"
                 f"WHERE {condition}\n"
                 "ORDER BY ordinal_position",
             )
 
-            for column_record in column_records:
-                (
-                    column_name,
-                    data_type,
-                    nullable,
-                    character_maximum_length,
-                    numeric_precision,
-                    numeric_scale,
-                    timestamp_precision,
-                ) = typing.cast(
-                    tuple[
-                        str,
-                        str,
-                        bool,
-                        Optional[int],
-                        Optional[int],
-                        Optional[int],
-                        Optional[int],
-                    ],
-                    column_record,
-                )
+            for col in ansi_column_records:
                 columns.append(
-                    Column(
-                        LocalId(column_name),
-                        sql_data_type_from_spec(
-                            data_type,
-                            character_maximum_length=character_maximum_length,
-                            numeric_precision=numeric_precision,
-                            numeric_scale=numeric_scale,
-                            timestamp_precision=timestamp_precision,
+                    self.conn.connection.generator.column_class(
+                        LocalId(col.column_name),
+                        self.discovery.sql_data_type_from_spec(
+                            col.column_type,
+                            character_maximum_length=col.character_maximum_length,
+                            numeric_precision=col.numeric_precision,
+                            numeric_scale=col.numeric_scale,
+                            datetime_precision=col.datetime_precision,
                         ),
-                        bool(nullable),
+                        bool(col.nullable),
                     )
                 )
         else:
-            column_records = await self.conn.query_all(
+            limited_column_records = await self.conn.query_all(
                 tuple[str, str, bool],
                 "SELECT column_name, data_type, is_nullable = 'YES' AS nullable\n"
                 "FROM information_schema.columns col\n"
@@ -177,18 +178,21 @@ class AnsiReflection(Explorer):
                 "ORDER BY ordinal_position",
             )
 
-            for column_record in column_records:
+            for column_record in limited_column_records:
                 column_name, data_type, nullable = typing.cast(
                     tuple[str, str, bool],
                     column_record,
                 )
                 columns.append(
-                    Column(
+                    self.conn.connection.generator.column_class(
                         LocalId(column_name),
-                        sql_data_type_from_spec(data_type),
+                        self.discovery.sql_data_type_from_spec(data_type),
                         bool(nullable),
                     )
                 )
+
+        if not columns:
+            raise DiscoveryError(f"table not found: {table_id}")
 
         if await self.has_information_tables(["table_constraints", "key_column_usage"]):
             constraint_records = await self.conn.query_all(
@@ -235,16 +239,57 @@ class AnsiReflection(Explorer):
                     )
 
             if primary_key is None:
-                raise RuntimeError(f"primary key required in table: {table_id}")
+                raise DiscoveryError(f"primary key required in table: {table_id}")
 
             return Table(
                 name=table_id,
                 columns=columns,
                 primary_key=primary_key,
-                constraints=list(constraints.values()),
+                constraints=list(constraints.values()) or None,
             )
 
         else:
             # assume first column is the primary key
             primary_key = columns[0].name
             return Table(name=table_id, columns=columns, primary_key=primary_key)
+
+    async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
+        tables: list[Table] = []
+
+        # create namespace using qualified IDs
+        table_names = await self.conn.query_all(
+            str,
+            "SELECT table_name\n"
+            "FROM information_schema.tables\n"
+            f"WHERE table_schema = {quote(namespace_id.id)}\n"
+            "ORDER BY table_name ASC",
+        )
+        if table_names:
+            for table_name in table_names:
+                table = await self.get_table_meta(
+                    self.get_qualified_id(namespace_id.local_id, table_name)
+                )
+                tables.append(table)
+
+            return Namespace(name=namespace_id, enums=[], structs=[], tables=tables)
+
+        # create namespace using flat IDs
+        table_names = await self.conn.query_all(
+            str,
+            "SELECT table_name\n"
+            "FROM information_schema.tables\n"
+            f"WHERE table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'\n"
+            "ORDER BY table_name ASC",
+        )
+        if table_names:
+            for table_name in table_names:
+                table_name = table_name.removeprefix(f"{namespace_id.local_id}__")
+
+                table = await self.get_table_meta(
+                    self.get_qualified_id(namespace_id.local_id, table_name)
+                )
+                tables.append(table)
+
+            return Namespace(name=LocalId(""), enums=[], structs=[], tables=tables)
+
+        raise DiscoveryError(f"namespace/schema not found: {namespace_id}")

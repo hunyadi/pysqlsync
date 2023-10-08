@@ -574,8 +574,11 @@ class DataclassConverter:
                 enum_defs = enums.setdefault(enum_type.__module__, [])
                 enum_defs.append(
                     EnumType(
-                        enum_type,
-                        namespace=self.options.namespaces.get(enum_type.__module__),
+                        QualifiedId(
+                            self.options.namespaces.get(enum_type.__module__),
+                            enum_type.__name__,
+                        ),
+                        [str(e.value) for e in enum_type],
                     )
                 )
 

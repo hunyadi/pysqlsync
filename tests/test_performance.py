@@ -8,6 +8,7 @@ from tsv.helper import Generator, Parser
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.py_to_sql import EnumMode
+from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.properties import get_class_properties
 from tests import tables
 from tests.measure import Timer
@@ -37,6 +38,10 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         if not os.path.exists(data_file_path):
             generate_input_file(data_file_path, cls.RECORD_COUNT)
 
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.drop_schema(LocalId("performance_test"))
+
     async def test_rows_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.EventRecord])
@@ -64,17 +69,11 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
 
 class TestPostgreSQLConnection(PostgreSQLBase, TestPerformance):
-    async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute('DROP SCHEMA IF EXISTS "performance_test" CASCADE;')
+    pass
 
 
 class TestMySQLConnection(MySQLBase, TestPerformance):
-    async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute(
-                'DROP TABLE IF EXISTS "performance_test__EventRecord", "performance_test__HTTPMethod", "performance_test__HTTPStatus", "performance_test__HTTPVersion";'
-            )
+    pass
 
 
 del TestPerformance

@@ -9,8 +9,8 @@ from typing import Any, Callable, Iterable, Optional, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
-from .formation.object_types import Catalog, Column, Table
-from .formation.py_to_sql import DataclassConverter, EnumMode
+from .formation.object_types import Catalog, Column, Namespace, Table
+from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -28,6 +28,7 @@ class GeneratorOptions:
     """
 
     enum_mode: Optional[EnumMode] = None
+    struct_mode: Optional[StructMode] = None
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
@@ -274,7 +275,10 @@ class BaseContext(abc.ABC):
 
             # check result shape
             it = iter(records)
-            item = next(it)
+            try:
+                item = next(it)
+            except StopIteration:
+                return []
             if len(item) != 1:
                 raise ValueError(
                     f"invalid number of columns, expected: 1; got: {len(item)}"
@@ -294,7 +298,10 @@ class BaseContext(abc.ABC):
 
             # check result shape
             it = iter(records)
-            item = next(it)
+            try:
+                item = next(it)
+            except StopIteration:
+                return []
             if len(item) != len(origin_args):
                 raise ValueError(
                     f"invalid number of columns, expected: {len(origin_args)}; got: {len(item)}"
@@ -326,6 +333,9 @@ class BaseContext(abc.ABC):
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         ...
+
+    async def drop_schema(self, namespace: LocalId) -> None:
+        await self.execute(f"DROP SCHEMA IF EXISTS {namespace} CASCADE;")
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
         return self.connection.generator.catalog.get_table(
@@ -431,20 +441,29 @@ class Explorer(abc.ABC):
     def __init__(self, conn: BaseContext) -> None:
         self.conn = conn
 
+    def get_qualified_id(self, namespace: str, id: str) -> SupportsQualifiedId:
+        return QualifiedId(namespace, id)
+
     @abc.abstractmethod
     async def get_table_names(self) -> list[QualifiedId]:
         ...
 
     @abc.abstractmethod
-    async def has_table(self, table_id: QualifiedId) -> bool:
+    async def has_table(self, table_id: SupportsQualifiedId) -> bool:
         ...
 
     @abc.abstractmethod
-    async def has_column(self, table_id: QualifiedId, column_id: LocalId) -> bool:
+    async def has_column(
+        self, table_id: SupportsQualifiedId, column_id: LocalId
+    ) -> bool:
         ...
 
     @abc.abstractmethod
-    async def get_table_meta(self, table_id: QualifiedId) -> Table:
+    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+        ...
+
+    @abc.abstractmethod
+    async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
         ...
 
 
