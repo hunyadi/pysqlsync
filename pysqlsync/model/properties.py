@@ -1,4 +1,9 @@
 import dataclasses
+import datetime
+import decimal
+import ipaddress
+import typing
+import uuid
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -7,10 +12,15 @@ from strong_typing.inspection import (
     TypeLike,
     enum_value_types,
     get_annotation,
+    is_dataclass_type,
     is_type_enum,
+    is_type_literal,
     is_type_optional,
+    is_type_union,
     unwrap_annotated_type,
+    unwrap_literal_types,
     unwrap_optional_type,
+    unwrap_union_types,
 )
 
 from .key_types import PrimaryKey, PrimaryKeyTag
@@ -44,12 +54,50 @@ def tsv_type(plain_type: TypeLike) -> type:
         if len(value_types) != 1:
             raise TypeError("inconsistent enumeration value types")
         return value_types.pop()
-    elif is_type_optional(plain_type):
-        return tsv_type(unwrap_optional_type(plain_type))
-    elif isinstance(plain_type, type):
-        return plain_type
-    else:
-        raise TypeError("unsupported TSV value type")
+    elif is_type_literal(plain_type):
+        literal_types = set(tsv_type(t) for t in unwrap_literal_types(plain_type))
+        if len(literal_types) != 1:
+            raise TypeError("inconsistent literal value types")
+        return literal_types.pop()
+    elif is_type_union(plain_type):
+        union_types = set(tsv_type(t) for t in unwrap_union_types(plain_type))
+        if len(union_types) != 1:
+            raise TypeError("inconsistent union types")
+        return union_types.pop()
+    elif is_dataclass_type(plain_type):
+        return dict
+    elif plain_type is bool:
+        return bool
+    elif plain_type is bytes:
+        return bytes
+    elif plain_type is int:
+        return int
+    elif plain_type is float:
+        return float
+    elif plain_type is str:
+        return str
+    elif plain_type is uuid.UUID:
+        return uuid.UUID
+    elif plain_type is datetime.datetime:
+        return datetime.datetime
+    elif plain_type is datetime.date:
+        return datetime.date
+    elif plain_type is datetime.time:
+        return datetime.time
+    elif plain_type is decimal.Decimal:
+        return decimal.Decimal
+    elif plain_type is ipaddress.IPv4Address:
+        return ipaddress.IPv4Address
+    elif plain_type is ipaddress.IPv6Address:
+        return ipaddress.IPv6Address
+
+    origin_type = typing.get_origin(plain_type)
+    if origin_type is list:  # JSON
+        return list
+    elif origin_type is dict:  # JSON
+        return dict
+
+    raise TypeError(f"unsupported TSV value type: {plain_type}")
 
 
 @dataclass
@@ -63,6 +111,7 @@ class FieldProperties:
     """
 
     plain_type: TypeLike
+    nullable: bool
     metadata: tuple[Any, ...]
     is_primary: bool
 
@@ -85,10 +134,18 @@ class FieldProperties:
 
 
 def get_field_properties(field_type: TypeLike) -> FieldProperties:
+    if is_type_optional(field_type):
+        nullable = True
+        field_type = unwrap_optional_type(field_type)
+    else:
+        nullable = False
+
     metadata = getattr(field_type, "__metadata__", None)
     if metadata is None:
         # field has a type without annotations or constraints
-        return FieldProperties(plain_type=field_type, metadata=(), is_primary=False)
+        return FieldProperties(
+            plain_type=field_type, nullable=nullable, metadata=(), is_primary=False
+        )
 
     # field has a type of Annotated[T, ...]
     plain_type = unwrap_annotated_type(field_type)
@@ -101,6 +158,7 @@ def get_field_properties(field_type: TypeLike) -> FieldProperties:
 
     return FieldProperties(
         plain_type=plain_type,
+        nullable=nullable,
         metadata=metadata,
         is_primary=is_primary,
     )

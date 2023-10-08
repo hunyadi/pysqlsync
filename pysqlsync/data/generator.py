@@ -214,8 +214,8 @@ class RandomGenerator:
 
             raise DataGeneratorError(f"unknown key type: {plain_type}")
 
-        if is_type_optional(plain_type):
-            optional_generator = self.create(unwrap_optional_type(plain_type), cls)
+        if properties.nullable:
+            optional_generator = self.create(plain_type, cls)
             return (
                 lambda k: optional_generator(k)
                 if random.uniform(0.0, 1.0) > 0.5

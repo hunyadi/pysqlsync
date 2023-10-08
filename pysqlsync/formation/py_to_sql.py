@@ -400,16 +400,7 @@ class DataclassConverter:
         "Converts a data-class field into a SQL table column."
 
         props = get_field_properties(field.type)
-        typ = props.field_type
-
-        if is_type_optional(typ):
-            typ = unwrap_optional_type(typ)
-            nullable = True
-        else:
-            nullable = False
-
-        data_type = self.member_to_sql_data_type(typ, cls)
-
+        data_type = self.member_to_sql_data_type(props.field_type, cls)
         description = (
             doc.params[field.name].description if field.name in doc.params else None
         )
@@ -417,7 +408,7 @@ class DataclassConverter:
         return self.options.column_class(
             name=LocalId(field.name),
             data_type=data_type,
-            nullable=nullable,
+            nullable=props.nullable,
             description=description,
         )
 
@@ -518,18 +509,13 @@ class DataclassConverter:
         "Converts a data-class field into a SQL struct (composite type) field."
 
         props = get_field_properties(field.type)
-        typ = props.field_type
-
-        if is_type_optional(typ):
-            typ = unwrap_optional_type(typ)
-
         description = (
             doc.params[field.name].description if field.name in doc.params else None
         )
 
         return StructMember(
             name=LocalId(field.name),
-            data_type=self.member_to_sql_data_type(typ, cls),
+            data_type=self.member_to_sql_data_type(props.field_type, cls),
             description=description,
         )
 
