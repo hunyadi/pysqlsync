@@ -197,14 +197,14 @@ class Column(MutableObject):
         statements: list[str] = []
 
         if source.data_type != target.data_type:
-            statements.append(f"SET DATA TYPE {target.data_spec}")
+            statements.append(f"SET DATA TYPE {target.data_type}")
 
         if source.nullable and not target.nullable:
             statements.append("SET NOT NULL")
         elif not source.nullable and target.nullable:
             statements.append("DROP NOT NULL")
 
-        if target.default is None:
+        if source.default is not None and target.default is None:
             statements.append("DROP DEFAULT")
         elif source.default != target.default:
             statements.append(f"SET DEFAULT {constant(target.default)}")
@@ -438,7 +438,7 @@ class Table(QualifiedObject, MutableObject):
         statements: list[str] = []
         source_column: Optional[Column]
         for source_column in source.columns.values():
-            if source_column not in target.columns.values():
+            if source_column.name.id not in target.columns:
                 statements.append(source_column.drop_stmt())
         for target_column in target.columns.values():
             source_column = source.columns.get(target_column.name.id)
@@ -451,10 +451,12 @@ class Table(QualifiedObject, MutableObject):
 
         if source.constraints and not target.constraints:
             for constraint in source.constraints:
-                statements.append(f"DROP CONSTRAINT {constraint.name}")
+                if constraint.is_alter_table():
+                    statements.append(f"DROP CONSTRAINT {constraint.name}")
         elif not source.constraints and target.constraints:
             for constraint in target.constraints:
-                statements.append(f"ADD {str(constraint)}")
+                if constraint.is_alter_table():
+                    statements.append(f"ADD {str(constraint)}")
         elif source.constraints and target.constraints:
             for target_constraint in target.constraints:
                 ...

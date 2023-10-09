@@ -17,6 +17,13 @@ from pysqlsync.formation.object_types import (
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
+from .generator import PostgreSQLTable
+
+
+@dataclass
+class PostgreSQLTableMeta:
+    description: str
+
 
 @dataclass
 class PostgreSQLColumnMeta:
@@ -24,6 +31,10 @@ class PostgreSQLColumnMeta:
     type_schema: str
     type_name: str
     nullable: bool
+    character_maximum_length: int
+    numeric_precision: int
+    numeric_scale: int
+    datetime_precision: int
     description: str
 
 
@@ -99,6 +110,16 @@ class PostgreSQLExplorer(Explorer):
         return len(rows) > 0 and rows[0] > 0
 
     async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+        table_records = await self.conn.query_one(
+            PostgreSQLTableMeta,
+            "SELECT\n"
+            "    dsc.description AS description\n"
+            "FROM pg_catalog.pg_class AS cls\n"
+            "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
+            "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = 0\n"
+            f"WHERE {self._where_table(table_id)}",
+        )
+
         column_records = await self.conn.query_all(
             PostgreSQLColumnMeta,
             "SELECT\n"
@@ -106,6 +127,10 @@ class PostgreSQLExplorer(Explorer):
             "    typ_nsp.nspname AS type_schema,\n"
             "    typ.typname AS type_name,\n"
             "    NOT att.attnotnull AS nullable,\n"
+            "    col.character_maximum_length AS character_maximum_length,\n"
+            "    col.numeric_precision AS numeric_precision,\n"
+            "    col.numeric_scale AS numeric_scale,\n"
+            "    col.datetime_precision AS datetime_precision,\n"
             "    dsc.description AS description\n"
             "FROM pg_catalog.pg_attribute AS att\n"
             "    INNER JOIN pg_catalog.pg_type AS typ ON att.atttypid = typ.oid\n"
@@ -113,6 +138,7 @@ class PostgreSQLExplorer(Explorer):
             "    INNER JOIN pg_catalog.pg_class AS cls ON att.attrelid = cls.oid\n"
             "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
             "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = att.attnum\n"
+            "    INNER JOIN information_schema.columns col ON nsp.nspname = col.table_schema AND cls.relname = col.table_name AND att.attname = col.column_name\n"
             f"WHERE {self._where_table(table_id)} AND (att.attnum > 0)\n"
             "ORDER BY att.attnum",
         )
@@ -123,7 +149,12 @@ class PostgreSQLExplorer(Explorer):
                 Column(
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
-                        col.type_name, col.type_schema
+                        col.type_name,
+                        col.type_schema,
+                        character_maximum_length=col.character_maximum_length,
+                        numeric_precision=col.numeric_precision,
+                        numeric_scale=col.numeric_scale,
+                        datetime_precision=None,
                     ),
                     bool(col.nullable),
                     description=col.description,
@@ -185,11 +216,12 @@ class PostgreSQLExplorer(Explorer):
         if primary_key is None:
             raise DiscoveryError(f"primary key required in table: {table_id}")
 
-        return Table(
+        return PostgreSQLTable(
             name=table_id,
             columns=columns,
             primary_key=primary_key,
             constraints=list(constraints.values()) or None,
+            description=table_records.description,
         )
 
     async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:

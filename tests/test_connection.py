@@ -104,25 +104,25 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             converter = DataclassConverter(options=options)
             catalog = converter.dataclasses_to_catalog([tables.EnumTable])
             await conn.execute(str(catalog))
-            conn.connection.generator.catalog = catalog
+            conn.connection.generator.state = catalog
             table = catalog.get_table(QualifiedId(None, tables.EnumTable.__name__))
             state_table = catalog.get_table(
                 QualifiedId(None, tables.WorkflowState.__name__)
             )
             await conn.upsert_rows(
                 table,
-                (int, str),
-                [(1, "active"), (2, "inactive"), (3, "deleted")],
+                field_types=(int, str),
+                records=[(1, "active"), (2, "inactive"), (3, "deleted")],
             )
             await conn.upsert_rows(
                 table,
-                (int, str),
-                [(4, "active"), (5, "inactive"), (6, "inactive")],
+                field_types=(int, str),
+                records=[(4, "active"), (5, "inactive"), (6, "inactive")],
             )
             await conn.upsert_rows(
                 table,
-                (int, str),
-                [(7, "deleted"), (8, "deleted"), (9, "deleted")],
+                field_types=(int, str),
+                records=[(7, "deleted"), (8, "deleted"), (9, "deleted")],
             )
             self.assertEqual(
                 await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable";'), 9

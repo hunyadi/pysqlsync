@@ -241,7 +241,7 @@ class AnsiReflection(Explorer):
             if primary_key is None:
                 raise DiscoveryError(f"primary key required in table: {table_id}")
 
-            return Table(
+            return self.conn.connection.generator.table_class(
                 name=table_id,
                 columns=columns,
                 primary_key=primary_key,
@@ -251,7 +251,9 @@ class AnsiReflection(Explorer):
         else:
             # assume first column is the primary key
             primary_key = columns[0].name
-            return Table(name=table_id, columns=columns, primary_key=primary_key)
+            return self.conn.connection.generator.table_class(
+                name=table_id, columns=columns, primary_key=primary_key
+            )
 
     async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
         tables: list[Table] = []

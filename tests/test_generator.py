@@ -172,11 +172,11 @@ class TestGenerator(unittest.TestCase):
             '"address" bigint NOT NULL,',
             'PRIMARY KEY ("id")',
             ");",
+            """COMMENT ON TABLE "Person" IS 'A person.';""",
+            """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
             'ALTER TABLE "Person"',
             'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")',
             ";",
-            """COMMENT ON TABLE "Person" IS 'A person.';""",
-            """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';""",
         ]
         self.assertMultiLineEqual(
             get_create_stmt(tables.Person, dialect="postgresql"), "\n".join(lines)
@@ -188,14 +188,14 @@ class TestGenerator(unittest.TestCase):
             '"lat" double precision,',
             '"long" double precision',
             ");",
+            """COMMENT ON TYPE "Coordinates" IS 'Coordinates in the geographic coordinate system.';""",
+            """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
+            """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
             'CREATE TABLE "Location" (',
             '"id" bigint NOT NULL,',
             '"coords" "Coordinates" NOT NULL,',
             'PRIMARY KEY ("id")',
             ");",
-            """COMMENT ON TYPE "Coordinates" IS 'Coordinates in the geographic coordinate system.';""",
-            """COMMENT ON COLUMN "Coordinates"."lat" IS 'Latitude in degrees.';""",
-            """COMMENT ON COLUMN "Coordinates"."long" IS 'Longitude in degrees.';""",
         ]
         self.assertMultiLineEqual(
             get_create_stmt(tables.Location, dialect="postgresql"), "\n".join(lines)

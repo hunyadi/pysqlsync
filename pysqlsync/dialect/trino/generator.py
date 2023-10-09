@@ -16,7 +16,8 @@ class TrinoGenerator(BaseGenerator):
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.CHECK,
                 struct_mode=options.struct_mode or StructMode.JSON,
-                namespaces=NamespaceMapping(self.options.namespaces),
+                namespaces=NamespaceMapping(options.namespaces),
+                foreign_constraints=options.foreign_constraints,
                 skip_annotations=options.skip_annotations,
             )
         )

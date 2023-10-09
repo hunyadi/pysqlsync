@@ -89,6 +89,14 @@ def is_unique(items: Iterable[T]) -> bool:
     return len(unique) == 1
 
 
+def is_relationship(field_type: TypeLike) -> bool:
+    if not is_generic_list(field_type):
+        return False
+
+    elem_type = unwrap_generic_list(field_type)
+    return is_entity_type(elem_type)
+
+
 def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
@@ -162,8 +170,11 @@ class DataclassConverterOptions:
     :param extra_numeric_types: Whether to use extra numeric types like `int1` or `uint4`.
     :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
+    :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
     :param substitutions: SQL type to be substituted for a specific Python type.
     :param column_class: The object type instantiated for table columns. Must derive from `Column`.
+    :param table_class: The object type instantiated for tables. Must derive from `Table`.
+    :param struct_class: The object type instantiated for struct types. Must derive from `StructType`.
     :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
@@ -172,8 +183,11 @@ class DataclassConverterOptions:
     extra_numeric_types: bool = False
     qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
+    foreign_constraints: bool = True
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     column_class: type[Column] = Column
+    table_class: type[Table] = Table
+    struct_class: type[StructType] = StructType
     skip_annotations: tuple[type, ...] = ()
 
 
@@ -273,8 +287,9 @@ class DataclassConverter:
         metadata = getattr(typ, "__metadata__", None)
         if metadata:
             unadorned_type = unwrap_annotated_type(typ)
+            sql_type: Optional[SqlDataType]
             if unadorned_type is str:
-                sql_type: SqlDataType = SqlCharacterType()
+                sql_type = SqlCharacterType()
             elif unadorned_type is decimal.Decimal:
                 sql_type = SqlDecimalType()
             elif unadorned_type is datetime.datetime:
@@ -282,13 +297,20 @@ class DataclassConverter:
             elif unadorned_type is datetime.time:
                 sql_type = SqlTimeType()
             else:
-                raise TypeError(f"unsupported annotated Python type: {typ}")
+                # avoid error when only skipped annotations are applied to a custom type
+                sql_type = None
 
             for meta in metadata:
-                if not isinstance(meta, self.options.skip_annotations):
-                    sql_type.parse_meta(meta)
+                if isinstance(meta, self.options.skip_annotations):
+                    continue
+                if sql_type is None:
+                    raise TypeError(f"unsupported annotated Python type: {typ}")
+                sql_type.parse_meta(meta)
 
-            return sql_type
+            if sql_type:
+                return sql_type
+
+            typ = unadorned_type
 
         if is_type_enum(typ):
             value_types = enum_value_types(typ)
@@ -424,12 +446,58 @@ class DataclassConverter:
             columns = [
                 self.member_to_column(field, cls, doc)
                 for field in dataclass_fields(cls)
-                if not is_generic_list(field.type)
+                if not is_relationship(field.type)
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
 
-        # table constraints
+        # foreign/primary key constraints
+        constraints = (
+            self.dataclass_to_constraints(cls)
+            if self.options.foreign_constraints
+            else []
+        )
+
+        # checks
+        if self.options.enum_mode is EnumMode.RELATION:
+            for field in dataclass_fields_as_required(cls):
+                if is_type_enum(field.type):
+                    constraints.append(
+                        ForeignConstraint(
+                            LocalId(f"fk_{cls.__name__}_{field.name}"),
+                            LocalId(field.name),
+                            ConstraintReference(
+                                self.create_qualified_id(
+                                    field.type.__module__, field.type.__name__
+                                ),
+                                LocalId("id"),
+                            ),
+                        ),
+                    )
+        elif self.options.enum_mode is EnumMode.CHECK:
+            for field in dataclass_fields_as_required(cls):
+                if is_type_enum(field.type):
+                    enum_values = ", ".join(constant(e.value) for e in field.type)
+                    constraints.append(
+                        CheckConstraint(
+                            LocalId(f"ch_{cls.__name__}_{field.name}"),
+                            f"{LocalId(field.name)} IN ({enum_values})",
+                        ),
+                    )
+
+        return self.options.table_class(
+            name=self.create_qualified_id(cls.__module__, cls.__name__),
+            columns=columns,
+            primary_key=LocalId(dataclass_primary_key_name(cls)),
+            constraints=constraints or None,
+            description=doc.full_description,
+        )
+
+    def dataclass_to_constraints(
+        self, cls: type[DataclassInstance]
+    ) -> list[Constraint]:
+        "Extracts the foreign/primary key relationships from a data-class."
+
         constraints: list[Constraint] = []
 
         for field in dataclass_fields_as_required(cls):
@@ -468,40 +536,7 @@ class DataclassConverter:
                         )
                     )
 
-        # checks
-        if self.options.enum_mode is EnumMode.RELATION:
-            for field in dataclass_fields_as_required(cls):
-                if is_type_enum(field.type):
-                    constraints.append(
-                        ForeignConstraint(
-                            LocalId(f"fk_{cls.__name__}_{field.name}"),
-                            LocalId(field.name),
-                            ConstraintReference(
-                                self.create_qualified_id(
-                                    field.type.__module__, field.type.__name__
-                                ),
-                                LocalId("id"),
-                            ),
-                        ),
-                    )
-        elif self.options.enum_mode is EnumMode.CHECK:
-            for field in dataclass_fields_as_required(cls):
-                if is_type_enum(field.type):
-                    enum_values = ", ".join(constant(e.value) for e in field.type)
-                    constraints.append(
-                        CheckConstraint(
-                            LocalId(f"ch_{cls.__name__}_{field.name}"),
-                            f"{LocalId(field.name)} IN ({enum_values})",
-                        ),
-                    )
-
-        return Table(
-            name=self.create_qualified_id(cls.__module__, cls.__name__),
-            columns=columns,
-            primary_key=LocalId(dataclass_primary_key_name(cls)),
-            constraints=constraints if constraints else None,
-            description=doc.full_description,
-        )
+        return constraints
 
     def member_to_field(
         self, field: DataclassField, cls: type[DataclassInstance], doc: Docstring
@@ -534,7 +569,7 @@ class DataclassConverter:
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
 
-        return StructType(
+        return self.options.struct_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
             members=members,
             description=doc.full_description,
@@ -599,7 +634,7 @@ class DataclassConverter:
                     enum_type = field.type
                     table_defs = tables.setdefault(enum_type.__module__, [])
                     table_defs.append(
-                        Table(
+                        self.options.table_class(
                             self.create_qualified_id(
                                 enum_type.__module__, enum_type.__name__
                             ),
@@ -641,7 +676,7 @@ class DataclassConverter:
                 column_right = f"{item_type.__name__}_{primary_key_right.id}"
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
-                    Table(
+                    self.options.table_class(
                         self.create_qualified_id(
                             entity.__module__,
                             f"{column_left}_{item_type.__name__}",

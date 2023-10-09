@@ -17,10 +17,8 @@ from strong_typing.inspection import (
     get_annotation,
     is_type_enum,
     is_type_literal,
-    is_type_optional,
     is_type_union,
     unwrap_literal_values,
-    unwrap_optional_type,
     unwrap_union_types,
 )
 from strong_typing.serialization import object_to_json
@@ -215,10 +213,10 @@ class RandomGenerator:
             raise DataGeneratorError(f"unknown key type: {plain_type}")
 
         if properties.nullable:
-            optional_generator = self.create(plain_type, cls)
+            optional_generator = self.create(field_type, cls)
             return (
                 lambda k: optional_generator(k)
-                if random.uniform(0.0, 1.0) > 0.5
+                if random.uniform(0.0, 1.0) > 0.1
                 else None
             )
         elif plain_type is bool:
@@ -226,7 +224,9 @@ class RandomGenerator:
         elif plain_type is int:
             integer_range = get_annotation(field_type, IntegerRange)
             if integer_range is not None:
-                lambda _: random.randint(integer_range.minimum, integer_range.maximum)
+                minimum_value = integer_range.minimum
+                maximum_value = integer_range.maximum
+                return lambda _: random.randint(minimum_value, maximum_value)
 
             return lambda _: random.randint(0, 1000000)
         elif plain_type is float:
@@ -245,7 +245,7 @@ class RandomGenerator:
             min_length_tag = get_annotation(field_type, MinLength)
             min_length = min_length_tag.value if min_length_tag is not None else 0
             max_length_tag = get_annotation(field_type, MaxLength)
-            max_length = max_length_tag.value if max_length_tag is not None else 1024
+            max_length = max_length_tag.value if max_length_tag is not None else 255
             return lambda _: random_alphanumeric_str(min_length, max_length)
         elif plain_type is decimal.Decimal:
             return lambda _: decimal.Decimal.from_float(random.uniform(0, 1000))

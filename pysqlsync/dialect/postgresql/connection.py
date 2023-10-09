@@ -4,9 +4,8 @@ import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
-from strong_typing.inspection import DataclassInstance, is_dataclass_type
-
 from pysqlsync.base import BaseConnection, BaseContext
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")

@@ -23,7 +23,9 @@ class GeneratorOptions:
     Database-agnostic generator options.
 
     :param enum_mode: Conversion mode for enumeration types.
+    :param struct_mode: Conversion mode for composite types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
+    :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
     :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
@@ -32,6 +34,7 @@ class GeneratorOptions:
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
+    foreign_constraints: bool = True
     skip_annotations: tuple[type, ...] = ()
 
 
@@ -50,11 +53,15 @@ class BaseGenerator(abc.ABC):
 
     def __init__(self, options: GeneratorOptions) -> None:
         self.options = options
-        self.catalog = Catalog([])
+        self.state = Catalog([])
 
     @property
     def column_class(self) -> type[Column]:
         return Column
+
+    @property
+    def table_class(self) -> type[Table]:
+        return Table
 
     @overload
     def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]:
@@ -70,6 +77,14 @@ class BaseGenerator(abc.ABC):
         tables: Optional[list[type[DataclassInstance]]] = None,
         modules: Optional[list[types.ModuleType]] = None,
     ) -> Optional[str]:
+        """
+        Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions.
+
+        :param tables: The list of entity classes to define the SQL objects.
+        :param modules: The list of modules whose entity classes defined the SQL objects.
+        :returns: A SQL statement that creates tables, structs, enumerations, constraints, etc.
+        """
+
         if tables is not None and modules is not None:
             raise TypeError("arguments `tables` and `modules` are exclusive")
         if tables is None and modules is None:
@@ -78,26 +93,34 @@ class BaseGenerator(abc.ABC):
         if tables:
             target = self.converter.dataclasses_to_catalog(tables)
             statement = self.get_mutate_stmt(target)
-            self.catalog = target
+            self.state = target
             return statement
         elif modules:
             target = self.converter.modules_to_catalog(modules)
             statement = self.get_mutate_stmt(target)
-            self.catalog = target
+            self.state = target
             return statement
         else:
             raise NotImplementedError()
 
     def drop(self) -> Optional[str]:
+        """
+        Drops all objects currently synced with the generator.
+
+        (This function is mainly for unit tests.)
+
+        :returns: A SQL statement that drops tables, structs, enumerations, constraints, etc.
+        """
+
         target = Catalog([])
         statement = self.get_mutate_stmt(target)
-        self.catalog = target
+        self.state = target
         return statement
 
     def get_mutate_stmt(self, target: Catalog) -> Optional[str]:
         "Returns a SQL statement to mutate a source state into a target state."
 
-        return target.mutate_stmt(self.catalog)
+        return target.mutate_stmt(self.state)
 
     @abc.abstractmethod
     def get_table_insert_stmt(self, table: Table) -> str:
@@ -117,7 +140,7 @@ class BaseGenerator(abc.ABC):
     def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
         "Returns a SQL statement to insert records into a database table."
 
-        table_object = self.catalog.get_table(self.get_qualified_id(table))
+        table_object = self.state.get_table(self.get_qualified_id(table))
         return self.get_table_upsert_stmt(table_object)
 
     def get_dataclass_as_record(self, item: DataclassInstance) -> tuple:
@@ -165,7 +188,9 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_value_extractor(self, field_type: type) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(
+        self, column: Column, field_type: type
+    ) -> Optional[Callable[[Any], Any]]:
         "Returns a callable function object that extracts a single field of a data-class."
 
         if is_type_enum(field_type):
@@ -175,7 +200,7 @@ class BaseGenerator(abc.ABC):
         else:
             return None
 
-    def get_enum_extractor(self, enum_dict: dict[Any, int]) -> Callable[[Any], Any]:
+    def get_enum_transformer(self, enum_dict: dict[Any, int]) -> Callable[[Any], Any]:
         return lambda field: enum_dict[field]
 
 
@@ -338,17 +363,21 @@ class BaseContext(abc.ABC):
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace} CASCADE;")
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
-        return self.connection.generator.catalog.get_table(
+        return self.connection.generator.state.get_table(
             self.connection.generator.get_qualified_id(table)
         )
 
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
+        "Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions."
+
         generator = self.connection.generator
         statement = generator.create(tables=tables)
         if statement:
             await self.execute(statement)
 
     async def drop_objects(self) -> None:
+        "Drops all objects currently synced with the generator. (This function is mainly for unit tests.)"
+
         generator = self.connection.generator
         statement = generator.drop()
         if statement:
@@ -367,54 +396,106 @@ class BaseContext(abc.ABC):
         records = generator.get_dataclasses_as_records(data)
         await self.execute_all(statement, records)
 
+    async def insert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        """
+        Inserts rows in a database table, ignoring duplicate keys.
+
+        :param table: The table to insert into.
+        :param field_types: The data types of the items in a row record.
+        :param field_names: The field names of the items in a row record.
+        :param records: The rows to be inserted into the database table.
+        """
+
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        statement = self.connection.generator.get_table_insert_stmt(table)
+        await self.execute_all(
+            statement,
+            record_generator,
+        )
+
     async def upsert_rows(
         self,
         table: Table,
-        signature: tuple[type, ...],
         records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
         """
         Inserts or updates rows in a database table.
 
         :param table: The table to be updated.
-        :param signature: The data types of the items in a row record.
+        :param field_types: The data types of the items in a row record.
+        :param field_names: The field names of the items in a row record.
         :param records: The rows to be inserted into or updated in the database table.
         """
 
-        generator = self.connection.generator
-
-        extractors: list[Optional[Callable[[Any], Any]]] = []
-        for index, column, value_type in zip(
-            range(len(table.columns)), table.columns.values(), signature
-        ):
-            extractor = generator.get_value_extractor(value_type)
-            if value_type is str and table.is_relation(column.name):
-                relation = generator.catalog.get_referenced_table(
-                    table.name, column.name
-                )
-                if relation.is_lookup_table():
-                    enum_dict: dict[Any, int] = await self._merge_lookup_table(
-                        relation, set(record[index] for record in records)
-                    )
-                    extractor = generator.get_enum_extractor(enum_dict)
-            extractors.append(extractor)
-
-        if all(extractor is None for extractor in extractors):
-            record_generator = records
-        else:
-            record_generator = (
-                tuple(
-                    (extractor(field) if extractor is not None else field)
-                    for extractor, field in zip(extractors, record)
-                )
-                for record in records
-            )
-
-        statement = generator.get_table_upsert_stmt(table)
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        statement = self.connection.generator.get_table_upsert_stmt(table)
         await self.execute_all(
             statement,
             record_generator,
         )
+
+    async def _generate_records(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> Iterable[tuple[Any, ...]]:
+        "Creates a record generator for a database table."
+
+        if field_names is not None:
+            columns: list[Column] = []
+
+            for field_name in field_names:
+                column = table.columns.get(field_name, None)
+                if column is None:
+                    raise ValueError(
+                        f"column {LocalId(field_name)} not found in table {table.name}"
+                    )
+                columns.append(column)
+        else:
+            columns = list(table.columns.values())
+
+        generator = self.connection.generator
+
+        transformers: list[Optional[Callable[[Any], Any]]] = []
+        for index, column, field_type in zip(range(len(columns)), columns, field_types):
+            transformer = generator.get_value_transformer(column, field_type)
+            if field_type is str and table.is_relation(column.name):
+                relation = generator.state.get_referenced_table(table.name, column.name)
+                if relation.is_lookup_table():
+                    enum_dict: dict[Any, int] = await self._merge_lookup_table(
+                        relation, set(record[index] for record in records)
+                    )
+                    transformer = generator.get_enum_transformer(enum_dict)
+
+            transformers.append(transformer)
+
+        if all(transformer is None for transformer in transformers):
+            return records
+        else:
+            return (
+                tuple(
+                    (transformer(field) if transformer is not None else field)
+                    for transformer, field in zip(transformers, record)
+                )
+                for record in records
+            )
 
     async def _merge_lookup_table(
         self, table: Table, values: Iterable[str]

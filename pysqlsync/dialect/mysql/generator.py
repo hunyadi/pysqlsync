@@ -99,7 +99,8 @@ class MySQLGenerator(BaseGenerator):
                 enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=options.struct_mode or StructMode.JSON,
                 qualified_names=False,
-                namespaces=NamespaceMapping(self.options.namespaces),
+                namespaces=NamespaceMapping(options.namespaces),
+                foreign_constraints=options.foreign_constraints,
                 substitutions={
                     datetime.datetime: MySQLDateTimeType(),
                     uuid.UUID: SqlFixedBinaryType(16),
@@ -140,8 +141,9 @@ class MySQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.columns.values() if not column.identity]
         statements.append(_field_list([column.name for column in columns]))
+        value_columns = table.get_value_columns()
         statements.append(f"ON DUPLICATE KEY UPDATE")
-        defs = [_field_update(column.name) for column in table.get_value_columns()]
+        defs = [_field_update(column.name) for column in value_columns]
         statements.append(",\n".join(defs))
         return "\n".join(statements)
 
@@ -153,13 +155,15 @@ class MySQLGenerator(BaseGenerator):
 
         return super().get_field_extractor(field_name, field_type)
 
-    def get_value_extractor(self, field_type: type) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(
+        self, column: Column, field_type: type
+    ) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
             return lambda field: field.packed
 
-        return super().get_value_extractor(field_type)
+        return super().get_value_transformer(column, field_type)
 
 
 def _field_list(field_ids: list[LocalId]) -> str:

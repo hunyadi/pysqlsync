@@ -81,7 +81,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 self.fail()
             await conn.execute(create_stmt)
 
-            catalog = conn.connection.generator.catalog
+            catalog = conn.connection.generator.state
             create_ns = (
                 catalog.namespaces["sample"]
                 if "sample" in catalog.namespaces

@@ -58,7 +58,7 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     data = parser.parse_file(f)
 
             with Timer(f"insert into {self.engine.name} database table"):
-                await conn.upsert_rows(table, column_types, data)
+                await conn.upsert_rows(table, field_types=column_types, records=data)
 
             self.assertEqual(
                 await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};"),

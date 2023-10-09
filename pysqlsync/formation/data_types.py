@@ -33,7 +33,7 @@ class SqlDiscovery:
             if substitute is not None:
                 return substitute
 
-        if type_name == "boolean":
+        if type_name in ["bool", "boolean"]:
             return SqlBooleanType()
         elif type_name in ["tinyint", "int1"]:
             return SqlIntegerType(1)
@@ -59,6 +59,10 @@ class SqlDiscovery:
                 return SqlFloatType(numeric_precision)  # precision in base 2
         elif type_name == "float":
             return SqlFloatType(numeric_precision)  # precision in base 2
+        elif type_name == "float4":
+            return SqlRealType()
+        elif type_name == "float8":
+            return SqlDoubleType()
         elif type_name == "timestamp" or type_name == "timestamp without time zone":
             return SqlTimestampType(datetime_precision, False)
         elif type_name == "timestamp with time zone":
