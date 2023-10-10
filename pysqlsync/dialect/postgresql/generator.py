@@ -1,11 +1,10 @@
 import json
 import re
 import typing
-from typing import Any, Callable, Optional
+from typing import Optional
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import (
-    Column,
     FormationError,
     MutableObject,
     StructType,
@@ -18,7 +17,6 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlJsonType
 
 _sql_quoted_str_table = str.maketrans(
     {
@@ -119,15 +117,6 @@ class PostgreSQLStructType(StructType):
         return super().mutate_stmt(src)
 
 
-_JSON_ENCODER = json.JSONEncoder(
-    ensure_ascii=False,
-    check_circular=False,
-    allow_nan=False,
-    indent=None,
-    separators=(",", ":"),
-)
-
-
 class PostgreSQLGenerator(BaseGenerator):
     converter: DataclassConverter
 
@@ -182,13 +171,3 @@ class PostgreSQLGenerator(BaseGenerator):
         else:
             statements.append(f"ON CONFLICT ({table.primary_key}) DO NOTHING")
         return "\n".join(statements)
-
-    def get_value_transformer(
-        self, column: Column, field_type: type
-    ) -> Optional[Callable[[Any], Any]]:
-        if isinstance(column.data_type, SqlJsonType):
-            return (
-                lambda field: _JSON_ENCODER.encode(field) if field is not None else None
-            )
-
-        return super().get_value_transformer(column, field_type)

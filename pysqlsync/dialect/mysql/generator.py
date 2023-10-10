@@ -14,6 +14,7 @@ from pysqlsync.formation.object_types import (
     quote,
 )
 from pysqlsync.formation.py_to_sql import (
+    ArrayMode,
     DataclassConverter,
     DataclassConverterOptions,
     EnumMode,
@@ -43,7 +44,7 @@ class MySQLColumn(Column):
         )
         identity = " AUTO_INCREMENT" if self.identity else ""
         description = (
-            f" COMMENT = {self.comment()}" if self.description is not None else ""
+            f" COMMENT {self.comment()}" if self.description is not None else ""
         )
         return f"{self.data_type}{nullable}{default}{identity}{description}"
 
@@ -98,6 +99,7 @@ class MySQLGenerator(BaseGenerator):
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=options.struct_mode or StructMode.JSON,
+                array_mode=ArrayMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
@@ -143,8 +145,12 @@ class MySQLGenerator(BaseGenerator):
         statements.append(_field_list([column.name for column in columns]))
         value_columns = table.get_value_columns()
         statements.append(f"ON DUPLICATE KEY UPDATE")
-        defs = [_field_update(column.name) for column in value_columns]
-        statements.append(",\n".join(defs))
+        if value_columns:
+            defs = [_field_update(column.name) for column in value_columns]
+            statements.append(",\n".join(defs))
+        else:
+            statements.append(_field_update(table.primary_key))
+
         return "\n".join(statements)
 
     def get_field_extractor(

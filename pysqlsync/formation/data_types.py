@@ -35,7 +35,7 @@ class SqlDiscovery:
 
         if type_name in ["bool", "boolean"]:
             return SqlBooleanType()
-        elif type_name in ["tinyint", "int1"]:
+        elif type_name in ["tinyint", "tinyint(1)", "int1"]:
             return SqlIntegerType(1)
         elif type_name in ["smallint", "int2"]:
             return SqlIntegerType(2)

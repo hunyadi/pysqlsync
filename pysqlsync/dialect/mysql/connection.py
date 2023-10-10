@@ -3,11 +3,10 @@ import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiomysql
-from strong_typing.inspection import DataclassInstance, is_dataclass_type
-
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -25,10 +24,10 @@ class MySQLConnection(BaseConnection):
             ]
         )
         self.native = await aiomysql.connect(
-            host=self.params.host,
-            port=self.params.port,
+            host=self.params.host or "localhost",
+            port=self.params.port or 3306,
             user=self.params.username,
-            password=self.params.password,
+            password=self.params.password or "",
             db=self.params.database,
             sql_mode=f"'{sql_mode}'",
             init_command='SET @@session.time_zone = "+00:00";',

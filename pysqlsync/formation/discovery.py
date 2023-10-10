@@ -4,16 +4,14 @@ from typing import Optional
 
 from ..base import BaseContext, Explorer
 from ..model.data_types import escape_like, quote
-from ..model.id_types import SupportsQualifiedId
+from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .data_types import SqlDiscovery
 from .object_types import (
     Column,
     Constraint,
     ConstraintReference,
     ForeignConstraint,
-    LocalId,
     Namespace,
-    QualifiedId,
     Table,
 )
 

@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import ipaddress
+import json
 import types
 import typing
 from collections.abc import Sequence
@@ -11,10 +12,19 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_ty
 
 from .formation.object_types import Catalog, Column, Namespace, Table
 from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
+from .model.data_types import SqlJsonType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
+
+_JSON_ENCODER = json.JSONEncoder(
+    ensure_ascii=False,
+    check_circular=False,
+    allow_nan=False,
+    indent=None,
+    separators=(",", ":"),
+)
 
 
 @dataclass
@@ -192,6 +202,9 @@ class BaseGenerator(abc.ABC):
         self, column: Column, field_type: type
     ) -> Optional[Callable[[Any], Any]]:
         "Returns a callable function object that extracts a single field of a data-class."
+
+        if isinstance(column.data_type, SqlJsonType):
+            return lambda field: _JSON_ENCODER.encode(field)
 
         if is_type_enum(field_type):
             return lambda field: field.value
@@ -491,7 +504,11 @@ class BaseContext(abc.ABC):
         else:
             return (
                 tuple(
-                    (transformer(field) if transformer is not None else field)
+                    (
+                        (transformer(field) if field is not None else None)
+                        if transformer is not None
+                        else field
+                    )
                     for transformer, field in zip(transformers, record)
                 )
                 for record in records

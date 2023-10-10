@@ -160,6 +160,12 @@ class StructMode(enum.Enum):
     "Dataclass types are converted into SQL JSON type (or text)."
 
 
+@enum.unique
+class ArrayMode(enum.Enum):
+    ARRAY = "array"
+    JSON = "json"
+
+
 @dataclass
 class DataclassConverterOptions:
     """
@@ -180,6 +186,7 @@ class DataclassConverterOptions:
 
     enum_mode: EnumMode = EnumMode.TYPE
     struct_mode: StructMode = StructMode.TYPE
+    array_mode: ArrayMode = ArrayMode.ARRAY
     extra_numeric_types: bool = False
     qualified_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
@@ -372,19 +379,26 @@ class DataclassConverter:
         if is_generic_list(typ):
             item_type = unwrap_generic_list(typ)
             if is_simple_type(item_type):
-                return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
+                if self.options.array_mode is ArrayMode.ARRAY:
+                    return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
+                elif self.options.array_mode is ArrayMode.JSON:
+                    return SqlJsonType()
             if is_entity_type(item_type):
                 raise TypeError(
                     f"use a join table, unable to convert list of entity type with primary key: {typ}"
                 )
             if isinstance(item_type, type):
-                return SqlArrayType(
-                    SqlUserDefinedType(
-                        self.create_qualified_id(
-                            item_type.__module__, item_type.__name__
+                if self.options.array_mode is ArrayMode.ARRAY:
+                    return SqlArrayType(
+                        SqlUserDefinedType(
+                            self.create_qualified_id(
+                                item_type.__module__, item_type.__name__
+                            )
                         )
                     )
-                )
+                elif self.options.array_mode is ArrayMode.JSON:
+                    return SqlJsonType()
+
             raise TypeError(f"unsupported array data type: {item_type}")
         if is_type_union(typ):
             member_types = [
