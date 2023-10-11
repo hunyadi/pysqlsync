@@ -10,6 +10,7 @@ from typing import Any, Callable, Iterable, Optional, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
+from .formation.inspection import get_entity_types
 from .formation.object_types import Catalog, Column, Namespace, Table
 from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType
@@ -63,7 +64,7 @@ class BaseGenerator(abc.ABC):
 
     def __init__(self, options: GeneratorOptions) -> None:
         self.options = options
-        self.state = Catalog([])
+        self.reset()
 
     @property
     def column_class(self) -> type[Column]:
@@ -72,6 +73,9 @@ class BaseGenerator(abc.ABC):
     @property
     def table_class(self) -> type[Table]:
         return Table
+
+    def reset(self) -> None:
+        self.state = Catalog([])
 
     @overload
     def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]:
@@ -533,6 +537,10 @@ class BaseContext(abc.ABC):
         return dict(results)  # type: ignore
 
 
+class DiscoveryError(RuntimeError):
+    pass
+
+
 class Explorer(abc.ABC):
     conn: BaseContext
 
@@ -563,6 +571,39 @@ class Explorer(abc.ABC):
     @abc.abstractmethod
     async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
         ...
+
+    async def get_catalog_meta(self, *, namespace: str) -> Catalog:
+        "Discovers database objects in a namespace."
+
+        ns_name = self.conn.connection.generator.converter.options.namespaces.get(
+            namespace
+        )
+        if ns_name is None:
+            raise DiscoveryError(
+                "discovery expects a (pseudo) namespace but options map to blank name"
+            )
+
+        ns = await self.get_namespace_meta(LocalId(ns_name))
+        return Catalog(namespaces=[ns])
+
+    async def synchronize(self, module: types.ModuleType) -> None:
+        "Synchronizes a current source state with a desired target state."
+
+        generator = self.conn.connection.generator
+
+        # determine target database schema
+        generator.reset()
+        generator.create(tables=get_entity_types([module]))
+        target_state = generator.state
+
+        # acquire current database schema
+        generator.state = await self.get_catalog_meta(namespace=module.__name__)
+
+        # mutate current state into desired state
+        stmt = generator.get_mutate_stmt(target_state)
+        if stmt is not None:
+            await self.conn.execute(stmt)
+            generator.state = target_state
 
 
 class BaseEngine(abc.ABC):

@@ -260,4 +260,7 @@ class PostgreSQLExplorer(Explorer):
             table = await self.get_table_meta(QualifiedId(namespace_id.id, table_name))
             tables.append(table)
 
-        return Namespace(namespace_id, enums=enums, structs=[], tables=tables)
+        if tables:
+            return Namespace(namespace_id, enums=enums, structs=[], tables=tables)
+        else:
+            return Namespace()

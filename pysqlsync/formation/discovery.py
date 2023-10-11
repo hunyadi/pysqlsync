@@ -2,7 +2,7 @@ import typing
 from dataclasses import dataclass
 from typing import Optional
 
-from ..base import BaseContext, Explorer
+from ..base import BaseContext, DiscoveryError, Explorer
 from ..model.data_types import escape_like, quote
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .data_types import SqlDiscovery
@@ -14,10 +14,6 @@ from .object_types import (
     Namespace,
     Table,
 )
-
-
-class DiscoveryError(RuntimeError):
-    pass
 
 
 @dataclass
@@ -292,4 +288,4 @@ class AnsiReflection(Explorer):
 
             return Namespace(name=LocalId(""), enums=[], structs=[], tables=tables)
 
-        raise DiscoveryError(f"namespace/schema not found: {namespace_id}")
+        return Namespace()

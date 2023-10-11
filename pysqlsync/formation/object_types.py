@@ -3,7 +3,7 @@ import enum
 import typing
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, overload
 
 from ..model.data_types import SqlDataType, constant, quote
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
@@ -62,7 +62,7 @@ class EnumType(QualifiedObject, MutableObject):
 
         if source_values - target_values:
             raise FormationError(
-                "operation not permitted; cannot drop values in an enumeration"
+                f"operation not permitted; cannot drop values in an enumeration: {''.join(source_values - target_values)}"
             )
 
         diff_values = list(target_values - source_values)
@@ -526,17 +526,33 @@ class Namespace(MutableObject):
     structs: ObjectDict[StructType]
     tables: ObjectDict[Table]
 
+    @overload
+    def __init__(self) -> None:
+        ...
+
+    @overload
     def __init__(
         self,
         name: LocalId,
+        *,
         enums: list[EnumType],
         structs: list[StructType],
         tables: list[Table],
     ) -> None:
-        self.name = name
-        self.enums = ObjectDict(enums)
-        self.structs = ObjectDict(structs)
-        self.tables = ObjectDict(tables)
+        ...
+
+    def __init__(
+        self,
+        name: Optional[LocalId] = None,
+        *,
+        enums: Optional[list[EnumType]] = None,
+        structs: Optional[list[StructType]] = None,
+        tables: Optional[list[Table]] = None,
+    ) -> None:
+        self.name = name or LocalId("")
+        self.enums = ObjectDict(enums or [])
+        self.structs = ObjectDict(structs or [])
+        self.tables = ObjectDict(tables or [])
 
     def create_stmt(self) -> str:
         items: list[str] = []

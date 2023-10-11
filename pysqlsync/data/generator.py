@@ -1,12 +1,12 @@
 import datetime
 import decimal
 import enum
-import ipaddress
 import random
 import string
 import typing
 import uuid
-from socket import AF_INET6, inet_ntop
+from ipaddress import IPv4Address, IPv6Address, ip_address
+from socket import AF_INET, AF_INET6, inet_ntop
 from struct import pack
 from typing import Any, Callable, Optional, TypeVar
 
@@ -118,23 +118,21 @@ def random_enum_generator(
         raise TypeError("invalid parameter combination")
 
 
-def random_ipv4addr() -> ipaddress.IPv4Address:
-    """
-    Creates a random IPv4 address.
-    """
+def random_ipv4addr() -> IPv4Address:
+    "Creates a random IPv4 address."
 
     return typing.cast(
-        ipaddress.IPv4Address,
-        ipaddress.ip_address(
-            f"{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
-        ),
+        IPv4Address,
+        ip_address(inet_ntop(AF_INET, pack(">L", random.getrandbits(32)))),
     )
 
 
-def random_ipv6addr() -> ipaddress.IPv6Address:
+def random_ipv6addr() -> IPv6Address:
+    "Creates a random IPv6 address."
+
     return typing.cast(
-        ipaddress.IPv6Address,
-        ipaddress.ip_address(
+        IPv6Address,
+        ip_address(
             inet_ntop(
                 AF_INET6, pack(">QQ", random.getrandbits(64), random.getrandbits(64))
             )
@@ -251,9 +249,9 @@ class RandomGenerator:
             return lambda _: decimal.Decimal.from_float(random.uniform(0, 1000))
         elif plain_type is uuid.UUID:
             return lambda _: uuid.uuid4()
-        elif plain_type is ipaddress.IPv4Address:
+        elif plain_type is IPv4Address:
             return lambda _: random_ipv4addr()
-        elif plain_type is ipaddress.IPv6Address:
+        elif plain_type is IPv6Address:
             return lambda _: random_ipv6addr()
         elif is_type_enum(plain_type):
             return lambda _: random_enum(plain_type)  # type: ignore

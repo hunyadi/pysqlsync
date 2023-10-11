@@ -131,11 +131,14 @@ class MySQLGenerator(BaseGenerator):
 
     def get_table_insert_stmt(self, table: Table) -> str:
         statements: list[str] = []
-        statements.append(f"INSERT IGNORE INTO {table.name}")
+        statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.columns.values() if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join(f"%s" for column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
+        statements.append(
+            f"ON DUPLICATE KEY UPDATE {table.primary_key} = {table.primary_key}"
+        )
         return "\n".join(statements)
 
     def get_table_upsert_stmt(self, table: Table) -> str:

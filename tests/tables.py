@@ -22,7 +22,7 @@ from strong_typing.auxiliary import (
 )
 from strong_typing.inspection import extend_enum
 
-from pysqlsync.model.properties import PrimaryKey
+from pysqlsync.model.key_types import PrimaryKey
 
 
 class WorkflowState(enum.Enum):
