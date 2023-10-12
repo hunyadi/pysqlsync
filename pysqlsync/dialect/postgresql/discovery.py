@@ -3,7 +3,7 @@ from itertools import groupby
 from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
-from pysqlsync.formation.data_types import SqlDiscovery
+from pysqlsync.formation.data_types import SqlArrayType, SqlDiscovery
 from pysqlsync.formation.discovery import DiscoveryError
 from pysqlsync.formation.object_types import (
     Column,
@@ -30,7 +30,8 @@ class PostgreSQLColumnMeta:
     column_name: str
     type_schema: str
     type_name: str
-    nullable: bool
+    is_nullable: bool
+    is_array: bool
     character_maximum_length: int
     numeric_precision: int
     numeric_scale: int
@@ -126,7 +127,8 @@ class PostgreSQLExplorer(Explorer):
             "    att.attname AS column_name,\n"
             "    typ_nsp.nspname AS type_schema,\n"
             "    typ.typname AS type_name,\n"
-            "    NOT att.attnotnull AS nullable,\n"
+            "    NOT att.attnotnull AS is_nullable,\n"
+            "    attndims != 0 AS is_array,\n"
             "    col.character_maximum_length AS character_maximum_length,\n"
             "    col.numeric_precision AS numeric_precision,\n"
             "    col.numeric_scale AS numeric_scale,\n"
@@ -145,18 +147,21 @@ class PostgreSQLExplorer(Explorer):
 
         columns: list[Column] = []
         for col in column_records:
+            data_type = self.discovery.sql_data_type_from_spec(
+                col.type_name,
+                col.type_schema,
+                character_maximum_length=col.character_maximum_length,
+                numeric_precision=col.numeric_precision,
+                numeric_scale=col.numeric_scale,
+                datetime_precision=None,
+            )
+            if col.is_array:
+                data_type = SqlArrayType(data_type)
             columns.append(
                 Column(
                     LocalId(col.column_name),
-                    self.discovery.sql_data_type_from_spec(
-                        col.type_name,
-                        col.type_schema,
-                        character_maximum_length=col.character_maximum_length,
-                        numeric_precision=col.numeric_precision,
-                        numeric_scale=col.numeric_scale,
-                        datetime_precision=None,
-                    ),
-                    bool(col.nullable),
+                    data_type,
+                    bool(col.is_nullable),
                     description=col.description,
                 )
             )

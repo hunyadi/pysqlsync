@@ -1,15 +1,20 @@
+import logging
 import types
 import typing
+from collections.abc import Sized
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiomysql
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
+
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
-from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
+
+LOGGER = logging.getLogger("pysqlsync.mysql")
 
 
 class MySQLConnection(BaseConnection):
@@ -23,6 +28,7 @@ class MySQLConnection(BaseConnection):
                 "STRICT_ALL_TABLES",
             ]
         )
+        LOGGER.info(f"connecting to {self.params}")
         self.native = await aiomysql.connect(
             host=self.params.host or "localhost",
             port=self.params.port or 3306,
@@ -52,16 +58,28 @@ class MySQLContext(BaseContext):
         return typing.cast(MySQLConnection, self.connection).native
 
     async def execute(self, statement: str) -> None:
+        if not statement:
+            raise ValueError("empty statement")
+
         async with self.native_connection.cursor() as cur:
+            LOGGER.debug(f"execute SQL:\n{statement}")
+
             await cur.execute(statement)
 
     async def execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         async with self.native_connection.cursor() as cur:
+            if isinstance(args, Sized):
+                LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
+            else:
+                LOGGER.debug(f"execute SQL:\n{statement}")
+
             await cur.executemany(statement, args)
 
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        LOGGER.debug(f"query SQL into type {repr(signature)}:\n{statement}")
+
         if is_dataclass_type(signature):
             cur = await self.native_connection.cursor(aiomysql.cursors.DictCursor)
             await cur.execute(statement)
@@ -74,6 +92,8 @@ class MySQLContext(BaseContext):
             return self._resultset_unwrap_tuple(signature, records)
 
     async def drop_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"drop schema: {namespace}")
+
         statement = await self.query_one(
             str,
             "SELECT CONCAT('DROP TABLE IF EXISTS ', GROUP_CONCAT(table_name), ';') AS statement\n"

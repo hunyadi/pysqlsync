@@ -2,6 +2,7 @@ import abc
 import dataclasses
 import ipaddress
 import json
+import logging
 import types
 import typing
 from collections.abc import Sequence
@@ -18,6 +19,8 @@ from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
+
+LOGGER = logging.getLogger("pysqlsync")
 
 _JSON_ENCODER = json.JSONEncoder(
     ensure_ascii=False,
@@ -231,6 +234,13 @@ class ConnectionParameters:
     password: Optional[str]
     database: Optional[str]
 
+    def __str__(self) -> str:
+        host = self.host or "localhost"
+        port = f":{self.port}" if self.port else ""
+        username = f"{self.username}@" if self.username else ""
+        database = f"/{self.database}" if self.database else ""
+        return f"{username}{host}{port}{database}"
+
 
 class BaseConnection(abc.ABC):
     "An active connection to a database."
@@ -377,6 +387,7 @@ class BaseContext(abc.ABC):
         ...
 
     async def drop_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"drop schema: {namespace}")
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace} CASCADE;")
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
@@ -602,6 +613,7 @@ class Explorer(abc.ABC):
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)
         if stmt is not None:
+            LOGGER.info(f"synchronize schema with SQL:\n{stmt}")
             await self.conn.execute(stmt)
             generator.state = target_state
 

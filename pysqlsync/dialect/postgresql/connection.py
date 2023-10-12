@@ -1,20 +1,27 @@
 import dataclasses
+import logging
 import types
 import typing
+from collections.abc import Sized
 from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
-from pysqlsync.base import BaseConnection, BaseContext
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
+from strong_typing.name import python_type_to_str
+
+from pysqlsync.base import BaseConnection, BaseContext
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
+
+LOGGER = logging.getLogger("pysqlsync.postgres")
 
 
 class PostgreSQLConnection(BaseConnection):
     native: asyncpg.Connection
 
     async def __aenter__(self) -> BaseContext:
+        LOGGER.info(f"connecting to {self.params}")
         self.native = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
@@ -45,14 +52,27 @@ class PostgreSQLContext(BaseContext):
         if not statement:
             raise ValueError("empty statement")
 
+        LOGGER.debug(f"execute SQL:\n{statement}")
         await self.native_connection.execute(statement)
 
     async def execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
+        if not statement:
+            raise ValueError("empty statement")
+
+        if isinstance(args, Sized):
+            LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
+        else:
+            LOGGER.debug(f"execute SQL:\n{statement}")
+
         await self.native_connection.executemany(statement, args)
 
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        LOGGER.debug(
+            f"query SQL with into {python_type_to_str(signature)}:\n{statement}"
+        )
+
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
         if is_dataclass_type(signature):
             return self._resultset_unwrap_dict(signature, records)  # type: ignore
@@ -60,6 +80,11 @@ class PostgreSQLContext(BaseContext):
             return self._resultset_unwrap_tuple(signature, records)  # type: ignore
 
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
+        if isinstance(data, Sized):
+            LOGGER.debug(f"insert {len(data)} rows into {table}")
+        else:
+            LOGGER.debug(f"insert into {table}")
+
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator
