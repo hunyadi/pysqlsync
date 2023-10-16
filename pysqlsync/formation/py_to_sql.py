@@ -382,7 +382,7 @@ class DataclassConverter:
                 if self.options.array_mode is ArrayMode.ARRAY:
                     return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
                 elif self.options.array_mode is ArrayMode.JSON:
-                    return SqlJsonType()
+                    return self.member_to_sql_data_type(JsonType, cls)
             if is_entity_type(item_type):
                 raise TypeError(
                     f"use a join table, unable to convert list of entity type with primary key: {typ}"
@@ -397,7 +397,7 @@ class DataclassConverter:
                         )
                     )
                 elif self.options.array_mode is ArrayMode.JSON:
-                    return SqlJsonType()
+                    return self.member_to_sql_data_type(JsonType, cls)
 
             raise TypeError(f"unsupported array data type: {item_type}")
         if is_type_union(typ):

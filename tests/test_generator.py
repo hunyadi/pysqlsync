@@ -34,9 +34,18 @@ class TestGenerator(unittest.TestCase):
                     'PRIMARY KEY ("id")\n'
                     ");",
                 )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.BooleanTable, dialect="mssql"),
+            'CREATE TABLE "BooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean" bit NOT NULL,\n'
+            '"nullable_boolean" bit,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
 
     def test_create_numeric_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
+        for dialect in ["postgresql", "mssql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.NumericTable, dialect=dialect),
@@ -57,7 +66,7 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_float_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
+        for dialect in ["postgresql", "mssql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.FloatTable, dialect=dialect),
@@ -70,7 +79,7 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_string_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
+        for dialect in ["postgresql", "mssql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.StringTable, dialect=dialect),
@@ -93,6 +102,17 @@ class TestGenerator(unittest.TestCase):
             '"iso_date" date NOT NULL,\n'
             '"iso_time" time NOT NULL,\n'
             '"optional_date_time" timestamp,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DateTimeTable, dialect="mssql"),
+            'CREATE TABLE "DateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"iso_date_time" datetime2 NOT NULL,\n'
+            '"iso_date" date NOT NULL,\n'
+            '"iso_time" time NOT NULL,\n'
+            '"optional_date_time" datetime2,\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -126,6 +146,25 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")\n'
             ");",
         )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.EnumTable, dialect="mssql"),
+            'CREATE TABLE "EnumTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"state" integer NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "WorkflowState" (\n'
+            '"id" integer NOT NULL IDENTITY,\n'
+            '"value" varchar(64) NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");\n"
+            'ALTER TABLE "EnumTable"\n'
+            'ADD CONSTRAINT "fk_EnumTable_state" FOREIGN KEY ("state") REFERENCES "WorkflowState" ("id")\n'
+            ";\n"
+            'ALTER TABLE "WorkflowState"\n'
+            'ADD CONSTRAINT "uq_WorkflowState" UNIQUE ("value")\n'
+            ";",
+        )
 
     def test_create_ipaddress_table(self) -> None:
         self.assertMultiLineEqual(
@@ -137,18 +176,20 @@ class TestGenerator(unittest.TestCase):
             'PRIMARY KEY ("id")\n'
             ");",
         )
-        self.assertMultiLineEqual(
-            get_create_stmt(tables.IPAddressTable, dialect="mysql"),
-            'CREATE TABLE "IPAddressTable" (\n'
-            '"id" bigint NOT NULL,\n'
-            '"ipv4" binary(4) NOT NULL,\n'
-            '"ipv6" binary(16) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
-            ");",
-        )
+        for dialect in ["mssql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.IPAddressTable, dialect=dialect),
+                    'CREATE TABLE "IPAddressTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"ipv4" binary(4) NOT NULL,\n'
+                    '"ipv6" binary(16) NOT NULL,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
 
     def test_create_primary_key_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
+        for dialect in ["postgresql", "mssql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.DataTable, dialect=dialect),

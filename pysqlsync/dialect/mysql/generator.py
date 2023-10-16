@@ -34,7 +34,7 @@ def _description(description: str) -> str:
     return quote(description)
 
 
-@dataclass(eq=True)
+@dataclass
 class MySQLColumn(Column):
     @property
     def data_spec(self) -> str:
@@ -79,6 +79,12 @@ class MySQLColumn(Column):
 
 
 class MySQLGenerator(BaseGenerator):
+    """
+    Generator for MySQL.
+
+    Assumes configuration `ANSI_QUOTES` and `SET @@session.time_zone = "+00:00"`.
+    """
+
     @property
     def column_class(self) -> type[Column]:
         return MySQLColumn
