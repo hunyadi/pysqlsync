@@ -21,7 +21,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType
+from pysqlsync.model.data_types import SqlEnumType, SqlFixedBinaryType
 from pysqlsync.model.id_types import LocalId
 
 from .data_types import MySQLDateTimeType
@@ -38,6 +38,11 @@ def _description(description: str) -> str:
 class MySQLColumn(Column):
     @property
     def data_spec(self) -> str:
+        charset = (
+            " CHARACTER SET ascii COLLATE ascii_bin"
+            if isinstance(self.data_type, SqlEnumType)
+            else ""
+        )
         nullable = " NOT NULL" if not self.nullable else ""
         default = (
             f" DEFAULT {constant(self.default)}" if self.default is not None else ""
@@ -46,7 +51,7 @@ class MySQLColumn(Column):
         description = (
             f" COMMENT {self.comment()}" if self.description is not None else ""
         )
-        return f"{self.data_type}{nullable}{default}{identity}{description}"
+        return f"{self.data_type}{charset}{nullable}{default}{identity}{description}"
 
     def mutate_column_stmt(target: Column, source: Column) -> list[str]:
         statements: list[str] = []

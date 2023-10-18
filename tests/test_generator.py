@@ -142,7 +142,7 @@ class TestGenerator(unittest.TestCase):
             get_create_stmt(tables.EnumTable, dialect="mysql"),
             'CREATE TABLE "EnumTable" (\n'
             '"id" bigint NOT NULL,\n'
-            """"state" ENUM ('active', 'inactive', 'deleted') NOT NULL,\n"""
+            """"state" ENUM ('active', 'inactive', 'deleted') CHARACTER SET ascii COLLATE ascii_bin NOT NULL,\n"""
             'PRIMARY KEY ("id")\n'
             ");",
         )

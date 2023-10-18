@@ -10,7 +10,7 @@ from socket import AF_INET, AF_INET6, inet_ntop
 from struct import pack
 from typing import Any, Callable, Optional, TypeVar
 
-from strong_typing.auxiliary import IntegerRange, MaxLength, MinLength
+from strong_typing.auxiliary import IntegerRange, MaxLength, MinLength, Precision
 from strong_typing.inspection import (
     DataclassInstance,
     dataclass_fields,
@@ -36,6 +36,15 @@ class DataGeneratorError(RuntimeError):
 
 def random_bool() -> bool:
     return random.uniform(0.0, 1.0) > 0.5
+
+
+def random_decimal(significant_digits: int, decimal_digits: int) -> decimal.Decimal:
+    integer_digits = significant_digits - decimal_digits
+    digits: list[str] = []
+    digits.extend(random.choices(string.digits, k=integer_digits))
+    digits.append(".")
+    digits.extend(random.choices(string.digits, k=decimal_digits))
+    return decimal.Decimal("".join(digits))
 
 
 def time_today(time_of_day: datetime.time) -> datetime.datetime:
@@ -246,7 +255,10 @@ class RandomGenerator:
             max_length = max_length_tag.value if max_length_tag is not None else 255
             return lambda _: random_alphanumeric_str(min_length, max_length)
         elif plain_type is decimal.Decimal:
-            return lambda _: decimal.Decimal.from_float(random.uniform(0, 1000))
+            precision = get_annotation(field_type, Precision)
+            significant_digits = precision.significant_digits if precision else 18
+            decimal_digits = precision.decimal_digits if precision else 0
+            return lambda _: random_decimal(significant_digits, decimal_digits)
         elif plain_type is uuid.UUID:
             return lambda _: uuid.uuid4()
         elif plain_type is IPv4Address:
