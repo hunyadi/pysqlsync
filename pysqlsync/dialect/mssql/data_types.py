@@ -1,7 +1,7 @@
 from pysqlsync.model.data_types import (
     SqlBooleanType,
-    SqlCharacterType,
     SqlTimestampType,
+    SqlVariableCharacterType,
 )
 
 
@@ -10,7 +10,7 @@ class MSSQLBooleanType(SqlBooleanType):
         return "bit"
 
 
-class MSSQLCharacterType(SqlCharacterType):
+class MSSQLVariableCharacterType(SqlVariableCharacterType):
     def __str__(self) -> str:
         if self.limit is not None:
             return f"varchar({self.limit})"

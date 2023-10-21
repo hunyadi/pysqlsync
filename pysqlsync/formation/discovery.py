@@ -12,6 +12,7 @@ from .object_types import (
     ConstraintReference,
     ForeignConstraint,
     Namespace,
+    ObjectFactory,
     Table,
 )
 
@@ -19,7 +20,6 @@ from .object_types import (
 @dataclass
 class AnsiColumnMeta:
     column_name: str
-    column_type: str
     data_type: str
     nullable: bool
     character_maximum_length: Optional[int]
@@ -30,10 +30,14 @@ class AnsiColumnMeta:
 
 class AnsiReflection(Explorer):
     discovery: SqlDiscovery
+    factory: ObjectFactory
 
-    def __init__(self, conn: BaseContext, discovery: SqlDiscovery) -> None:
+    def __init__(
+        self, conn: BaseContext, discovery: SqlDiscovery, factory: ObjectFactory
+    ) -> None:
         super().__init__(conn)
         self.discovery = discovery
+        self.factory = factory
 
     async def get_table_names(self) -> list[QualifiedId]:
         records = await self.conn.query_all(
@@ -126,7 +130,6 @@ class AnsiReflection(Explorer):
         if await self.has_information_columns(
             "columns",
             [
-                "column_type",
                 "character_maximum_length",
                 "numeric_precision",
                 "numeric_scale",
@@ -137,24 +140,23 @@ class AnsiReflection(Explorer):
                 AnsiColumnMeta,
                 "SELECT\n"
                 "    column_name AS column_name,\n"
-                "    column_type AS column_type,\n"
                 "    data_type AS data_type,\n"
                 "    is_nullable = 'YES' AS nullable,\n"
                 "    character_maximum_length AS character_maximum_length,\n"
                 "    numeric_precision AS numeric_precision,\n"
                 "    numeric_scale AS numeric_scale,\n"
                 "    datetime_precision AS datetime_precision\n"
-                "FROM information_schema.columns col\n"
+                "FROM information_schema.columns AS col\n"
                 f"WHERE {condition}\n"
                 "ORDER BY ordinal_position",
             )
 
             for col in ansi_column_records:
                 columns.append(
-                    self.conn.connection.generator.column_class(
+                    self.factory.column_class(
                         LocalId(col.column_name),
                         self.discovery.sql_data_type_from_spec(
-                            col.column_type,
+                            col.data_type,
                             character_maximum_length=col.character_maximum_length,
                             numeric_precision=col.numeric_precision,
                             numeric_scale=col.numeric_scale,
@@ -166,8 +168,8 @@ class AnsiReflection(Explorer):
         else:
             limited_column_records = await self.conn.query_all(
                 tuple[str, str, bool],
-                "SELECT column_name, data_type, is_nullable = 'YES' AS nullable\n"
-                "FROM information_schema.columns col\n"
+                "SELECT col.column_name, col.data_type, CASE WHEN col.is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable\n"
+                "FROM information_schema.columns AS col\n"
                 f"WHERE {condition}\n"
                 "ORDER BY ordinal_position",
             )
@@ -178,7 +180,7 @@ class AnsiReflection(Explorer):
                     column_record,
                 )
                 columns.append(
-                    self.conn.connection.generator.column_class(
+                    self.factory.column_class(
                         LocalId(column_name),
                         self.discovery.sql_data_type_from_spec(data_type),
                         bool(nullable),
@@ -235,7 +237,7 @@ class AnsiReflection(Explorer):
             if primary_key is None:
                 raise DiscoveryError(f"primary key required in table: {table_id}")
 
-            return self.conn.connection.generator.table_class(
+            return self.factory.table_class(
                 name=table_id,
                 columns=columns,
                 primary_key=primary_key,
@@ -245,7 +247,7 @@ class AnsiReflection(Explorer):
         else:
             # assume first column is the primary key
             primary_key = columns[0].name
-            return self.conn.connection.generator.table_class(
+            return self.factory.table_class(
                 name=table_id, columns=columns, primary_key=primary_key
             )
 
@@ -267,7 +269,9 @@ class AnsiReflection(Explorer):
                 )
                 tables.append(table)
 
-            return Namespace(name=namespace_id, enums=[], structs=[], tables=tables)
+            return self.factory.namespace_class(
+                name=namespace_id, enums=[], structs=[], tables=tables
+            )
 
         # create namespace using flat IDs
         table_names = await self.conn.query_all(
@@ -286,6 +290,8 @@ class AnsiReflection(Explorer):
                 )
                 tables.append(table)
 
-            return Namespace(name=LocalId(""), enums=[], structs=[], tables=tables)
+            return self.factory.namespace_class(
+                name=LocalId(""), enums=[], structs=[], tables=tables
+            )
 
-        return Namespace()
+        return self.factory.namespace_class()

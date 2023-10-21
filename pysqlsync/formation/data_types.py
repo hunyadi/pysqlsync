@@ -67,7 +67,7 @@ class SqlDiscovery:
             return SqlTimestampType(datetime_precision, False)
         elif type_name == "timestamp with time zone":
             return SqlTimestampType(datetime_precision, True)
-        elif type_name == "datetime":  # MySQL-specific
+        elif type_name == "datetime":
             return SqlTimestampType()
         elif type_name == "date":
             return SqlDateType()
@@ -76,19 +76,13 @@ class SqlDiscovery:
         elif type_name == "time with time zone":
             return SqlTimeType(datetime_precision, True)
         elif type_name == "varchar" or type_name == "character varying":
-            return SqlCharacterType(limit=character_maximum_length)
+            return SqlVariableCharacterType(limit=character_maximum_length)
+        elif type_name == "binary":
+            return SqlFixedBinaryType(storage=character_maximum_length)
+        elif type_name == "varbinary" or type_name == "binary varying":
+            return SqlVariableBinaryType(storage=character_maximum_length)
         elif type_name == "text":
-            return SqlCharacterType()
-        elif type_name == "mediumtext":  # MySQL-specific
-            return SqlCharacterType(storage=16777215)
-        elif type_name == "longtext":  # MySQL-specific
-            return SqlCharacterType(storage=4294967295)
-        elif type_name == "blob":  # MySQL-specific
-            return SqlVariableBinaryType(storage=65535)
-        elif type_name == "mediumblob":  # MySQL-specific
-            return SqlVariableBinaryType(storage=16777215)
-        elif type_name == "longblob":  # MySQL-specific
-            return SqlVariableBinaryType(storage=4294967295)
+            return SqlVariableCharacterType()
         elif type_name == "bytea":  # PostgreSQL-specific
             return SqlVariableBinaryType()
         elif type_name == "uuid":  # PostgreSQL-specific
@@ -108,7 +102,7 @@ class SqlDiscovery:
 
         m = re.fullmatch(r"^varchar[(](\d+)[)]$", type_name, re.IGNORECASE)
         if m is not None:
-            return SqlCharacterType(int(m.group(1)))
+            return SqlVariableCharacterType(int(m.group(1)))
 
         m = re.fullmatch(r"^binary[(](\d+)[)]$", type_name, re.IGNORECASE)
         if m is not None:

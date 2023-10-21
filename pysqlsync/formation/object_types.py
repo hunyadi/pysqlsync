@@ -1,5 +1,4 @@
 import abc
-import enum
 import typing
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -379,6 +378,27 @@ class Table(QualifiedObject, MutableObject):
 
         return False
 
+    def get_unique_columns(self) -> list[Column]:
+        "Returns all columns that must have unique values."
+
+        return [
+            column
+            for column in self.columns.values()
+            if self.is_unique_column(column.name)
+        ]
+
+    def is_lookup_column(self, column_id: LocalId) -> bool:
+        return self.is_primary_column(column_id) or self.is_unique_column(column_id)
+
+    def get_lookup_columns(self) -> list[Column]:
+        "Returns all columns that are part of the primary key or must have unique values."
+
+        return [
+            column
+            for column in self.columns.values()
+            if self.is_primary_column(column.name) or self.is_unique_column(column.name)
+        ]
+
     def is_lookup_table(self) -> bool:
         "Checks whether the table maps a primary key to a unique value."
 
@@ -531,6 +551,10 @@ class Namespace(MutableObject):
         ...
 
     @overload
+    def __init__(self, name: LocalId) -> None:
+        ...
+
+    @overload
     def __init__(
         self,
         name: LocalId,
@@ -557,7 +581,7 @@ class Namespace(MutableObject):
     def create_stmt(self) -> str:
         items: list[str] = []
         if self.name.local_id:
-            items.append(f"CREATE SCHEMA IF NOT EXISTS {self.name};")
+            items.append(f"CREATE SCHEMA {self.name};")
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
@@ -707,3 +731,31 @@ class Catalog(MutableObject):
         if constraints is not None:
             statements.append(constraints)
         return "\n".join(statements)
+
+
+class ObjectFactory:
+    "Creates new column, table, struct and namespace instances."
+
+    @property
+    def column_class(self) -> type[Column]:
+        "The object type instantiated for table columns."
+
+        return Column
+
+    @property
+    def table_class(self) -> type[Table]:
+        "The object type instantiated for tables."
+
+        return Table
+
+    @property
+    def struct_class(self) -> type[StructType]:
+        "The object type instantiated for struct types."
+
+        return StructType
+
+    @property
+    def namespace_class(self) -> type[Namespace]:
+        "The object type instantiated for namespaces (schemas)."
+
+        return Namespace

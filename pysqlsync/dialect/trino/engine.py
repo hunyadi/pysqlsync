@@ -2,6 +2,7 @@ from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator, Explorer
 from pysqlsync.formation.discovery import AnsiReflection
 
 from .connection import TrinoConnection
+from .discovery import TrinoExplorer
 from .generator import TrinoGenerator
 
 
@@ -17,4 +18,4 @@ class TrinoEngine(BaseEngine):
         return TrinoConnection
 
     def get_explorer_type(self) -> type[Explorer]:
-        return AnsiReflection
+        return TrinoExplorer

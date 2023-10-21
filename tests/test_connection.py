@@ -99,7 +99,7 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             options = DataclassConverterOptions(
                 enum_mode=EnumMode.RELATION,
                 namespaces=NamespaceMapping({tables: None}),
-                column_class=conn.connection.generator.column_class,
+                factory=conn.connection.generator.factory,
             )
             converter = DataclassConverter(options=options)
             catalog = converter.dataclasses_to_catalog([tables.EnumTable])

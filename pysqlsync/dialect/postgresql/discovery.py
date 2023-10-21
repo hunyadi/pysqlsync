@@ -17,7 +17,7 @@ from pysqlsync.formation.object_types import (
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
-from .generator import PostgreSQLTable
+from .object_types import PostgreSQLObjectFactory
 
 
 @dataclass
@@ -57,10 +57,12 @@ class PostgreSQLEnumMeta:
 
 class PostgreSQLExplorer(Explorer):
     discovery: SqlDiscovery
+    factory: PostgreSQLObjectFactory
 
     def __init__(self, conn: BaseContext) -> None:
         super().__init__(conn)
         self.discovery = SqlDiscovery()
+        self.factory = PostgreSQLObjectFactory()
 
     async def get_table_names(self) -> list[QualifiedId]:
         rows = await self.conn.query_all(
@@ -221,7 +223,7 @@ class PostgreSQLExplorer(Explorer):
         if primary_key is None:
             raise DiscoveryError(f"primary key required in table: {table_id}")
 
-        return PostgreSQLTable(
+        return self.factory.table_class(
             name=table_id,
             columns=columns,
             primary_key=primary_key,
@@ -266,6 +268,8 @@ class PostgreSQLExplorer(Explorer):
             tables.append(table)
 
         if tables:
-            return Namespace(namespace_id, enums=enums, structs=[], tables=tables)
+            return self.factory.namespace_class(
+                namespace_id, enums=enums, structs=[], tables=tables
+            )
         else:
-            return Namespace()
+            return self.factory.namespace_class()

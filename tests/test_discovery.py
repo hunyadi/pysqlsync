@@ -10,7 +10,7 @@ from pysqlsync.formation.py_to_sql import (
     dataclass_to_table,
 )
 from pysqlsync.model.id_types import LocalId
-from tests.params import MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 
 
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
@@ -76,10 +76,24 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.parameters, GeneratorOptions(namespaces={tables: "sample"})
         ) as conn:
             generator = conn.connection.generator
+
+            # create schema in separate batch (Microsoft SQL Server cannot create schema in same batch)
+            await conn.create_schema(LocalId("sample"))
+
+            # create objects in the database
+            generator.state.namespaces.add(
+                generator.factory.namespace_class(LocalId("sample"))
+            )
+            execute_stmt = generator.create(tables=[tables.UserTable])
+            if execute_stmt is None:
+                self.fail()
+            await conn.execute(execute_stmt)
+
+            # get reference schema
+            generator.reset()
             create_stmt = generator.create(tables=[tables.UserTable])
             if create_stmt is None:
                 self.fail()
-            await conn.execute(create_stmt)
 
             catalog = conn.connection.generator.state
             create_ns = (
@@ -88,10 +102,12 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 else catalog.namespaces[""]
             )
 
+            # discover actual schema
             explorer = self.engine.create_explorer(conn)
             discover_ns = await explorer.get_namespace_meta(LocalId("sample"))
             discover_stmt = str(discover_ns)
 
+            self.maxDiff = None
             self.assertMultiLineEqual(create_stmt, discover_stmt)
             self.assertEqual(create_ns, discover_ns)
 
@@ -101,6 +117,16 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
     async def get_current_namespace(self, conn: BaseContext) -> str:
         return await conn.query_one(str, "SELECT CURRENT_SCHEMA();")
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.drop_schema(LocalId("sample"))
+
+
+class TestMSSQLDiscovery(MSSQLBase, TestDiscovery):
+    async def get_current_namespace(self, conn: BaseContext) -> str:
+        return await conn.query_one(str, "SELECT SCHEMA_NAME();")
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()

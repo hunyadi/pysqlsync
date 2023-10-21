@@ -1,6 +1,5 @@
 import abc
 import dataclasses
-import ipaddress
 import json
 import logging
 import types
@@ -12,7 +11,7 @@ from typing import Any, Callable, Iterable, Optional, TypeVar, overload
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 
 from .formation.inspection import get_entity_types
-from .formation.object_types import Catalog, Column, Namespace, Table
+from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
 from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
@@ -57,25 +56,22 @@ class BaseGenerator(abc.ABC):
     Generates SQL statements for creating or dropping tables, and inserting, updating or deleting data.
 
     :param options: Database-agnostic generator options.
+    :param factory: A factory object to create new column, table, struct and namespace instances.
     :param converter: A converter that maps a set of data-class types into a database state.
     :param state: A current database state based on which statements are generated.
     """
 
     options: GeneratorOptions
+    factory: ObjectFactory
     converter: DataclassConverter
     state: Catalog
 
-    def __init__(self, options: GeneratorOptions) -> None:
+    def __init__(
+        self, options: GeneratorOptions, factory: Optional[ObjectFactory] = None
+    ) -> None:
         self.options = options
+        self.factory = factory if factory is not None else ObjectFactory()
         self.reset()
-
-    @property
-    def column_class(self) -> type[Column]:
-        return Column
-
-    @property
-    def table_class(self) -> type[Table]:
-        return Table
 
     def reset(self) -> None:
         self.state = Catalog([])
@@ -139,8 +135,13 @@ class BaseGenerator(abc.ABC):
 
         return target.mutate_stmt(self.state)
 
-    @abc.abstractmethod
     def get_table_insert_stmt(self, table: Table) -> str:
+        "Returns a SQL statement to insert new records in a database table."
+
+        return self.get_table_merge_stmt(table)
+
+    @abc.abstractmethod
+    def get_table_merge_stmt(self, table: Table) -> str:
         "Returns a SQL statement to insert or ignore records in a database table."
 
         ...
@@ -154,8 +155,14 @@ class BaseGenerator(abc.ABC):
     def get_qualified_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
         return self.converter.create_qualified_id(table.__module__, table.__name__)
 
+    def get_dataclass_insert_stmt(self, table: type[DataclassInstance]) -> str:
+        "Returns a SQL statement to insert or ignore records in a database table."
+
+        table_object = self.state.get_table(self.get_qualified_id(table))
+        return self.get_table_insert_stmt(table_object)
+
     def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
-        "Returns a SQL statement to insert records into a database table."
+        "Returns a SQL statement to insert or update records in a database table."
 
         table_object = self.state.get_table(self.get_qualified_id(table))
         return self.get_table_upsert_stmt(table_object)
@@ -163,7 +170,8 @@ class BaseGenerator(abc.ABC):
     def get_dataclass_as_record(self, item: DataclassInstance) -> tuple:
         "Converts a data-class object into a record to insert into a database table."
 
-        extractors = self.get_dataclass_extractors(item.__class__)
+        table_object = self.state.get_table(self.get_qualified_id(item.__class__))
+        extractors = self._get_dataclass_extractors(table_object, item.__class__)
         return tuple(extractor(item) for extractor in extractors)
 
     def get_dataclasses_as_records(
@@ -173,7 +181,8 @@ class BaseGenerator(abc.ABC):
 
         it = iter(items)
         item = next(it)
-        extractors = self.get_dataclass_extractors(item.__class__)
+        table_object = self.state.get_table(self.get_qualified_id(item.__class__))
+        extractors = self._get_dataclass_extractors(table_object, item.__class__)
 
         results = [tuple(extractor(item) for extractor in extractors)]
         while True:
@@ -183,44 +192,42 @@ class BaseGenerator(abc.ABC):
                 return results
             results.append(tuple(extractor(item) for extractor in extractors))
 
-    def get_dataclass_extractors(
-        self, class_type: type
+    def _get_dataclass_extractors(
+        self, table: Table, class_type: type[DataclassInstance]
     ) -> tuple[Callable[[Any], Any], ...]:
         "Returns a tuple of callable function objects that extracts each field of a data-class."
 
         return tuple(
-            self.get_field_extractor(field.name, field.type)
+            self.get_field_extractor(table.columns[field.name], field.name, field.type)
             for field in dataclasses.fields(class_type)
         )
 
     def get_field_extractor(
-        self, field_name: str, field_type: type
+        self, column: Column, field_name: str, field_type: type
     ) -> Callable[[Any], Any]:
         "Returns a callable function object that extracts a single field of a data-class."
 
         if is_type_enum(field_type):
             return lambda obj: getattr(obj, field_name).value
-        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
-            return lambda obj: str(getattr(obj, field_name))
         else:
             return lambda obj: getattr(obj, field_name)
 
     def get_value_transformer(
         self, column: Column, field_type: type
     ) -> Optional[Callable[[Any], Any]]:
-        "Returns a callable function object that extracts a single field of a data-class."
+        "Returns a callable function object that transforms a value type into the expected column type."
 
         if isinstance(column.data_type, SqlJsonType):
             return lambda field: _JSON_ENCODER.encode(field)
 
         if is_type_enum(field_type):
             return lambda field: field.value
-        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
-            return lambda field: str(field)
         else:
             return None
 
-    def get_enum_transformer(self, enum_dict: dict[Any, int]) -> Callable[[Any], Any]:
+    def get_enum_transformer(self, enum_dict: dict[str, int]) -> Callable[[Any], Any]:
+        "Returns a callable function object that looks up an assigned integer value based on the enumeration string value."
+
         return lambda field: enum_dict[field]
 
 
@@ -386,6 +393,10 @@ class BaseContext(abc.ABC):
     ) -> None:
         ...
 
+    async def create_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"create schema: {namespace}")
+        await self.execute(f"CREATE SCHEMA IF NOT EXISTS {namespace};")
+
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace} CASCADE;")
@@ -484,7 +495,17 @@ class BaseContext(abc.ABC):
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> Iterable[tuple[Any, ...]]:
-        "Creates a record generator for a database table."
+        """
+        Creates a record generator for a database table.
+
+        Pass a list of field names when the order of fields in the source data does not match the column order
+        in the target table.
+
+        :param table: The database table descriptor.
+        :param records: The records to insert or update.
+        :param field_types: Type of each record field.
+        :param field_names: Label for each record field.
+        """
 
         if field_names is not None:
             columns: list[Column] = []
@@ -507,7 +528,7 @@ class BaseContext(abc.ABC):
             if field_type is str and table.is_relation(column.name):
                 relation = generator.state.get_referenced_table(table.name, column.name)
                 if relation.is_lookup_table():
-                    enum_dict: dict[Any, int] = await self._merge_lookup_table(
+                    enum_dict: dict[str, int] = await self._merge_lookup_table(
                         relation, set(record[index] for record in records)
                     )
                     transformer = generator.get_enum_transformer(enum_dict)
@@ -531,11 +552,11 @@ class BaseContext(abc.ABC):
 
     async def _merge_lookup_table(
         self, table: Table, values: Iterable[str]
-    ) -> dict[Any, int]:
+    ) -> dict[str, int]:
         "Merges new values into a lookup table and returns the entire updated table."
 
         await self.execute_all(
-            self.connection.generator.get_table_insert_stmt(table),
+            self.connection.generator.get_table_merge_stmt(table),
             list((value,) for value in values),
         )
         column_names = ", ".join(  # join on one element
@@ -653,5 +674,7 @@ class BaseEngine(abc.ABC):
         return generator_type(options)
 
     def create_explorer(self, conn: BaseContext) -> Explorer:
+        "Instantiates an explorer that can discover objects in a database."
+
         explorer_type = self.get_explorer_type()
         return explorer_type(conn)

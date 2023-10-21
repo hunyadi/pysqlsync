@@ -6,6 +6,8 @@ from typing import Any, Iterable, Optional, TypeVar
 import pyodbc
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.model.data_types import quote
+from pysqlsync.model.id_types import LocalId, QualifiedId
 
 T = TypeVar("T")
 
@@ -67,10 +69,31 @@ class MSSQLContext(BaseContext):
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         with self.native_connection.cursor() as cur:
-            # cur.fast_executemany = True
+            cur.fast_executemany = True
             cur.executemany(statement, args)
 
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
             return self._resultset_unwrap_tuple(signature, records)
+
+    async def create_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"create schema: {namespace}")
+        await self.execute(f"CREATE SCHEMA {namespace};")
+
+    async def drop_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"drop schema: {namespace}")
+
+        tables = await self.query_all(
+            str,
+            "SELECT table_name\n"
+            "FROM information_schema.tables\n"
+            f"WHERE table_schema = {quote(namespace.id)};",
+        )
+        if tables:
+            table_list = ", ".join(
+                str(QualifiedId(namespace.local_id, table)) for table in tables
+            )
+            await self.execute(f"DROP TABLE IF EXISTS {table_list};")
+
+        await self.execute(f"DROP SCHEMA IF EXISTS {namespace};")

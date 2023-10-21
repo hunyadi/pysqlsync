@@ -1,7 +1,7 @@
 import datetime
 import ipaddress
 import uuid
-from dataclasses import dataclass
+from typing import Any, Callable, Optional
 
 from strong_typing.core import JsonType
 
@@ -15,28 +15,10 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlCharacterType, SqlFixedBinaryType, constant
+from pysqlsync.model.data_types import SqlFixedBinaryType, SqlVariableCharacterType
 
-from .data_types import MSSQLBooleanType, MSSQLCharacterType, MSSQLDateTimeType
-
-
-@dataclass
-class MSSQLColumn(Column):
-    @property
-    def data_spec(self) -> str:
-        nullable = " NOT NULL" if not self.nullable else ""
-        default = (
-            f" DEFAULT {constant(self.default)}" if self.default is not None else ""
-        )
-        identity = " IDENTITY" if self.identity else ""
-        return f"{self.data_type}{nullable}{default}{identity}"
-
-    def mutate_column_stmt(target: "MSSQLColumn", source: Column) -> list[str]:
-        if source.identity != target.identity:
-            raise FormationError(
-                "operation not permitted; cannot add or drop identity property"
-            )
-        return super().mutate_column_stmt(source)
+from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLVariableCharacterType
+from .object_types import MSSQLObjectFactory
 
 
 class MSSQLGenerator(BaseGenerator):
@@ -47,7 +29,7 @@ class MSSQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options)
+        super().__init__(options, MSSQLObjectFactory())
 
         if options.enum_mode is EnumMode.TYPE:
             raise FormationError(
@@ -68,20 +50,16 @@ class MSSQLGenerator(BaseGenerator):
                 substitutions={
                     bool: MSSQLBooleanType(),
                     datetime.datetime: MSSQLDateTimeType(),
-                    str: MSSQLCharacterType(),
+                    str: MSSQLVariableCharacterType(),
                     uuid.UUID: SqlFixedBinaryType(16),
-                    JsonType: SqlCharacterType(),
+                    JsonType: SqlVariableCharacterType(),
                     ipaddress.IPv4Address: SqlFixedBinaryType(4),
                     ipaddress.IPv6Address: SqlFixedBinaryType(16),
                 },
+                factory=self.factory,
                 skip_annotations=options.skip_annotations,
-                column_class=MSSQLColumn,
             )
         )
-
-    @property
-    def column_class(self) -> type[Column]:
-        return MSSQLColumn
 
     def get_table_insert_stmt(self, table: Table) -> str:
         statements: list[str] = []
@@ -92,23 +70,72 @@ class MSSQLGenerator(BaseGenerator):
         statements.append(f"({column_list}) VALUES ({value_list})")
         return "\n".join(statements)
 
-    def get_table_upsert_stmt(self, table: Table) -> str:
+    def _get_merge_preamble(self, table: Table, columns: list[Column]) -> list[str]:
         statements: list[str] = []
 
         statements.append(f"MERGE INTO {table.name} AS target")
-        columns = [column for column in table.columns.values() if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join("?" for _ in columns)
         statements.append(f"USING (VALUES ({value_list})) AS source({column_list})")
-        statements.append(f"ON target.{table.primary_key} = source.{table.primary_key}")
 
-        statements.append("WHEN MATCHED THEN")
-        update_list = ", ".join(f"target.{c.name} = source.{c.name}" for c in columns)
-        statements.append(f"UPDATE SET {update_list}")
+        match_columns = [
+            column
+            for column in table.columns.values()
+            if not column.identity and table.is_lookup_column(column.name)
+        ]
+        match_condition = " OR ".join(
+            f"target.{column.name} = source.{column.name}" for column in match_columns
+        )
+        statements.append(f"ON {match_condition}")
+
+        return statements
+
+    def get_table_merge_stmt(self, table: Table) -> str:
+        columns = [column for column in table.columns.values() if not column.identity]
+        statements = self._get_merge_preamble(table, columns)
 
         statements.append("WHEN NOT MATCHED BY TARGET THEN")
+        column_list = ", ".join(str(column.name) for column in columns)
         insert_list = ", ".join(f"source.{column.name}" for column in columns)
         statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
 
         statements.append(";")
         return "\n".join(statements)
+
+    def get_table_upsert_stmt(self, table: Table) -> str:
+        columns = [column for column in table.columns.values() if not column.identity]
+        statements: list[str] = self._get_merge_preamble(table, columns)
+
+        statements.append("WHEN MATCHED THEN")
+        update_list = ", ".join(
+            f"target.{column.name} = source.{column.name}" for column in columns
+        )
+        statements.append(f"UPDATE SET {update_list}")
+
+        statements.append("WHEN NOT MATCHED BY TARGET THEN")
+        column_list = ", ".join(str(column.name) for column in columns)
+        insert_list = ", ".join(f"source.{column.name}" for column in columns)
+        statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
+
+        statements.append(";")
+        return "\n".join(statements)
+
+    def get_field_extractor(
+        self, column: Column, field_name: str, field_type: type
+    ) -> Callable[[Any], Any]:
+        if field_type is uuid.UUID:
+            return lambda obj: getattr(obj, field_name).bytes
+        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+            return lambda obj: getattr(obj, field_name).packed
+
+        return super().get_field_extractor(column, field_name, field_type)
+
+    def get_value_transformer(
+        self, column: Column, field_type: type
+    ) -> Optional[Callable[[Any], Any]]:
+        if field_type is uuid.UUID:
+            return lambda field: field.bytes
+        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+            return lambda field: field.packed
+
+        return super().get_value_transformer(column, field_type)

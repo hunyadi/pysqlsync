@@ -66,6 +66,7 @@ from .object_types import (
     EnumType,
     ForeignConstraint,
     Namespace,
+    ObjectFactory,
     StructMember,
     StructType,
     Table,
@@ -178,9 +179,7 @@ class DataclassConverterOptions:
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
     :param substitutions: SQL type to be substituted for a specific Python type.
-    :param column_class: The object type instantiated for table columns. Must derive from `Column`.
-    :param table_class: The object type instantiated for tables. Must derive from `Table`.
-    :param struct_class: The object type instantiated for struct types. Must derive from `StructType`.
+    :param factory: Creates new column, table, struct and namespace instances.
     :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
@@ -192,9 +191,7 @@ class DataclassConverterOptions:
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     foreign_constraints: bool = True
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
-    column_class: type[Column] = Column
-    table_class: type[Table] = Table
-    struct_class: type[StructType] = StructType
+    factory: ObjectFactory = dataclasses.field(default_factory=ObjectFactory)
     skip_annotations: tuple[type, ...] = ()
 
 
@@ -273,7 +270,7 @@ class DataclassConverter:
         if typ is float64:
             return SqlDoubleType()
         if typ is str:
-            return SqlCharacterType()
+            return SqlVariableCharacterType()
         if typ is decimal.Decimal:
             return SqlDecimalType()
         if typ is datetime.datetime:
@@ -296,7 +293,7 @@ class DataclassConverter:
             unadorned_type = unwrap_annotated_type(typ)
             sql_type: Optional[SqlDataType]
             if unadorned_type is str:
-                sql_type = SqlCharacterType()
+                sql_type = SqlVariableCharacterType()
             elif unadorned_type is decimal.Decimal:
                 sql_type = SqlDecimalType()
             elif unadorned_type is datetime.datetime:
@@ -441,7 +438,7 @@ class DataclassConverter:
             doc.params[field.name].description if field.name in doc.params else None
         )
 
-        return self.options.column_class(
+        return self.options.factory.column_class(
             name=LocalId(field.name),
             data_type=data_type,
             nullable=props.nullable,
@@ -499,7 +496,7 @@ class DataclassConverter:
                         ),
                     )
 
-        return self.options.table_class(
+        return self.options.factory.table_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
             columns=columns,
             primary_key=LocalId(dataclass_primary_key_name(cls)),
@@ -583,7 +580,7 @@ class DataclassConverter:
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
 
-        return self.options.struct_class(
+        return self.options.factory.struct_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
             members=members,
             description=doc.full_description,
@@ -648,20 +645,20 @@ class DataclassConverter:
                     enum_type = field.type
                     table_defs = tables.setdefault(enum_type.__module__, [])
                     table_defs.append(
-                        self.options.table_class(
+                        self.options.factory.table_class(
                             self.create_qualified_id(
                                 enum_type.__module__, enum_type.__name__
                             ),
                             [
-                                self.options.column_class(
+                                self.options.factory.column_class(
                                     LocalId("id"),
                                     SqlIntegerType(4),
                                     False,
                                     identity=True,
                                 ),
-                                self.options.column_class(
+                                self.options.factory.column_class(
                                     LocalId("value"),
-                                    SqlCharacterType(ENUM_NAME_LENGTH),
+                                    SqlVariableCharacterType(ENUM_NAME_LENGTH),
                                     False,
                                 ),
                             ],
@@ -690,25 +687,25 @@ class DataclassConverter:
                 column_right = f"{item_type.__name__}_{primary_key_right.id}"
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
-                    self.options.table_class(
+                    self.options.factory.table_class(
                         self.create_qualified_id(
                             entity.__module__,
                             f"{column_left}_{item_type.__name__}",
                         ),
                         [
-                            self.options.column_class(
+                            self.options.factory.column_class(
                                 LocalId("uuid"),
                                 self.member_to_sql_data_type(uuid.UUID, entity),
                                 False,
                             ),
-                            self.options.column_class(
+                            self.options.factory.column_class(
                                 LocalId(column_left),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
                                 ),
                                 False,
                             ),
-                            self.options.column_class(
+                            self.options.factory.column_class(
                                 LocalId(column_right),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(item_type), item_type
@@ -746,7 +743,7 @@ class DataclassConverter:
 
         if self.options.qualified_names:
             namespaces = [
-                Namespace(
+                self.options.factory.namespace_class(
                     name=LocalId(self.options.namespaces.get(module_name) or ""),
                     enums=enums.get(module_name, []),
                     structs=structs.get(module_name, []),
@@ -756,7 +753,7 @@ class DataclassConverter:
             ]
         else:
             namespaces = [
-                Namespace(
+                self.options.factory.namespace_class(
                     name=LocalId(""),
                     enums=[item for enum_list in enums.values() for item in enum_list],
                     structs=[

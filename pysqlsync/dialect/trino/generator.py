@@ -22,7 +22,7 @@ class TrinoGenerator(BaseGenerator):
             )
         )
 
-    def get_table_insert_stmt(self, table: Table) -> str:
+    def get_table_merge_stmt(self, table: Table) -> str:
         raise NotImplementedError()
 
     def get_table_upsert_stmt(self, table: Table) -> str:

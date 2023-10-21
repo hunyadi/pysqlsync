@@ -79,25 +79,34 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_string_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
-            with self.subTest(dialect=dialect):
-                self.assertMultiLineEqual(
-                    get_create_stmt(tables.StringTable, dialect=dialect),
-                    'CREATE TABLE "StringTable" (\n'
-                    '"id" bigint NOT NULL,\n'
-                    '"arbitrary_length_string" text NOT NULL,\n'
-                    '"nullable_arbitrary_length_string" text,\n'
-                    '"maximum_length_string" varchar(255) NOT NULL,\n'
-                    '"nullable_maximum_length_string" varchar(255),\n'
-                    'PRIMARY KEY ("id")\n'
-                    ");",
-                )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.StringTable, dialect="postgresql"),
+            'CREATE TABLE "StringTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"arbitrary_length_string" text NOT NULL,\n'
+            '"nullable_arbitrary_length_string" text,\n'
+            '"maximum_length_string" varchar(255) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(255),\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
         self.assertMultiLineEqual(
             get_create_stmt(tables.StringTable, dialect="mssql"),
             'CREATE TABLE "StringTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"arbitrary_length_string" varchar(max) NOT NULL,\n'
             '"nullable_arbitrary_length_string" varchar(max),\n'
+            '"maximum_length_string" varchar(255) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(255),\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.StringTable, dialect="mysql"),
+            'CREATE TABLE "StringTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"arbitrary_length_string" mediumtext NOT NULL,\n'
+            '"nullable_arbitrary_length_string" mediumtext,\n'
             '"maximum_length_string" varchar(255) NOT NULL,\n'
             '"nullable_maximum_length_string" varchar(255),\n'
             'PRIMARY KEY ("id")\n'
@@ -200,21 +209,27 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_primary_key_table(self) -> None:
-        for dialect in ["postgresql", "mysql"]:
-            with self.subTest(dialect=dialect):
-                self.assertMultiLineEqual(
-                    get_create_stmt(tables.DataTable, dialect=dialect),
-                    'CREATE TABLE "DataTable" (\n'
-                    '"id" bigint NOT NULL,\n'
-                    '"data" text NOT NULL,\n'
-                    'PRIMARY KEY ("id")\n'
-                    ");",
-                )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DataTable, dialect="postgresql"),
+            'CREATE TABLE "DataTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"data" text NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
         self.assertMultiLineEqual(
             get_create_stmt(tables.DataTable, dialect="mssql"),
             'CREATE TABLE "DataTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"data" varchar(max) NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DataTable, dialect="mysql"),
+            'CREATE TABLE "DataTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"data" mediumtext NOT NULL,\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -294,6 +309,15 @@ class TestGenerator(unittest.TestCase):
 
     def test_table_data(self) -> None:
         generator = get_generator(dialect="postgresql")
+        generator.create(
+            tables=[
+                tables.DataTable,
+                tables.DateTimeTable,
+                tables.EnumTable,
+                tables.IPAddressTable,
+                tables.StringTable,
+            ]
+        )
 
         self.assertEqual(
             generator.get_dataclass_as_record(tables.DataTable(123, "abc")),
@@ -339,15 +363,15 @@ class TestGenerator(unittest.TestCase):
             generator.get_dataclass_as_record(
                 tables.IPAddressTable(
                     1,
-                    typing.cast(
-                        ipaddress.IPv4Address, ipaddress.ip_address("192.168.0.1")
-                    ),
-                    typing.cast(
-                        ipaddress.IPv6Address, ipaddress.ip_address("2001:db8::")
-                    ),
+                    ipaddress.IPv4Address("192.168.0.1"),
+                    ipaddress.IPv6Address("2001:db8::"),
                 )
             ),
-            (1, "192.168.0.1", "2001:db8::"),
+            (
+                1,
+                ipaddress.IPv4Address("192.168.0.1"),
+                ipaddress.IPv6Address("2001:db8::"),
+            ),
         )
 
 

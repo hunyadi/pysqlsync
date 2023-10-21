@@ -60,7 +60,7 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
         if sql_type.precision is not None:
             return Annotated[datetime.time, TimePrecision(sql_type.precision)]
         return datetime.time
-    elif isinstance(sql_type, SqlCharacterType):
+    elif isinstance(sql_type, SqlVariableCharacterType):
         if sql_type.limit is not None:
             return Annotated[str, MaxLength(sql_type.limit)]
         return str

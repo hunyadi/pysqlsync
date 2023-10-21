@@ -17,11 +17,11 @@ from pysqlsync.formation.py_to_sql import (
 )
 from pysqlsync.formation.sql_to_py import SqlConverterOptions, table_to_dataclass
 from pysqlsync.model.data_types import (
-    SqlCharacterType,
     SqlDoubleType,
     SqlIntegerType,
     SqlUserDefinedType,
     SqlUuidType,
+    SqlVariableCharacterType,
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.python_types import dataclass_to_code
@@ -34,8 +34,8 @@ class TestConverter(unittest.TestCase):
             list(table_def.columns.values()),
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("city"), SqlCharacterType(), False),
-                Column(LocalId("state"), SqlCharacterType(), True),
+                Column(LocalId("city"), SqlVariableCharacterType(), False),
+                Column(LocalId("state"), SqlVariableCharacterType(), True),
             ],
         )
 
@@ -63,7 +63,7 @@ class TestConverter(unittest.TestCase):
             list(table_def.columns.values()),
             [
                 Column(LocalId("id"), SqlUuidType(), False),
-                Column(LocalId("name"), SqlCharacterType(), False),
+                Column(LocalId("name"), SqlVariableCharacterType(), False),
                 Column(LocalId("reports_to"), SqlUuidType(), False),
             ],
         )
@@ -104,7 +104,9 @@ class TestConverter(unittest.TestCase):
             list(enum_def.columns.values()),
             [
                 Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
-                Column(LocalId("value"), SqlCharacterType(ENUM_NAME_LENGTH), False),
+                Column(
+                    LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                ),
             ],
         )
 
@@ -168,7 +170,7 @@ class TestConverter(unittest.TestCase):
         target_ns.tables.remove("Employee")
         target_ns.tables["UserTable"].columns.remove("homepage_url")
         target_ns.tables["UserTable"].columns.add(
-            Column(LocalId("social_url"), SqlCharacterType(), False)
+            Column(LocalId("social_url"), SqlVariableCharacterType(), False)
         )
         self.assertEqual(
             target.mutate_stmt(source),

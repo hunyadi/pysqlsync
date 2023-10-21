@@ -150,10 +150,7 @@ class SqlFixedBinaryType(SqlDataType):
     storage: Optional[int] = None
 
     def __str__(self) -> str:
-        if self.storage is not None:
-            storage = f"({self.storage})"
-        else:
-            storage = ""
+        storage = f"({self.storage})" if self.storage is not None else ""
         return f"binary{storage}"
 
 
@@ -182,21 +179,19 @@ class SqlVariableBinaryType(SqlDataType):
 
 
 @dataclass
-class SqlCharacterType(SqlDataType):
+class SqlFixedCharacterType(SqlDataType):
     limit: Optional[int] = None
-    storage: Optional[int] = None
 
     def __str__(self) -> str:
-        if self.storage is not None:
-            if self.storage < 65536:
-                return f"varchar({self.storage})"
-            elif self.storage < 16777216:
-                return "mediumtext"  # MySQL-specific
-            elif self.storage < 4294967296:
-                return "longtext"  # MySQL-specific
-            else:
-                raise ValueError(f"storage size exceeds maximum: {self.storage}")
+        limit = f"({self.limit})" if self.limit is not None else ""
+        return f"char{limit}"
 
+
+@dataclass
+class SqlVariableCharacterType(SqlDataType):
+    limit: Optional[int] = None
+
+    def __str__(self) -> str:
         if self.limit is not None:
             return f"varchar({self.limit})"
         else:
@@ -205,8 +200,6 @@ class SqlCharacterType(SqlDataType):
     def parse_meta(self, meta: Any) -> None:
         if isinstance(meta, MaxLength):
             self.limit = meta.value
-        elif isinstance(meta, Storage):
-            self.storage = meta.bytes
         else:
             super().parse_meta(meta)
 
@@ -328,11 +321,14 @@ def _compatible_type(left: SqlDataType, right: SqlDataType) -> SqlDataType:
             return SqlDoubleType()
 
     # character types
-    if isinstance(left, SqlCharacterType) and isinstance(right, SqlCharacterType):
-        return SqlCharacterType(
-            limit=max_or_none(left.limit, right.limit),
-            storage=max_or_none(left.storage, right.storage),
-        )
+    if isinstance(left, SqlFixedCharacterType):
+        if isinstance(right, SqlFixedCharacterType):
+            return SqlFixedCharacterType(limit=max_or_none(left.limit, right.limit))
+        elif isinstance(right, SqlVariableCharacterType):
+            return SqlVariableCharacterType(limit=max_or_none(left.limit, right.limit))
+    elif isinstance(left, SqlVariableCharacterType):
+        if isinstance(right, (SqlFixedCharacterType, SqlVariableCharacterType)):
+            return SqlVariableCharacterType(limit=max_or_none(left.limit, right.limit))
 
     # binary types
     if isinstance(left, SqlFixedBinaryType):

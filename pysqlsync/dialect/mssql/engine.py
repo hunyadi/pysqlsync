@@ -1,9 +1,8 @@
 from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator, Explorer
-from pysqlsync.formation.discovery import AnsiReflection
 
 from .connection import MSSQLConnection
 from .generator import MSSQLGenerator
-
+from .discovery import MSSQLExplorer
 
 class MSSQLEngine(BaseEngine):
     @property
@@ -17,4 +16,4 @@ class MSSQLEngine(BaseEngine):
         return MSSQLConnection
 
     def get_explorer_type(self) -> type[Explorer]:
-        return AnsiReflection
+        return MSSQLExplorer
