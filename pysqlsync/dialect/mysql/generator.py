@@ -90,10 +90,6 @@ class MySQLGenerator(BaseGenerator):
     Assumes configuration `ANSI_QUOTES` and `SET @@session.time_zone = "+00:00"`.
     """
 
-    @property
-    def column_class(self) -> type[Column]:
-        return MySQLColumn
-
     def __init__(self, options: GeneratorOptions) -> None:
         super().__init__(options)
 
@@ -124,6 +120,10 @@ class MySQLGenerator(BaseGenerator):
                 skip_annotations=options.skip_annotations,
             )
         )
+
+    @property
+    def column_class(self) -> type[Column]:
+        return MySQLColumn
 
     def get_mutate_stmt(self, target: Catalog) -> str:
         statements: list[str] = []

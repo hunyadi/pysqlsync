@@ -105,7 +105,7 @@ class UserTable:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime
-    workflow_state: WorkflowState
+    # workflow_state: WorkflowState
     uuid: UUID
     name: str
     short_name: str

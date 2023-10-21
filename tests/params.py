@@ -30,6 +30,22 @@ class PostgreSQLBase(TestEngineBase):
         )
 
 
+class MSSQLBase(TestEngineBase):
+    @property
+    def engine(self) -> BaseEngine:
+        return get_dialect("mssql")
+
+    @property
+    def parameters(self) -> ConnectionParameters:
+        return ConnectionParameters(
+            host="127.0.0.1",
+            port=None,
+            username="SA",
+            password="<YourStrong@Passw0rd>",
+            database=None,
+        )
+
+
 class MySQLBase(TestEngineBase):
     @property
     def engine(self) -> BaseEngine:

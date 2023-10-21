@@ -17,7 +17,7 @@ from pysqlsync.formation.py_to_sql import (
 )
 from pysqlsync.model.data_types import SqlCharacterType, SqlFixedBinaryType, constant
 
-from .data_types import MSSQLBooleanType, MSSQLDateTimeType
+from .data_types import MSSQLBooleanType, MSSQLCharacterType, MSSQLDateTimeType
 
 
 @dataclass
@@ -68,6 +68,7 @@ class MSSQLGenerator(BaseGenerator):
                 substitutions={
                     bool: MSSQLBooleanType(),
                     datetime.datetime: MSSQLDateTimeType(),
+                    str: MSSQLCharacterType(),
                     uuid.UUID: SqlFixedBinaryType(16),
                     JsonType: SqlCharacterType(),
                     ipaddress.IPv4Address: SqlFixedBinaryType(4),
@@ -78,8 +79,36 @@ class MSSQLGenerator(BaseGenerator):
             )
         )
 
+    @property
+    def column_class(self) -> type[Column]:
+        return MSSQLColumn
+
     def get_table_insert_stmt(self, table: Table) -> str:
-        raise NotImplementedError()
+        statements: list[str] = []
+        statements.append(f"INSERT INTO {table.name}")
+        columns = [column for column in table.columns.values() if not column.identity]
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join("?" for _ in columns)
+        statements.append(f"({column_list}) VALUES ({value_list})")
+        return "\n".join(statements)
 
     def get_table_upsert_stmt(self, table: Table) -> str:
-        raise NotImplementedError()
+        statements: list[str] = []
+
+        statements.append(f"MERGE INTO {table.name} AS target")
+        columns = [column for column in table.columns.values() if not column.identity]
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join("?" for _ in columns)
+        statements.append(f"USING (VALUES ({value_list})) AS source({column_list})")
+        statements.append(f"ON target.{table.primary_key} = source.{table.primary_key}")
+
+        statements.append("WHEN MATCHED THEN")
+        update_list = ", ".join(f"target.{c.name} = source.{c.name}" for c in columns)
+        statements.append(f"UPDATE SET {update_list}")
+
+        statements.append("WHEN NOT MATCHED BY TARGET THEN")
+        insert_list = ", ".join(f"source.{column.name}" for column in columns)
+        statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
+
+        statements.append(";")
+        return "\n".join(statements)

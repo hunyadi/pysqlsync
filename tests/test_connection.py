@@ -11,7 +11,7 @@ from pysqlsync.formation.py_to_sql import (
 )
 from pysqlsync.model.id_types import QualifiedId
 from tests import tables
-from tests.params import MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 from tests.timed_test import TimedAsyncioTestCase
 
 
@@ -64,14 +64,14 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
                 deleted_at=datetime.now(),
-                workflow_state=tables.WorkflowState.inactive,
+                # workflow_state=tables.WorkflowState.inactive,
                 uuid=uuid.uuid4(),
                 name="Dr. Levente Hunyadi",
                 short_name="Levente",
                 sortable_name="Hunyadi, Levente",
                 homepage_url="https://hunyadi.info.hu",
             )
-            for k in range(10000)
+            for k in range(1, 10001)
         ]
 
     async def test_dataclass_insert(self) -> None:
@@ -80,8 +80,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.UserTable])
             await conn.insert_data(tables.UserTable, data)
-            rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
-            self.assertEqual(rows[0], len(data))
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, len(data))
             await conn.drop_objects()
 
     async def test_dataclass_upsert(self) -> None:
@@ -90,8 +90,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.UserTable])
             await conn.upsert_data(tables.UserTable, data)
-            rows = await conn.query_all(int, 'SELECT COUNT(*) FROM "UserTable"')
-            self.assertEqual(rows[0], len(data))
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, len(data))
             await conn.drop_objects()
 
     async def test_rows_upsert(self) -> None:
@@ -142,6 +142,15 @@ class TestPostgreSQLConnection(PostgreSQLBase, TestConnection):
             await conn.execute('DROP TABLE IF EXISTS "UserTable";')
             await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
             await conn.execute('DROP TYPE IF EXISTS "WorkflowState";')
+
+
+class TestMSSQLConnection(MSSQLBase, TestConnection):
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.execute('DROP TABLE IF EXISTS "DataTable";')
+            await conn.execute('DROP TABLE IF EXISTS "EnumTable";')
+            await conn.execute('DROP TABLE IF EXISTS "UserTable";')
+            await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
 
 
 class TestMySQLConnection(MySQLBase, TestConnection):

@@ -79,7 +79,7 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_string_table(self) -> None:
-        for dialect in ["postgresql", "mssql", "mysql"]:
+        for dialect in ["postgresql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.StringTable, dialect=dialect),
@@ -92,6 +92,17 @@ class TestGenerator(unittest.TestCase):
                     'PRIMARY KEY ("id")\n'
                     ");",
                 )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.StringTable, dialect="mssql"),
+            'CREATE TABLE "StringTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"arbitrary_length_string" varchar(max) NOT NULL,\n'
+            '"nullable_arbitrary_length_string" varchar(max),\n'
+            '"maximum_length_string" varchar(255) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(255),\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
 
     def test_create_date_time_table(self) -> None:
         self.assertMultiLineEqual(
@@ -189,7 +200,7 @@ class TestGenerator(unittest.TestCase):
                 )
 
     def test_create_primary_key_table(self) -> None:
-        for dialect in ["postgresql", "mssql", "mysql"]:
+        for dialect in ["postgresql", "mysql"]:
             with self.subTest(dialect=dialect):
                 self.assertMultiLineEqual(
                     get_create_stmt(tables.DataTable, dialect=dialect),
@@ -199,6 +210,14 @@ class TestGenerator(unittest.TestCase):
                     'PRIMARY KEY ("id")\n'
                     ");",
                 )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DataTable, dialect="mssql"),
+            'CREATE TABLE "DataTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"data" varchar(max) NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
 
     def test_create_table_with_description(self) -> None:
         lines = [
