@@ -1,4 +1,8 @@
-from pysqlsync.model.data_types import SqlTimestampType, SqlVariableCharacterType
+from pysqlsync.model.data_types import (
+    SqlTimestampType,
+    SqlVariableBinaryType,
+    SqlVariableCharacterType,
+)
 
 
 class MySQLDateTimeType(SqlTimestampType):
@@ -9,7 +13,7 @@ class MySQLDateTimeType(SqlTimestampType):
 class MySQLVariableCharacterType(SqlVariableCharacterType):
     def __str__(self) -> str:
         if self.limit is None:
-            return "text"
+            return "mediumtext"
 
         if self.limit < 256:
             return f"varchar({self.limit})"
@@ -20,4 +24,21 @@ class MySQLVariableCharacterType(SqlVariableCharacterType):
         elif self.limit < 4294967296:
             return "longtext"
         else:
-            raise ValueError(f"storage size exceeds maximum: {self.limit}")
+            raise ValueError(f"character count exceeds maximum: {self.limit}")
+
+
+class MySQLVariableBinaryType(SqlVariableBinaryType):
+    def __str__(self) -> str:
+        if self.storage is None:
+            return "mediumblob"
+
+        if self.storage < 256:
+            return f"varbinary({self.storage})"
+        elif self.storage < 65536:
+            return "blob"
+        elif self.storage < 16777216:
+            return "mediumblob"
+        elif self.storage < 4294967296:
+            return "longblob"
+        else:
+            raise ValueError(f"storage size exceeds maximum: {self.storage}")

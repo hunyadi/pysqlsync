@@ -306,18 +306,42 @@ class BaseContext(abc.ABC):
     def _resultset_unwrap_dict(
         self, signature: type[D], records: Iterable[dict[str, Any]]
     ) -> list[D]:
-        """Converts a result-set into a list of data-class instances.
+        """
+        Converts a result-set into a list of data-class instances.
 
         :param signature: A data-class type.
         :param records: The result-set whose rows to convert.
         """
 
-        if is_dataclass_type(signature):
-            return [signature(**{name: value for name, value in record.items()}) for record in records]  # type: ignore
+        if not is_dataclass_type(signature):
+            raise TypeError(
+                f"expected: data-class type as result-set signature; got: {signature}"
+            )
 
-        raise TypeError(
-            f"expected: data-class type as result-set signature; got: {signature}"
-        )
+        return [
+            signature(**{name: value for name, value in record.items()})  # type: ignore
+            for record in records
+        ]
+
+    def _resultset_unwrap_object(
+        self, signature: type[D], records: Iterable[Any]
+    ) -> list[D]:
+        """
+        Converts a result-set into a list of data-class instances.
+
+        :param signature: A data-class type.
+        :param records: The result-set whose rows to convert.
+        """
+
+        if not is_dataclass_type(signature):
+            raise TypeError(
+                f"expected: data-class type as result-set signature; got: {signature}"
+            )
+
+        names = [name for name in signature.__dataclass_fields__.keys()]
+        return [
+            signature(**{name: record.__getattribute__(name) for name in names}) for record in records  # type: ignore
+        ]
 
     def _resultset_unwrap_tuple(
         self, signature: type[T], records: Iterable[Sequence[Any]]
@@ -392,6 +416,9 @@ class BaseContext(abc.ABC):
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         ...
+
+    async def current_schema(self) -> Optional[str]:
+        return await self.query_one(str, "SELECT CURRENT_SCHEMA();")
 
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")

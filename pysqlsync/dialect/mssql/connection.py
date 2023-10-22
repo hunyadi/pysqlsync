@@ -4,6 +4,7 @@ import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import pyodbc
+from strong_typing.inspection import is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import quote
@@ -75,7 +76,14 @@ class MSSQLContext(BaseContext):
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
-            return self._resultset_unwrap_tuple(signature, records)
+
+            if is_dataclass_type(signature):
+                return self._resultset_unwrap_object(signature, records)  # type: ignore
+            else:
+                return self._resultset_unwrap_tuple(signature, records)
+
+    async def current_schema(self) -> Optional[str]:
+        return await self.query_one(str, "SELECT SCHEMA_NAME();")
 
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")

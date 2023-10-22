@@ -160,16 +160,9 @@ class SqlVariableBinaryType(SqlDataType):
 
     def __str__(self) -> str:
         if self.storage is not None:
-            if self.storage < 65536:
-                return f"varbinary({self.storage})"
-            elif self.storage < 16777216:
-                return "mediumblob"  # MySQL-specific
-            elif self.storage < 4294967296:
-                return "longblob"  # MySQL-specific
-            else:
-                raise ValueError(f"storage size exceeds maximum: {self.storage}")
-
-        return "varbinary"
+            return f"varbinary({self.storage})"
+        else:
+            return "blob"
 
     def parse_meta(self, meta: Any) -> None:
         if isinstance(meta, Storage):
@@ -265,7 +258,7 @@ class SqlIntervalType(SqlDataType):
 @dataclass
 class SqlJsonType(SqlDataType):
     def __str__(self) -> str:
-        return "json"
+        return "jsonb"
 
 
 @dataclass

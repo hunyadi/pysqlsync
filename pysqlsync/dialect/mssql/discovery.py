@@ -2,7 +2,7 @@ from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import AnsiReflection
 
-from .data_types import MSSQLDateTimeType
+from .data_types import MSSQLDateTimeType, MSSQLVariableCharacterType
 from .object_types import MSSQLObjectFactory
 
 
@@ -15,6 +15,7 @@ class MSSQLExplorer(AnsiReflection):
                     substitutions={
                         "datetime": MSSQLDateTimeType(),
                         "datetime2": MSSQLDateTimeType(),
+                        "varchar": MSSQLVariableCharacterType(),
                     }
                 )
             ),

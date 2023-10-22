@@ -5,6 +5,14 @@ from pysqlsync.formation.object_types import ObjectFactory
 
 
 class TrinoExplorer(AnsiReflection):
+    """
+    Discovers objects in a database exposed via Trino.
+
+    We recommend setting the following configuration options in Trino:
+    * postgresql.array-mapping = AS_ARRAY
+    * postgresql.include-system-tables = true
+    """
+
     def __init__(self, conn: BaseContext) -> None:
         super().__init__(
             conn,

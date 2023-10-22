@@ -1,5 +1,4 @@
 from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator, Explorer
-from pysqlsync.formation.discovery import AnsiReflection
 
 from .connection import TrinoConnection
 from .discovery import TrinoExplorer

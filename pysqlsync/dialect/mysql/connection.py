@@ -91,6 +91,9 @@ class MySQLContext(BaseContext):
             records = await cur.fetchall()
             return self._resultset_unwrap_tuple(signature, records)
 
+    async def current_schema(self) -> Optional[str]:
+        return None
+
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 

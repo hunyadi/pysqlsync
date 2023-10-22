@@ -1,8 +1,7 @@
-import abc
 import unittest
 
 import tests.tables as tables
-from pysqlsync.base import BaseContext, GeneratorOptions
+from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import (
     DataclassConverterOptions,
@@ -18,10 +17,6 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(namespaces={tables: None})
 
-    @abc.abstractmethod
-    async def get_current_namespace(self, conn: BaseContext) -> str:
-        ...
-
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.execute('DROP TABLE IF EXISTS "NumericTable";')
@@ -30,7 +25,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
     async def test_table(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            current_namespace = await self.get_current_namespace(conn)
+            current_namespace = await conn.current_schema()
             options = DataclassConverterOptions(
                 namespaces=NamespaceMapping({tables: current_namespace})
             )
@@ -48,7 +43,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
     async def test_relation(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            current_namespace = await self.get_current_namespace(conn)
+            current_namespace = await conn.current_schema()
             options = DataclassConverterOptions(
                 namespaces=NamespaceMapping({tables: current_namespace})
             )
@@ -115,9 +110,6 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
 
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
-    async def get_current_namespace(self, conn: BaseContext) -> str:
-        return await conn.query_one(str, "SELECT CURRENT_SCHEMA();")
-
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -125,9 +117,6 @@ class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
 
 
 class TestMSSQLDiscovery(MSSQLBase, TestDiscovery):
-    async def get_current_namespace(self, conn: BaseContext) -> str:
-        return await conn.query_one(str, "SELECT SCHEMA_NAME();")
-
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -135,9 +124,6 @@ class TestMSSQLDiscovery(MSSQLBase, TestDiscovery):
 
 
 class TestMySQLDiscovery(MySQLBase, TestDiscovery):
-    async def get_current_namespace(self, conn: BaseContext) -> str:
-        return await conn.query_one(str, "SELECT DATABASE();")
-
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         async with self.engine.create_connection(self.parameters, self.options) as conn:

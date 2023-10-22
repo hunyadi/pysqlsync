@@ -1,3 +1,4 @@
+import logging
 import typing
 from dataclasses import dataclass
 from typing import Optional
@@ -16,6 +17,8 @@ from .object_types import (
     Table,
 )
 
+LOGGER = logging.getLogger("pysqlsync")
+
 
 @dataclass
 class AnsiColumnMeta:
@@ -28,9 +31,73 @@ class AnsiColumnMeta:
     datetime_precision: Optional[int]
 
 
+@dataclass
+class AnsiConstraintMeta:
+    fk_constraint_name: str
+    fk_table_schema: str
+    fk_table_name: str
+    fk_column_name: str
+    fk_ordinal_position: int
+    uq_constraint_name: str
+    uq_table_schema: str
+    uq_table_name: str
+    uq_column_name: str
+    uq_ordinal_position: int
+
+
 class AnsiReflection(Explorer):
     discovery: SqlDiscovery
     factory: ObjectFactory
+
+    _has_constraints: Optional[bool] = None
+    _has_column_extended_info: Optional[bool] = None
+
+    async def has_constraints(self) -> bool:
+        if self._has_constraints is None:
+            try:
+                await self.conn.query_one(
+                    int,
+                    "SELECT COUNT(*) FROM information_schema.table_constraints",
+                )
+                await self.conn.query_one(
+                    int,
+                    "SELECT COUNT(*) FROM information_schema.referential_constraints",
+                )
+                await self.conn.query_one(
+                    int,
+                    "SELECT COUNT(*) FROM information_schema.key_column_usage",
+                )
+                LOGGER.info("information on foreign key references available")
+                self._has_constraints = True
+            except Exception:
+                raise
+                LOGGER.info("information on foreign key references NOT available")
+                self._has_constraints = False
+
+        return self._has_constraints
+
+    async def has_column_extended_info(self) -> bool:
+        if self._has_column_extended_info is None:
+            try:
+                await self.conn.query_one(
+                    tuple[int, int, int, int, int, int, int],
+                    "SELECT\n"
+                    "    COUNT(column_name),\n"
+                    "    COUNT(data_type),\n"
+                    "    COUNT(is_nullable),\n"
+                    "    COUNT(character_maximum_length),\n"
+                    "    COUNT(numeric_precision),\n"
+                    "    COUNT(numeric_scale),\n"
+                    "    COUNT(datetime_precision)\n"
+                    "FROM information_schema.columns",
+                )
+                LOGGER.info("extended column information available")
+                self._has_column_extended_info = True
+            except Exception:
+                LOGGER.info("extended column information NOT available")
+                self._has_column_extended_info = False
+
+        return self._has_column_extended_info
 
     def __init__(
         self, conn: BaseContext, discovery: SqlDiscovery, factory: ObjectFactory
@@ -49,201 +116,169 @@ class AnsiReflection(Explorer):
         )
         return [QualifiedId(record[0], record[1]) for record in records]  # type: ignore[arg-type]
 
-    async def has_information_table(self, table_name: str) -> bool:
-        "Checks if an information schema table is available."
-
-        return await self.has_table(QualifiedId("information_schema", table_name))
-
-    async def has_information_tables(self, table_names: list[str]) -> bool:
-        for table_name in table_names:
-            result = await self.has_information_table(table_name)
-            if not result:
-                return False
-
-        return True
-
-    async def has_information_column(self, table_name: str, column_name: str) -> bool:
-        "Checks if an information schema table has the given column."
-
-        return await self.has_column(
-            QualifiedId("information_schema", table_name), LocalId(column_name)
-        )
-
-    async def has_information_columns(
-        self, table_name: str, column_names: list[str]
-    ) -> bool:
-        for column_name in column_names:
-            result = await self.has_information_column(table_name, column_name)
-            if not result:
-                return False
-
-        return True
+    def _where_table(self, table_id: SupportsQualifiedId, alias: str) -> str:
+        conditions: list[str] = []
+        conditions.append(f"{alias}.table_name = {quote(table_id.local_id)}")
+        if table_id.scope_id is not None:
+            conditions.append(f"{alias}.table_schema = {quote(table_id.scope_id)}")
+        return " AND ".join(f"({c})" for c in conditions)
 
     async def has_table(self, table_id: SupportsQualifiedId) -> bool:
         "Checks if a table exists."
 
-        conditions: list[str] = []
-        conditions.append(f"table_name = {quote(table_id.local_id)}")
-        if table_id.scope_id is not None:
-            conditions.append(f"table_schema = {quote(table_id.scope_id)}")
-        condition = " AND ".join(f"({c})" for c in conditions)
-
-        records = await self.conn.query_all(
+        count = await self.conn.query_one(
             int,
-            f"SELECT COUNT(*) FROM information_schema.tables WHERE {condition}",
+            f"SELECT COUNT(*) FROM information_schema.tables AS tab WHERE {self._where_table(table_id, 'tab')}",
         )
-        if len(records) == 1:
-            return records[0] > 0
-        else:
-            return False
+        return count > 0
 
     async def has_column(
         self, table_id: SupportsQualifiedId, column_id: LocalId
     ) -> bool:
         "Checks if a table has the specified column."
 
-        conditions: list[str] = []
-        conditions.append(f"table_name = {quote(table_id.local_id)}")
-        if table_id.scope_id is not None:
-            conditions.append(f"table_schema = {quote(table_id.scope_id)}")
-        condition = " AND ".join(f"({c})" for c in conditions)
-
-        records = await self.conn.query_all(
+        count = await self.conn.query_one(
             int,
             "SELECT COUNT(*)\n"
-            "FROM information_schema.columns\n"
-            f"WHERE {condition} AND column_name = {quote(column_id.local_id)}",
+            "FROM information_schema.columns AS col\n"
+            f"WHERE {self._where_table(table_id, 'col')} AND col.column_name = {quote(column_id.local_id)}",
         )
-        if len(records) == 1:
-            return records[0] > 0
-        else:
-            return False
+        return count > 0
 
-    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
-        conditions: list[str] = []
-        conditions.append(f"col.table_name = {quote(table_id.local_id)}")
-        if table_id.scope_id is not None:
-            conditions.append(f"col.table_schema = {quote(table_id.scope_id)}")
-        condition = " AND ".join(f"({c})" for c in conditions)
+    async def _get_columns_limited(self, table_id: SupportsQualifiedId) -> list[Column]:
+        column_meta = await self.conn.query_all(
+            tuple[str, str, bool],
+            "SELECT col.column_name, col.data_type, CASE WHEN col.is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable\n"
+            "FROM information_schema.columns AS col\n"
+            f"WHERE {self._where_table(table_id, 'col')}\n"
+            "ORDER BY ordinal_position",
+        )
 
         columns: list[Column] = []
-        if await self.has_information_columns(
-            "columns",
-            [
-                "character_maximum_length",
-                "numeric_precision",
-                "numeric_scale",
-                "datetime_precision",
-            ],
-        ):
-            ansi_column_records = await self.conn.query_all(
-                AnsiColumnMeta,
-                "SELECT\n"
-                "    column_name AS column_name,\n"
-                "    data_type AS data_type,\n"
-                "    is_nullable = 'YES' AS nullable,\n"
-                "    character_maximum_length AS character_maximum_length,\n"
-                "    numeric_precision AS numeric_precision,\n"
-                "    numeric_scale AS numeric_scale,\n"
-                "    datetime_precision AS datetime_precision\n"
-                "FROM information_schema.columns AS col\n"
-                f"WHERE {condition}\n"
-                "ORDER BY ordinal_position",
-            )
-
-            for col in ansi_column_records:
-                columns.append(
-                    self.factory.column_class(
-                        LocalId(col.column_name),
-                        self.discovery.sql_data_type_from_spec(
-                            col.data_type,
-                            character_maximum_length=col.character_maximum_length,
-                            numeric_precision=col.numeric_precision,
-                            numeric_scale=col.numeric_scale,
-                            datetime_precision=col.datetime_precision,
-                        ),
-                        bool(col.nullable),
-                    )
-                )
-        else:
-            limited_column_records = await self.conn.query_all(
+        for col in column_meta:
+            column_name, data_type, nullable = typing.cast(
                 tuple[str, str, bool],
-                "SELECT col.column_name, col.data_type, CASE WHEN col.is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable\n"
-                "FROM information_schema.columns AS col\n"
-                f"WHERE {condition}\n"
-                "ORDER BY ordinal_position",
+                col,
+            )
+            columns.append(
+                self.factory.column_class(
+                    LocalId(column_name),
+                    self.discovery.sql_data_type_from_spec(data_type),
+                    bool(nullable),
+                )
+            )
+        return columns
+
+    async def _get_columns_full(self, table_id: SupportsQualifiedId) -> list[Column]:
+        column_meta = await self.conn.query_all(
+            AnsiColumnMeta,
+            "SELECT\n"
+            "    column_name AS column_name,\n"
+            "    data_type AS data_type,\n"
+            "    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable,\n"
+            "    character_maximum_length AS character_maximum_length,\n"
+            "    numeric_precision AS numeric_precision,\n"
+            "    numeric_scale AS numeric_scale,\n"
+            "    datetime_precision AS datetime_precision\n"
+            "FROM information_schema.columns AS col\n"
+            f"WHERE {self._where_table(table_id, 'col')}\n"
+            "ORDER BY ordinal_position",
+        )
+
+        columns: list[Column] = []
+        for col in column_meta:
+            columns.append(
+                self.factory.column_class(
+                    LocalId(col.column_name),
+                    self.discovery.sql_data_type_from_spec(
+                        col.data_type,
+                        character_maximum_length=col.character_maximum_length,
+                        numeric_precision=col.numeric_precision,
+                        numeric_scale=col.numeric_scale,
+                        datetime_precision=col.datetime_precision,
+                    ),
+                    bool(col.nullable),
+                )
+            )
+        return columns
+
+    async def _get_table_primary_key(self, table_id: SupportsQualifiedId) -> LocalId:
+        primary_meta = await self.conn.query_all(
+            str,
+            "SELECT\n"
+            "    kcu.column_name\n"
+            "FROM information_schema.table_constraints AS tab\n"
+            "    INNER JOIN information_schema.key_column_usage AS kcu\n"
+            "        ON tab.constraint_catalog = kcu.constraint_catalog AND tab.constraint_schema = kcu.constraint_schema AND tab.constraint_name = kcu.constraint_name\n"
+            f"WHERE {self._where_table(table_id, 'tab')} AND {self._where_table(table_id, 'kcu')} AND\n"
+            "    tab.constraint_type = 'PRIMARY KEY'\n"
+            "ORDER BY kcu.ordinal_position",
+        )
+
+        if len(primary_meta) < 1:
+            raise DiscoveryError(f"primary key required in table: {table_id}")
+        elif len(primary_meta) > 1:
+            raise DiscoveryError(f"composite primary key in table: {table_id}")
+        return LocalId(primary_meta[0])
+
+    async def _get_table_constraints(
+        self, table_id: SupportsQualifiedId
+    ) -> list[Constraint]:
+        constraint_meta = await self.conn.query_all(
+            AnsiConstraintMeta,
+            "SELECT\n"
+            "    kcu1.constraint_name AS fk_constraint_name,\n"
+            "    kcu1.table_schema AS fk_table_schema,\n"
+            "    kcu1.table_name AS fk_table_name,\n"
+            "    kcu1.column_name AS fk_column_name,\n"
+            "    kcu1.ordinal_position AS fk_ordinal_position,\n"
+            "    kcu2.constraint_name AS uq_constraint_name,\n"
+            "    kcu2.table_schema AS uq_table_schema,\n"
+            "    kcu2.table_name AS uq_table_name,\n"
+            "    kcu2.column_name AS uq_column_name,\n"
+            "    kcu2.ordinal_position AS uq_ordinal_position\n"
+            "FROM information_schema.referential_constraints AS ref\n"
+            "    INNER JOIN information_schema.key_column_usage AS kcu1\n"
+            "        ON kcu1.constraint_catalog = ref.constraint_catalog AND kcu1.constraint_schema = ref.constraint_schema AND kcu1.constraint_name = ref.constraint_name\n"
+            "    INNER JOIN information_schema.key_column_usage AS kcu2\n"
+            "        ON kcu2.constraint_catalog = ref.unique_constraint_catalog AND kcu2.constraint_schema = ref.unique_constraint_schema AND kcu2.constraint_name = ref.unique_constraint_name\n"
+            f"WHERE {self._where_table(table_id, 'kcu1')} AND\n"
+            "    kcu1.ordinal_position = kcu2.ordinal_position",
+        )
+
+        constraints: dict[str, Constraint] = {}
+        for con in constraint_meta:
+            if con.fk_constraint_name in constraints:
+                raise DiscoveryError(f"composite foreign key in table: {table_id}")
+            constraints[con.fk_constraint_name] = ForeignConstraint(
+                LocalId(con.fk_constraint_name),
+                LocalId(con.fk_column_name),
+                ConstraintReference(
+                    QualifiedId(con.uq_table_schema, con.uq_table_name),
+                    LocalId(con.uq_column_name),
+                ),
             )
 
-            for column_record in limited_column_records:
-                column_name, data_type, nullable = typing.cast(
-                    tuple[str, str, bool],
-                    column_record,
-                )
-                columns.append(
-                    self.factory.column_class(
-                        LocalId(column_name),
-                        self.discovery.sql_data_type_from_spec(data_type),
-                        bool(nullable),
-                    )
-                )
+        return list(constraints.values())
 
-        if not columns:
+    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+        if not await self.has_table(table_id):
             raise DiscoveryError(f"table not found: {table_id}")
 
-        if await self.has_information_tables(["table_constraints", "key_column_usage"]):
-            constraint_records = await self.conn.query_all(
-                tuple[str, str, str, str, str, str],
-                "SELECT col.constraint_name, tab.constraint_type, col.column_name, col.referenced_table_schema, col.referenced_table_name, col.referenced_column_name\n"
-                "FROM information_schema.table_constraints AS tab, information_schema.key_column_usage AS col\n"
-                "WHERE col.constraint_schema = tab.constraint_schema AND col.constraint_name = tab.constraint_name\n"
-                "AND col.table_schema = tab.table_schema AND col.table_name = tab.table_name\n"
-                "AND (tab.constraint_type = 'PRIMARY KEY' OR tab.constraint_type = 'FOREIGN KEY')\n"
-                f"AND {condition}\n"
-                "ORDER BY col.ordinal_position",
-            )
+        if await self.has_column_extended_info():
+            columns = await self._get_columns_full(table_id)
+        else:
+            columns = await self._get_columns_limited(table_id)
 
-            primary_key: Optional[LocalId] = None
-            constraints: dict[str, Constraint] = {}
-            for constraint_record in constraint_records:
-                (
-                    constraint_name,
-                    constraint_type,
-                    column_name,
-                    referenced_table_schema,
-                    referenced_table_name,
-                    referenced_column_name,
-                ) = typing.cast(tuple[str, str, str, str, str, str], constraint_record)
-
-                if constraint_type == "PRIMARY KEY":
-                    if primary_key is not None:
-                        raise NotImplementedError(
-                            f"composite primary key in table: {table_id}"
-                        )
-                    primary_key = LocalId(column_name)
-                elif constraint_type == "FOREIGN KEY":
-                    if constraint_name in constraints:
-                        raise NotImplementedError(
-                            f"composite foreign key in table: {table_id}"
-                        )
-                    constraints[constraint_name] = ForeignConstraint(
-                        LocalId(constraint_name),
-                        LocalId(column_name),
-                        ConstraintReference(
-                            QualifiedId(referenced_table_schema, referenced_table_name),
-                            LocalId(referenced_column_name),
-                        ),
-                    )
-
-            if primary_key is None:
-                raise DiscoveryError(f"primary key required in table: {table_id}")
-
+        if await self.has_constraints():
+            primary_key = await self._get_table_primary_key(table_id)
+            constraints = await self._get_table_constraints(table_id)
             return self.factory.table_class(
                 name=table_id,
                 columns=columns,
                 primary_key=primary_key,
-                constraints=list(constraints.values()) or None,
+                constraints=constraints or None,
             )
-
         else:
             # assume first column is the primary key
             primary_key = columns[0].name

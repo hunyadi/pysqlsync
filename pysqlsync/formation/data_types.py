@@ -76,13 +76,19 @@ class SqlDiscovery:
         elif type_name == "time with time zone":
             return SqlTimeType(datetime_precision, True)
         elif type_name == "varchar" or type_name == "character varying":
-            return SqlVariableCharacterType(limit=character_maximum_length)
+            if character_maximum_length is not None and character_maximum_length > 0:
+                return SqlVariableCharacterType(limit=character_maximum_length)
+            else:
+                return SqlVariableCharacterType()
+        elif type_name == "text":
+            return SqlVariableCharacterType()
         elif type_name == "binary":
             return SqlFixedBinaryType(storage=character_maximum_length)
         elif type_name == "varbinary" or type_name == "binary varying":
-            return SqlVariableBinaryType(storage=character_maximum_length)
-        elif type_name == "text":
-            return SqlVariableCharacterType()
+            if character_maximum_length is not None and character_maximum_length > 0:
+                return SqlVariableBinaryType(storage=character_maximum_length)
+            else:
+                return SqlVariableBinaryType()
         elif type_name == "bytea":  # PostgreSQL-specific
             return SqlVariableBinaryType()
         elif type_name == "uuid":  # PostgreSQL-specific
@@ -99,6 +105,10 @@ class SqlDiscovery:
         m = re.fullmatch(r"^timestamp[(](\d+)[)]$", type_name, re.IGNORECASE)
         if m is not None:
             return SqlTimestampType(int(m.group(1)), False)
+
+        m = re.fullmatch(r"^char[(](\d+)[)]$", type_name, re.IGNORECASE)
+        if m is not None:
+            return SqlFixedCharacterType(int(m.group(1)))
 
         m = re.fullmatch(r"^varchar[(](\d+)[)]$", type_name, re.IGNORECASE)
         if m is not None:

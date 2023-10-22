@@ -90,7 +90,7 @@ class PrefixedId:
 
     @property
     def local_id(self) -> str:
-        return f"{self.namespace}__{self.id}"
+        return f"{self.namespace}__{self.id}" if self.namespace is not None else self.id
 
     @property
     def compact_id(self) -> str:

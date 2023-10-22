@@ -12,7 +12,7 @@ class MSSQLBooleanType(SqlBooleanType):
 
 class MSSQLVariableCharacterType(SqlVariableCharacterType):
     def __str__(self) -> str:
-        if self.limit is not None:
+        if self.limit is not None and self.limit > 0:
             return f"varchar({self.limit})"
         else:
             return "varchar(max)"
