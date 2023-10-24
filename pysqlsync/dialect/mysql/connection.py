@@ -1,7 +1,6 @@
 import logging
 import types
 import typing
-from collections.abc import Sized
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiomysql
@@ -57,29 +56,17 @@ class MySQLContext(BaseContext):
     def native_connection(self) -> aiomysql.Connection:
         return typing.cast(MySQLConnection, self.connection).native
 
-    async def execute(self, statement: str) -> None:
-        if not statement:
-            raise ValueError("empty statement")
-
+    async def _execute(self, statement: str) -> None:
         async with self.native_connection.cursor() as cur:
-            LOGGER.debug(f"execute SQL:\n{statement}")
-
             await cur.execute(statement)
 
-    async def execute_all(
+    async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         async with self.native_connection.cursor() as cur:
-            if isinstance(args, Sized):
-                LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
-            else:
-                LOGGER.debug(f"execute SQL:\n{statement}")
-
             await cur.executemany(statement, args)
 
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
-        LOGGER.debug(f"query SQL into type {repr(signature)}:\n{statement}")
-
+    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         if is_dataclass_type(signature):
             cur = await self.native_connection.cursor(aiomysql.cursors.DictCursor)
             await cur.execute(statement)

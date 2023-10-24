@@ -1,10 +1,10 @@
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.discovery import AnsiReflection
+from pysqlsync.formation.discovery import AnsiExplorer
 from pysqlsync.formation.object_types import ObjectFactory
 
 
-class TrinoExplorer(AnsiReflection):
+class TrinoExplorer(AnsiExplorer):
     """
     Discovers objects in a database exposed via Trino.
 

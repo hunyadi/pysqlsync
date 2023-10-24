@@ -67,8 +67,8 @@ class StringTable:
     id: PrimaryKey[int]
     arbitrary_length_string: str
     nullable_arbitrary_length_string: Optional[str]
-    maximum_length_string: Annotated[str, MaxLength(255)]
-    nullable_maximum_length_string: Optional[Annotated[str, MaxLength(255)]]
+    maximum_length_string: Annotated[str, MaxLength(128)]
+    nullable_maximum_length_string: Optional[Annotated[str, MaxLength(128)]]
 
 
 @dataclass(slots=True)

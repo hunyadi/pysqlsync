@@ -1,6 +1,6 @@
 from pysqlsync.base import BaseContext, DiscoveryError
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.discovery import AnsiConstraintMeta, AnsiReflection
+from pysqlsync.formation.discovery import AnsiConstraintMeta, AnsiExplorer
 from pysqlsync.formation.object_types import (
     Constraint,
     ConstraintReference,
@@ -17,7 +17,7 @@ from .data_types import (
 from .object_types import MySQLObjectFactory
 
 
-class MySQLExplorer(AnsiReflection):
+class MySQLExplorer(AnsiExplorer):
     def __init__(self, conn: BaseContext) -> None:
         super().__init__(
             conn,

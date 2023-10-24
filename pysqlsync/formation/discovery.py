@@ -45,7 +45,7 @@ class AnsiConstraintMeta:
     uq_ordinal_position: int
 
 
-class AnsiReflection(Explorer):
+class AnsiExplorer(Explorer):
     discovery: SqlDiscovery
     factory: ObjectFactory
 
@@ -67,11 +67,11 @@ class AnsiReflection(Explorer):
                     int,
                     "SELECT COUNT(*) FROM information_schema.key_column_usage",
                 )
-                LOGGER.info("information on foreign key references available")
+                LOGGER.info("explorer: PK/FK information available")
                 self._has_constraints = True
             except Exception:
                 raise
-                LOGGER.info("information on foreign key references NOT available")
+                LOGGER.info("explorer: PK/FK information NOT available")
                 self._has_constraints = False
 
         return self._has_constraints
@@ -91,10 +91,10 @@ class AnsiReflection(Explorer):
                     "    COUNT(datetime_precision)\n"
                     "FROM information_schema.columns",
                 )
-                LOGGER.info("extended column information available")
+                LOGGER.info("explorer: extended column information available")
                 self._has_column_extended_info = True
             except Exception:
-                LOGGER.info("extended column information NOT available")
+                LOGGER.info("explorer: extended column information NOT available")
                 self._has_column_extended_info = False
 
         return self._has_column_extended_info
@@ -261,14 +261,17 @@ class AnsiReflection(Explorer):
 
         return list(constraints.values())
 
+    async def get_columns_meta(self, table_id: SupportsQualifiedId) -> list[Column]:
+        if await self.has_column_extended_info():
+            return await self._get_columns_full(table_id)
+        else:
+            return await self._get_columns_limited(table_id)
+
     async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
         if not await self.has_table(table_id):
             raise DiscoveryError(f"table not found: {table_id}")
 
-        if await self.has_column_extended_info():
-            columns = await self._get_columns_full(table_id)
-        else:
-            columns = await self._get_columns_limited(table_id)
+        columns = await self.get_columns_meta(table_id)
 
         if await self.has_constraints():
             primary_key = await self._get_table_primary_key(table_id)

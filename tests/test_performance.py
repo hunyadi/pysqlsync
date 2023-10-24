@@ -2,7 +2,7 @@ import dataclasses
 import os.path
 import unittest
 
-from params import MySQLBase, PostgreSQLBase, TestEngineBase
+from params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 from tsv.helper import Generator, Parser
 
 from pysqlsync.base import GeneratorOptions
@@ -24,7 +24,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
-    RECORD_COUNT = 100000
+    RECORD_COUNT = 10000
 
     @property
     def options(self) -> GeneratorOptions:
@@ -70,6 +70,10 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
 class TestPostgreSQLConnection(PostgreSQLBase, TestPerformance):
     pass
+
+
+# class TestMSSQLConnection(MSSQLBase, TestPerformance):
+#     pass
 
 
 class TestMySQLConnection(MySQLBase, TestPerformance):

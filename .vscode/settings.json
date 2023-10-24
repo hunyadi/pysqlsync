@@ -5,8 +5,7 @@
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder}"
     },
-    "python.formatting.provider": "none",
-    "python.linting.mypyEnabled": true,
+    "python.analysis.typeCheckingMode": "off",
     "editor.formatOnSave": true,
     "files.insertFinalNewline": true,
     "editor.codeActionsOnSave": {

@@ -6,9 +6,10 @@ import types
 import typing
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, TypeVar, overload
+from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
+from strong_typing.name import python_type_to_str
 
 from .formation.inspection import get_entity_types
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
@@ -231,6 +232,17 @@ class BaseGenerator(abc.ABC):
         return lambda field: enum_dict[field]
 
 
+class QueryException(RuntimeError):
+    query: str
+
+    def __init__(self, query: str) -> None:
+        super().__init__()
+        self.query = query
+
+    def __str__(self) -> str:
+        return f"error executing query:\n{self.query}"
+
+
 @dataclass
 class ConnectionParameters:
     "Database connection parameters that would typically be encapsulated in a connection string."
@@ -285,9 +297,46 @@ class BaseContext(abc.ABC):
     def __init__(self, connection: BaseConnection) -> None:
         self.connection = connection
 
-    @abc.abstractmethod
     async def execute(self, statement: str) -> None:
         "Executes one or more SQL statements."
+
+        if not statement:
+            raise ValueError("empty statement")
+
+        LOGGER.debug(f"execute SQL:\n{statement}")
+        try:
+            await self._execute(statement)
+        except Exception as e:
+            raise QueryException(statement) from e
+
+    @abc.abstractmethod
+    async def _execute(self, statement: str) -> None:
+        "Executes one or more SQL statements."
+
+        ...
+
+    async def execute_all(
+        self, statement: str, args: Iterable[tuple[Any, ...]]
+    ) -> None:
+        "Executes a SQL statement with several records of data."
+
+        if not statement:
+            raise ValueError("empty statement")
+
+        if isinstance(args, Sized):
+            LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
+        else:
+            LOGGER.debug(f"execute SQL:\n{statement}")
+        try:
+            await self._execute_all(statement, args)
+        except Exception as e:
+            raise QueryException(statement) from e
+
+    @abc.abstractmethod
+    async def _execute_all(
+        self, statement: str, args: Iterable[tuple[Any, ...]]
+    ) -> None:
+        "Executes a SQL statement with several records of data."
 
         ...
 
@@ -297,8 +346,16 @@ class BaseContext(abc.ABC):
         rows = await self.query_all(signature, statement)
         return rows[0]
 
-    @abc.abstractmethod
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
+        "Runs a query to produce a result-set of one or more columns, and multiple rows."
+
+        LOGGER.debug(
+            f"query SQL with into {python_type_to_str(signature)}:\n{statement}"
+        )
+        return await self._query_all(signature, statement)
+
+    @abc.abstractmethod
+    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         "Runs a query to produce a result-set of one or more columns, and multiple rows."
 
         ...
@@ -410,12 +467,6 @@ class BaseContext(abc.ABC):
         raise TypeError(
             f"expected: tuple or simple type as result-set signature; got: {signature}"
         )
-
-    @abc.abstractmethod
-    async def execute_all(
-        self, statement: str, args: Iterable[tuple[Any, ...]]
-    ) -> None:
-        ...
 
     async def current_schema(self) -> Optional[str]:
         return await self.query_one(str, "SELECT CURRENT_SCHEMA();")
@@ -555,8 +606,10 @@ class BaseContext(abc.ABC):
             if field_type is str and table.is_relation(column.name):
                 relation = generator.state.get_referenced_table(table.name, column.name)
                 if relation.is_lookup_table():
+                    values = set(record[index] for record in records)
+                    values.discard(None)  # do not insert NULL into referenced table
                     enum_dict: dict[str, int] = await self._merge_lookup_table(
-                        relation, set(record[index] for record in records)
+                        relation, values
                     )
                     transformer = generator.get_enum_transformer(enum_dict)
 
@@ -578,7 +631,7 @@ class BaseContext(abc.ABC):
             )
 
     async def _merge_lookup_table(
-        self, table: Table, values: Iterable[str]
+        self, table: Table, values: set[str]
     ) -> dict[str, int]:
         "Merges new values into a lookup table and returns the entire updated table."
 
@@ -589,6 +642,7 @@ class BaseContext(abc.ABC):
         column_names = ", ".join(  # join on one element
             str(column.name) for column in table.get_value_columns()
         )
+        LOGGER.debug("adding new enumeration values: {}")
         results = await self.query_all(
             tuple[str, int],
             f"SELECT {column_names}, {table.get_primary_column().name} FROM {table.name}",

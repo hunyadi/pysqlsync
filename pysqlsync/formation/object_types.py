@@ -13,6 +13,36 @@ class FormationError(RuntimeError):
     "Raised when a source state cannot mutate into a target state."
 
 
+class ColumnFormationError(FormationError):
+    "Raised when a column cannot mutate into another column."
+
+    column: LocalId
+
+    def __init__(self, cause: str, column: LocalId) -> None:
+        super().__init__(cause)
+        self.column = column
+
+    def __str__(self) -> str:
+        return f"column {self.column}: {self.args[0]}"
+
+
+class TableFormationError(FormationError):
+    """
+    Raised when a table cannot mutate into another table.
+
+    Details on why the mutation failed are available in the stack trace.
+    """
+
+    table: SupportsQualifiedId
+
+    def __init__(self, cause: str, table: SupportsQualifiedId) -> None:
+        super().__init__(cause)
+        self.table = table
+
+    def __str__(self) -> str:
+        return f"table {self.table}: {self.args[0]}"
+
+
 @dataclass
 class QualifiedObject(abc.ABC):
     name: SupportsQualifiedId
@@ -192,7 +222,8 @@ class Column(MutableObject):
         else:
             return None
 
-    def mutate_column_stmt(target: "Column", source: "Column") -> list[str]:
+    def mutate_column_stmt(self, source: "Column") -> list[str]:
+        target = self
         statements: list[str] = []
 
         if source.data_type != target.data_type:
@@ -230,7 +261,7 @@ class ConstraintReference:
 
 
 @dataclass
-class Constraint:
+class Constraint(abc.ABC):
     """
     A table constraint, such as a primary, foreign or check constraint.
 
@@ -239,10 +270,17 @@ class Constraint:
 
     name: LocalId
 
+    @abc.abstractproperty
+    def spec(self) -> str:
+        ...
+
     def is_alter_table(self) -> bool:
         "True if the constraint is to be applied with an ALTER TABLE statement."
 
         return False
+
+    def __str__(self) -> str:
+        return f"CONSTRAINT {self.spec}"
 
 
 @dataclass
@@ -254,8 +292,9 @@ class UniqueConstraint(Constraint):
     def is_alter_table(self) -> bool:
         return True
 
-    def __str__(self) -> str:
-        return f"CONSTRAINT {self.name} UNIQUE ({self.unique_column})"
+    @property
+    def spec(self) -> str:
+        return f"{self.name} UNIQUE ({self.unique_column})"
 
 
 @dataclass
@@ -274,8 +313,9 @@ class ForeignConstraint(ReferenceConstraint):
     def is_alter_table(self) -> bool:
         return True
 
-    def __str__(self) -> str:
-        return f"CONSTRAINT {self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.reference.table} ({self.reference.column})"
+    @property
+    def spec(self) -> str:
+        return f"{self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.reference.table} ({self.reference.column})"
 
 
 @dataclass
@@ -288,6 +328,10 @@ class DiscriminatedConstraint(ReferenceConstraint):
 
     references: list[ConstraintReference]
 
+    @property
+    def spec(self) -> str:
+        raise NotImplementedError()
+
 
 @dataclass
 class CheckConstraint(Constraint):
@@ -298,8 +342,9 @@ class CheckConstraint(Constraint):
     def is_alter_table(self) -> bool:
         return True
 
-    def __str__(self) -> str:
-        return f"CONSTRAINT {self.name} CHECK ({self.condition})"
+    @property
+    def spec(self) -> str:
+        return f"{self.name} CHECK ({self.condition})"
 
 
 @dataclass
@@ -450,6 +495,9 @@ class Table(QualifiedObject, MutableObject):
     def drop_stmt(self) -> str:
         return f"DROP TABLE {self.name};"
 
+    def alter_table_stmt(self, statements: list[str]) -> str:
+        return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"
+
     def mutate_stmt(self, src: MutableObject) -> Optional[str]:
         source = typing.cast(Table, src)
         target = self
@@ -457,17 +505,28 @@ class Table(QualifiedObject, MutableObject):
 
         statements: list[str] = []
         source_column: Optional[Column]
-        for source_column in source.columns.values():
-            if source_column.name.id not in target.columns:
-                statements.append(source_column.drop_stmt())
-        for target_column in target.columns.values():
-            source_column = source.columns.get(target_column.name.id)
-            if source_column is None:
-                statements.append(target_column.create_stmt())
-            else:
-                statement = target_column.mutate_stmt(source_column)
-                if statement:
-                    statements.append(statement)
+        try:
+            for target_column in target.columns.values():
+                source_column = source.columns.get(target_column.name.id)
+                if source_column is None:
+                    statements.append(target_column.create_stmt())
+                else:
+                    statement = target_column.mutate_stmt(source_column)
+                    if statement:
+                        statements.append(statement)
+        except ColumnFormationError as e:
+            raise TableFormationError(
+                "failed to create or update columns in table", target.name
+            ) from e
+
+        try:
+            for source_column in source.columns.values():
+                if source_column.name.id not in target.columns:
+                    statements.append(source_column.drop_stmt())
+        except ColumnFormationError as e:
+            raise TableFormationError(
+                "failed to drop columns in table", target.name
+            ) from e
 
         if source.constraints and not target.constraints:
             for constraint in source.constraints:
@@ -476,13 +535,13 @@ class Table(QualifiedObject, MutableObject):
         elif not source.constraints and target.constraints:
             for constraint in target.constraints:
                 if constraint.is_alter_table():
-                    statements.append(f"ADD {str(constraint)}")
+                    statements.append(f"ADD CONSTRAINT {constraint.spec}")
         elif source.constraints and target.constraints:
             for target_constraint in target.constraints:
                 ...
 
         if statements:
-            return f"ALTER TABLE {source.name}\n" + ",\n".join(statements) + ";"
+            return self.alter_table_stmt(statements)
         else:
             return None
 
@@ -490,7 +549,11 @@ class Table(QualifiedObject, MutableObject):
         if self.constraints and any(c.is_alter_table() for c in self.constraints):
             return (
                 f"ALTER TABLE {self.name}\n"
-                + ",\n".join(f"ADD {c}" for c in self.constraints if c.is_alter_table())
+                + ",\n".join(
+                    f"ADD CONSTRAINT {c.spec}"
+                    for c in self.constraints
+                    if c.is_alter_table()
+                )
                 + "\n;"
             )
         else:
@@ -578,10 +641,13 @@ class Namespace(MutableObject):
         self.structs = ObjectDict(structs or [])
         self.tables = ObjectDict(tables or [])
 
+    def create_schema_stmt(self) -> str:
+        return f"CREATE SCHEMA {self.name};"
+
     def create_stmt(self) -> str:
         items: list[str] = []
         if self.name.local_id:
-            items.append(f"CREATE SCHEMA {self.name};")
+            items.append(self.create_schema_stmt())
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())

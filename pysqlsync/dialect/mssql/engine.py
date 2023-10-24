@@ -1,8 +1,9 @@
 from pysqlsync.base import BaseConnection, BaseEngine, BaseGenerator, Explorer
 
 from .connection import MSSQLConnection
-from .generator import MSSQLGenerator
 from .discovery import MSSQLExplorer
+from .generator import MSSQLGenerator
+
 
 class MSSQLEngine(BaseEngine):
     @property

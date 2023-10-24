@@ -177,8 +177,8 @@ class TestConverter(unittest.TestCase):
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
             'ALTER TABLE "public"."UserTable"\n'
-            'DROP COLUMN "homepage_url",\n'
-            'ADD COLUMN "social_url" text NOT NULL;\n'
+            'ADD COLUMN "social_url" text NOT NULL,\n'
+            'DROP COLUMN "homepage_url";\n'
             'DROP TABLE "public"."Employee";',
         )
 

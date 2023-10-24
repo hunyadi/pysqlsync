@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import datetime
 import decimal
@@ -291,10 +292,9 @@ class DataclassConverter:
         metadata = getattr(typ, "__metadata__", None)
         if metadata:
             unadorned_type = unwrap_annotated_type(typ)
-
-            sql_type = self.options.substitutions.get(typ)
-            if sql_type is not None:
-                pass
+            substitute = self.options.substitutions.get(unadorned_type)
+            if substitute is not None:
+                sql_type = copy.copy(substitute)
             elif unadorned_type is str:
                 sql_type = SqlVariableCharacterType()
             elif unadorned_type is decimal.Decimal:
@@ -303,10 +303,12 @@ class DataclassConverter:
                 sql_type = SqlTimestampType()
             elif unadorned_type is datetime.time:
                 sql_type = SqlTimeType()
+            else:
+                # avoid error when only skipped annotations are applied to a custom type
+                sql_type = None
 
             for meta in metadata:
                 if isinstance(meta, self.options.skip_annotations):
-                    # avoid error when only skipped annotations are applied to a custom type
                     continue
                 if sql_type is None:
                     raise TypeError(f"unsupported annotated Python type: {typ}")

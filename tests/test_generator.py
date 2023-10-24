@@ -85,8 +85,8 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"arbitrary_length_string" text NOT NULL,\n'
             '"nullable_arbitrary_length_string" text,\n'
-            '"maximum_length_string" varchar(255) NOT NULL,\n'
-            '"nullable_maximum_length_string" varchar(255),\n'
+            '"maximum_length_string" varchar(128) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(128),\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -96,8 +96,8 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"arbitrary_length_string" varchar(max) NOT NULL,\n'
             '"nullable_arbitrary_length_string" varchar(max),\n'
-            '"maximum_length_string" varchar(255) NOT NULL,\n'
-            '"nullable_maximum_length_string" varchar(255),\n'
+            '"maximum_length_string" varchar(128) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(128),\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -107,8 +107,8 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"arbitrary_length_string" mediumtext NOT NULL,\n'
             '"nullable_arbitrary_length_string" mediumtext,\n'
-            '"maximum_length_string" varchar(255) NOT NULL,\n'
-            '"nullable_maximum_length_string" varchar(255),\n'
+            '"maximum_length_string" varchar(128) NOT NULL,\n'
+            '"nullable_maximum_length_string" varchar(128),\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -178,11 +178,11 @@ class TestGenerator(unittest.TestCase):
             '"value" varchar(64) NOT NULL,\n'
             'PRIMARY KEY ("id")\n'
             ");\n"
-            'ALTER TABLE "EnumTable"\n'
-            'ADD CONSTRAINT "fk_EnumTable_state" FOREIGN KEY ("state") REFERENCES "WorkflowState" ("id")\n'
+            'ALTER TABLE "EnumTable" ADD\n'
+            'CONSTRAINT "fk_EnumTable_state" FOREIGN KEY ("state") REFERENCES "WorkflowState" ("id")\n'
             ";\n"
-            'ALTER TABLE "WorkflowState"\n'
-            'ADD CONSTRAINT "uq_WorkflowState" UNIQUE ("value")\n'
+            'ALTER TABLE "WorkflowState" ADD\n'
+            'CONSTRAINT "uq_WorkflowState" UNIQUE ("value")\n'
             ";",
         )
 

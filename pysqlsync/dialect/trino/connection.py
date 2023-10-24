@@ -43,16 +43,16 @@ class TrinoContext(BaseContext):
     def native_connection(self) -> aiotrino.dbapi.Connection:
         return typing.cast(TrinoConnection, self.connection).native
 
-    async def execute(self, statement: str) -> None:
+    async def _execute(self, statement: str) -> None:
         cur = await self.native_connection.cursor()
         await cur.execute(statement)
 
-    async def execute_all(
+    async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         raise NotImplementedError()
 
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         if is_dataclass_type(signature):
             raise NotImplementedError()
 

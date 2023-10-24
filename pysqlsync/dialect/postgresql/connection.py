@@ -7,7 +7,6 @@ from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
-from strong_typing.name import python_type_to_str
 
 from pysqlsync.base import BaseConnection, BaseContext
 
@@ -48,31 +47,15 @@ class PostgreSQLContext(BaseContext):
     def native_connection(self) -> asyncpg.Connection:
         return typing.cast(PostgreSQLConnection, self.connection).native
 
-    async def execute(self, statement: str) -> None:
-        if not statement:
-            raise ValueError("empty statement")
-
-        LOGGER.debug(f"execute SQL:\n{statement}")
+    async def _execute(self, statement: str) -> None:
         await self.native_connection.execute(statement)
 
-    async def execute_all(
+    async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
-        if not statement:
-            raise ValueError("empty statement")
-
-        if isinstance(args, Sized):
-            LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
-        else:
-            LOGGER.debug(f"execute SQL:\n{statement}")
-
         await self.native_connection.executemany(statement, args)
 
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
-        LOGGER.debug(
-            f"query SQL with into {python_type_to_str(signature)}:\n{statement}"
-        )
-
+    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
         if is_dataclass_type(signature):
             return self._resultset_unwrap_dict(signature, records)  # type: ignore

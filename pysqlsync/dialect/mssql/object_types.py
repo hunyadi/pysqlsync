@@ -1,5 +1,13 @@
-from pysqlsync.formation.object_types import Column, FormationError, ObjectFactory
-from pysqlsync.model.data_types import constant
+from typing import Optional
+
+from pysqlsync.formation.object_types import (
+    Column,
+    ColumnFormationError,
+    Namespace,
+    ObjectFactory,
+    Table,
+)
+from pysqlsync.model.data_types import constant, quote
 
 
 class MSSQLColumn(Column):
@@ -12,15 +20,74 @@ class MSSQLColumn(Column):
         identity = " IDENTITY" if self.identity else ""
         return f"{self.data_type}{nullable}{default}{identity}"
 
-    def mutate_column_stmt(target: "MSSQLColumn", source: Column) -> list[str]:
+    def mutate_column_stmt(self, source: Column) -> list[str]:
+        target = self
         if source.identity != target.identity:
-            raise FormationError(
-                "operation not permitted; cannot add or drop identity property"
+            raise ColumnFormationError(
+                f"operation not permitted; cannot add or drop identity property",
+                source.name,
             )
-        return super().mutate_column_stmt(source)
+
+        statements: list[str] = []
+        if (
+            source.data_type != target.data_type
+            or source.nullable != target.nullable
+            or source.default != target.default
+        ):
+            statements.append(f"ALTER COLUMN {source.name} {target.data_spec}")
+        return statements
+
+
+class MSSQLTable(Table):
+    def alter_table_stmt(self, statements: list[str]) -> str:
+        return "\n".join(
+            f"ALTER TABLE {self.name} {statement};" for statement in statements
+        )
+
+    def add_constraints_stmt(self) -> Optional[str]:
+        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+            return (
+                f"ALTER TABLE {self.name} ADD\n"
+                + ",\n".join(
+                    f"CONSTRAINT {c.spec}"
+                    for c in self.constraints
+                    if c.is_alter_table()
+                )
+                + "\n;"
+            )
+        else:
+            return None
+
+    def drop_constraints_stmt(self) -> Optional[str]:
+        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+            return (
+                f"ALTER TABLE {self.name} DROP\n"
+                + ",\n".join(
+                    f"CONSTRAINT {c.name}"
+                    for c in self.constraints
+                    if c.is_alter_table()
+                )
+                + "\n;"
+            )
+        else:
+            return None
+
+
+class MSSQLNamespace(Namespace):
+    def create_schema_stmt(self) -> str:
+        # Microsoft SQL Server requires a separate batch for creating a schema
+        return f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(self.name.id)} ) EXEC('CREATE SCHEMA {self.name}');"
 
 
 class MSSQLObjectFactory(ObjectFactory):
     @property
     def column_class(self) -> type[Column]:
         return MSSQLColumn
+
+    @property
+    def table_class(self) -> type[Table]:
+        return MSSQLTable
+
+    @property
+    def namespace_class(self) -> type[Namespace]:
+        return MSSQLNamespace

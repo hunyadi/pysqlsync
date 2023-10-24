@@ -18,6 +18,11 @@ LOGGER = logging.getLogger("pysqlsync.mssql")
 class MSSQLConnection(BaseConnection):
     """
     Represents a connection to a Microsoft SQL Server.
+
+    If Microsoft SQL Server is run in a Docker container in a Linux/MacOS environment, use:
+    ```
+    docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<YourStrong@Passw0rd>" -p 1433:1433 --name sql1 --hostname sql1 -d mcr.microsoft.com/mssql/server:2022-latest
+    ```
     """
 
     native: pyodbc.Connection
@@ -62,18 +67,18 @@ class MSSQLContext(BaseContext):
     def native_connection(self) -> pyodbc.Connection:
         return typing.cast(MSSQLConnection, self.connection).native
 
-    async def execute(self, statement: str) -> None:
+    async def _execute(self, statement: str) -> None:
         with self.native_connection.cursor() as cur:
             cur.execute(statement)
 
-    async def execute_all(
+    async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
             cur.executemany(statement, args)
 
-    async def query_all(self, signature: type[T], statement: str) -> list[T]:
+    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
 
@@ -87,7 +92,11 @@ class MSSQLContext(BaseContext):
 
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")
-        await self.execute(f"CREATE SCHEMA {namespace};")
+
+        # Microsoft SQL Server requires a separate batch for creating a schema
+        await self.execute(
+            f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(namespace.id)} ) EXEC('CREATE SCHEMA {namespace}');"
+        )
 
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")

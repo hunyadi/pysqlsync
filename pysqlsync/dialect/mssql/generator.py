@@ -23,7 +23,7 @@ from .object_types import MSSQLObjectFactory
 
 class MSSQLGenerator(BaseGenerator):
     """
-    Generator for Microsoft T-SQL.
+    Generator for Microsoft SQL Server (T-SQL).
 
     Assumes a UTF-8 collation and `SET ANSI_DEFAULTS ON`. UTF-8 collation makes `varchar` store UTF-8 characters.
     """

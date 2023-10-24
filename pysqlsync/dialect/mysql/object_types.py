@@ -82,7 +82,8 @@ class MySQLColumn(Column):
         )
         return f"{self.data_type}{charset}{nullable}{default}{identity}{description}"
 
-    def mutate_column_stmt(target: Column, source: Column) -> list[str]:
+    def mutate_column_stmt(self, source: Column) -> list[str]:
+        target = self
         statements: list[str] = []
         if (
             source.data_type != target.data_type

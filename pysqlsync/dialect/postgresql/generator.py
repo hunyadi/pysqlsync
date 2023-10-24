@@ -1,15 +1,5 @@
-import json
-import re
-import typing
-from typing import Optional
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import (
-    FormationError,
-    MutableObject,
-    StructType,
-    Table,
-)
+from pysqlsync.formation.object_types import FormationError, Table
 from pysqlsync.formation.py_to_sql import (
     DataclassConverter,
     DataclassConverterOptions,
@@ -22,6 +12,8 @@ from .object_types import PostgreSQLObjectFactory
 
 
 class PostgreSQLGenerator(BaseGenerator):
+    "Generator for PostgreSQL."
+
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
