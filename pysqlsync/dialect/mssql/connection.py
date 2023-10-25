@@ -9,6 +9,7 @@ from strong_typing.inspection import is_dataclass_type
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, QualifiedId
+from pysqlsync.util.dispatch import thread_dispatch
 
 T = TypeVar("T")
 
@@ -67,18 +68,19 @@ class MSSQLContext(BaseContext):
     def native_connection(self) -> pyodbc.Connection:
         return typing.cast(MSSQLConnection, self.connection).native
 
-    async def _execute(self, statement: str) -> None:
+    @thread_dispatch
+    def _execute(self, statement: str) -> None:
         with self.native_connection.cursor() as cur:
             cur.execute(statement)
 
-    async def _execute_all(
-        self, statement: str, args: Iterable[tuple[Any, ...]]
-    ) -> None:
+    @thread_dispatch
+    def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
             cur.executemany(statement, args)
 
-    async def _query_all(self, signature: type[T], statement: str) -> list[T]:
+    @thread_dispatch
+    def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
 

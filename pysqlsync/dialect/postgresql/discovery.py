@@ -3,7 +3,11 @@ from itertools import groupby
 from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
-from pysqlsync.formation.data_types import SqlArrayType, SqlDiscovery
+from pysqlsync.formation.data_types import (
+    SqlArrayType,
+    SqlDiscovery,
+    SqlDiscoveryOptions,
+)
 from pysqlsync.formation.discovery import DiscoveryError
 from pysqlsync.formation.object_types import (
     Column,
@@ -112,7 +116,7 @@ class PostgreSQLExplorer(Explorer):
         )
         return len(rows) > 0 and rows[0] > 0
 
-    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+    async def get_table(self, table_id: SupportsQualifiedId) -> Table:
         table_records = await self.conn.query_one(
             PostgreSQLTableMeta,
             "SELECT\n"
@@ -231,7 +235,7 @@ class PostgreSQLExplorer(Explorer):
             description=table_records.description,
         )
 
-    async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
+    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         enum_records = await self.conn.query_all(
             PostgreSQLEnumMeta,
             "SELECT\n"
@@ -264,7 +268,7 @@ class PostgreSQLExplorer(Explorer):
 
         tables: list[Table] = []
         for table_name in table_names:
-            table = await self.get_table_meta(QualifiedId(namespace_id.id, table_name))
+            table = await self.get_table(QualifiedId(namespace_id.id, table_name))
             tables.append(table)
 
         if tables:

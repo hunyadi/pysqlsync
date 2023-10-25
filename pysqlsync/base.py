@@ -14,7 +14,7 @@ from strong_typing.name import python_type_to_str
 from .formation.inspection import get_entity_types
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
 from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
-from .model.data_types import SqlJsonType
+from .model.data_types import SqlJsonType, SqlVariableCharacterType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -218,7 +218,10 @@ class BaseGenerator(abc.ABC):
     ) -> Optional[Callable[[Any], Any]]:
         "Returns a callable function object that transforms a value type into the expected column type."
 
-        if isinstance(column.data_type, SqlJsonType):
+        if isinstance(column.data_type, SqlJsonType) or (
+            isinstance(column.data_type, SqlVariableCharacterType)
+            and (field_type is dict or field_type is list)
+        ):
             return lambda field: _JSON_ENCODER.encode(field)
 
         if is_type_enum(field_type):
@@ -678,11 +681,11 @@ class Explorer(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+    async def get_table(self, table_id: SupportsQualifiedId) -> Table:
         ...
 
     @abc.abstractmethod
-    async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
+    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         ...
 
     async def get_catalog_meta(self, *, namespace: str) -> Catalog:
@@ -696,8 +699,12 @@ class Explorer(abc.ABC):
                 "discovery expects a (pseudo) namespace but options map to blank name"
             )
 
-        ns = await self.get_namespace_meta(LocalId(ns_name))
+        ns = await self.get_namespace(LocalId(ns_name))
         return Catalog(namespaces=[ns])
+
+    async def acquire(self, *, namespace: str) -> None:
+        generator = self.conn.connection.generator
+        generator.state = await self.get_catalog_meta(namespace=namespace)
 
     async def synchronize(self, module: types.ModuleType) -> None:
         "Synchronizes a current source state with a desired target state."
@@ -710,7 +717,7 @@ class Explorer(abc.ABC):
         target_state = generator.state
 
         # acquire current database schema
-        generator.state = await self.get_catalog_meta(namespace=module.__name__)
+        await self.acquire(namespace=module.__name__)
 
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)

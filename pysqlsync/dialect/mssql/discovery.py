@@ -20,14 +20,15 @@ class MSSQLExplorer(AnsiExplorer):
                         "datetime": MSSQLDateTimeType(),
                         "datetime2": MSSQLDateTimeType(),
                         "varchar": MSSQLVariableCharacterType(),
+                        "text": MSSQLVariableCharacterType(),
                     }
                 )
             ),
             MSSQLObjectFactory(),
         )
 
-    async def get_columns_meta(self, table_id: SupportsQualifiedId) -> list[Column]:
-        columns = await super().get_columns_meta(table_id)
+    async def get_columns(self, table_id: SupportsQualifiedId) -> list[Column]:
+        columns = await super().get_columns(table_id)
         identity_columns = await self.conn.query_all(
             str,
             "SELECT c.name\n"

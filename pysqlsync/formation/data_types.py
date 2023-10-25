@@ -16,23 +16,11 @@ class SqlDiscovery:
     def __init__(self, options: Optional[SqlDiscoveryOptions] = None) -> None:
         self.options = options if options is not None else SqlDiscoveryOptions()
 
-    def sql_data_type_from_spec(
+    def sql_data_type_from_name(
         self,
         type_name: str,
         type_schema: Optional[str] = None,
-        *,
-        character_maximum_length: Optional[int] = None,
-        numeric_precision: Optional[int] = None,
-        numeric_scale: Optional[int] = None,
-        datetime_precision: Optional[int] = None,
-    ) -> SqlDataType:
-        "Determines the column type from SQL column attribute data extracted from the information schema table."
-
-        if type_schema is None:
-            substitute = self.options.substitutions.get(type_name)
-            if substitute is not None:
-                return substitute
-
+    ) -> Optional[SqlDataType]:
         if type_name in ["bool", "boolean"]:
             return SqlBooleanType()
         elif type_name in ["tinyint", "tinyint(1)", "int1"]:
@@ -43,58 +31,36 @@ class SqlDiscovery:
             return SqlIntegerType(4)
         elif type_name in ["bigint", "int8"]:
             return SqlIntegerType(8)
-        elif type_name == "numeric" or type_name == "decimal":
-            return SqlDecimalType(
-                numeric_precision, numeric_scale
-            )  # precision in base 10
-        elif type_name == "real":
-            if numeric_precision is None or numeric_precision == 24:
-                return SqlRealType()
-            else:
-                return SqlFloatType(numeric_precision)  # precision in base 2
-        elif type_name == "double" or type_name == "double precision":
-            if numeric_precision is None or numeric_precision == 53:
-                return SqlDoubleType()
-            else:
-                return SqlFloatType(numeric_precision)  # precision in base 2
-        elif type_name == "float":
-            return SqlFloatType(numeric_precision)  # precision in base 2
-        elif type_name == "float4":
+        elif type_name in ["numeric", "decimal"]:
+            return SqlDecimalType()
+        elif type_name in ["real", "float4"]:
             return SqlRealType()
-        elif type_name == "float8":
+        elif type_name in ["double", "double precision", "float8"]:
             return SqlDoubleType()
-        elif type_name == "timestamp" or type_name == "timestamp without time zone":
-            return SqlTimestampType(datetime_precision, False)
+        elif type_name == "float":
+            return SqlFloatType()
+        elif type_name in ["timestamp", "timestamp without time zone"]:
+            return SqlTimestampType(None, False)
         elif type_name == "timestamp with time zone":
-            return SqlTimestampType(datetime_precision, True)
+            return SqlTimestampType(None, True)
         elif type_name == "datetime":
             return SqlTimestampType()
         elif type_name == "date":
             return SqlDateType()
-        elif type_name == "time" or type_name == "time without time zone":
-            return SqlTimeType(datetime_precision, False)
+        elif type_name in ["time", "time without time zone"]:
+            return SqlTimeType(None, False)
         elif type_name == "time with time zone":
-            return SqlTimeType(datetime_precision, True)
-        elif type_name == "varchar" or type_name == "character varying":
-            if character_maximum_length is not None and character_maximum_length > 0:
-                return SqlVariableCharacterType(limit=character_maximum_length)
-            else:
-                return SqlVariableCharacterType()
-        elif type_name == "text":
+            return SqlTimeType(None, True)
+        elif type_name in ["varchar", "character varying", "text"]:
             return SqlVariableCharacterType()
         elif type_name == "binary":
-            return SqlFixedBinaryType(storage=character_maximum_length)
-        elif type_name == "varbinary" or type_name == "binary varying":
-            if character_maximum_length is not None and character_maximum_length > 0:
-                return SqlVariableBinaryType(storage=character_maximum_length)
-            else:
-                return SqlVariableBinaryType()
-        elif type_name == "bytea":  # PostgreSQL-specific
+            return SqlFixedBinaryType()
+        elif type_name in ["varbinary", "binary varying", "bytea"]:
             return SqlVariableBinaryType()
+        elif type_name in ["json", "jsonb"]:  # PostgreSQL-specific
+            return SqlJsonType()
         elif type_name == "uuid":  # PostgreSQL-specific
             return SqlUuidType()
-        elif type_name == "json" or type_name == "jsonb":
-            return SqlJsonType()
 
         m = re.fullmatch(
             r"^(?:decimal|numeric)[(](\d+),\s*(\d+)[)]$", type_name, re.IGNORECASE
@@ -122,6 +88,7 @@ class SqlDiscovery:
         if m is not None:
             return SqlVariableBinaryType(int(m.group(1)))
 
+        # MySQL and Oracle
         m = re.fullmatch(r"^enum[(](.+)[)]$", type_name, re.IGNORECASE)
         if m is not None:
             value_list = m.group(1)
@@ -133,4 +100,55 @@ class SqlDiscovery:
         if type_schema is not None:
             return SqlUserDefinedType(QualifiedId(type_schema, type_name))
 
-        raise TypeError(f"unrecognized SQL type: {type_name}")
+        return None
+
+    def sql_data_type_from_spec(
+        self,
+        type_name: str,
+        type_schema: Optional[str] = None,
+        *,
+        character_maximum_length: Optional[int] = None,
+        numeric_precision: Optional[int] = None,
+        numeric_scale: Optional[int] = None,
+        datetime_precision: Optional[int] = None,
+    ) -> SqlDataType:
+        "Determines the column type from SQL column attribute data extracted from the information schema table."
+
+        sql_type: Optional[SqlDataType] = None
+        if type_schema is None:
+            sql_type = self.options.substitutions.get(type_name)
+
+        if sql_type is None:
+            sql_type = self.sql_data_type_from_name(type_name, type_schema)
+
+        if sql_type is None:
+            raise TypeError(f"unrecognized SQL type: {type_name}")
+
+        if isinstance(sql_type, SqlDecimalType):
+            if numeric_precision is not None:
+                sql_type.precision = numeric_precision  # precision in base 10
+            if numeric_scale is not None:
+                sql_type.scale = numeric_scale
+        elif isinstance(sql_type, SqlFloatType):
+            if numeric_precision is not None:
+                sql_type.precision = numeric_precision  # precision in base 2
+        elif isinstance(sql_type, SqlTimestampType):
+            if datetime_precision is not None and datetime_precision > 0:
+                sql_type.precision = datetime_precision
+        elif isinstance(sql_type, SqlTimeType):
+            if datetime_precision is not None and datetime_precision > 0:
+                sql_type.precision = datetime_precision
+        elif isinstance(sql_type, SqlFixedCharacterType):
+            if character_maximum_length is not None:
+                sql_type.limit = character_maximum_length
+        elif isinstance(sql_type, SqlVariableCharacterType):
+            if character_maximum_length is not None and character_maximum_length > 0:
+                sql_type.limit = character_maximum_length
+        elif isinstance(sql_type, SqlFixedBinaryType):
+            if character_maximum_length is not None:
+                sql_type.storage = character_maximum_length
+        elif isinstance(sql_type, SqlVariableBinaryType):
+            if character_maximum_length is not None and character_maximum_length > 0:
+                sql_type.storage = character_maximum_length
+
+        return sql_type

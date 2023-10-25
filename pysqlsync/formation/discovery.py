@@ -52,7 +52,16 @@ class AnsiExplorer(Explorer):
     _has_constraints: Optional[bool] = None
     _has_column_extended_info: Optional[bool] = None
 
+    def __init__(
+        self, conn: BaseContext, discovery: SqlDiscovery, factory: ObjectFactory
+    ) -> None:
+        super().__init__(conn)
+        self.discovery = discovery
+        self.factory = factory
+
     async def has_constraints(self) -> bool:
+        "True if `information_schema` has tables to query for referential constraints and key/column usage."
+
         if self._has_constraints is None:
             try:
                 await self.conn.query_one(
@@ -70,13 +79,14 @@ class AnsiExplorer(Explorer):
                 LOGGER.info("explorer: PK/FK information available")
                 self._has_constraints = True
             except Exception:
-                raise
                 LOGGER.info("explorer: PK/FK information NOT available")
                 self._has_constraints = False
 
         return self._has_constraints
 
     async def has_column_extended_info(self) -> bool:
+        "True if extended information is available for columns in `information_schema`."
+
         if self._has_column_extended_info is None:
             try:
                 await self.conn.query_one(
@@ -98,13 +108,6 @@ class AnsiExplorer(Explorer):
                 self._has_column_extended_info = False
 
         return self._has_column_extended_info
-
-    def __init__(
-        self, conn: BaseContext, discovery: SqlDiscovery, factory: ObjectFactory
-    ) -> None:
-        super().__init__(conn)
-        self.discovery = discovery
-        self.factory = factory
 
     async def get_table_names(self) -> list[QualifiedId]:
         records = await self.conn.query_all(
@@ -144,6 +147,12 @@ class AnsiExplorer(Explorer):
             f"WHERE {self._where_table(table_id, 'col')} AND col.column_name = {quote(column_id.local_id)}",
         )
         return count > 0
+
+    async def get_columns(self, table_id: SupportsQualifiedId) -> list[Column]:
+        if await self.has_column_extended_info():
+            return await self._get_columns_full(table_id)
+        else:
+            return await self._get_columns_limited(table_id)
 
     async def _get_columns_limited(self, table_id: SupportsQualifiedId) -> list[Column]:
         column_meta = await self.conn.query_all(
@@ -202,7 +211,7 @@ class AnsiExplorer(Explorer):
             )
         return columns
 
-    async def _get_table_primary_key(self, table_id: SupportsQualifiedId) -> LocalId:
+    async def get_table_primary_key(self, table_id: SupportsQualifiedId) -> LocalId:
         primary_meta = await self.conn.query_all(
             str,
             "SELECT\n"
@@ -221,7 +230,7 @@ class AnsiExplorer(Explorer):
             raise DiscoveryError(f"composite primary key in table: {table_id}")
         return LocalId(primary_meta[0])
 
-    async def _get_table_constraints(
+    async def get_table_constraints(
         self, table_id: SupportsQualifiedId
     ) -> list[Constraint]:
         constraint_meta = await self.conn.query_all(
@@ -261,21 +270,15 @@ class AnsiExplorer(Explorer):
 
         return list(constraints.values())
 
-    async def get_columns_meta(self, table_id: SupportsQualifiedId) -> list[Column]:
-        if await self.has_column_extended_info():
-            return await self._get_columns_full(table_id)
-        else:
-            return await self._get_columns_limited(table_id)
-
-    async def get_table_meta(self, table_id: SupportsQualifiedId) -> Table:
+    async def get_table(self, table_id: SupportsQualifiedId) -> Table:
         if not await self.has_table(table_id):
             raise DiscoveryError(f"table not found: {table_id}")
 
-        columns = await self.get_columns_meta(table_id)
+        columns = await self.get_columns(table_id)
 
         if await self.has_constraints():
-            primary_key = await self._get_table_primary_key(table_id)
-            constraints = await self._get_table_constraints(table_id)
+            primary_key = await self.get_table_primary_key(table_id)
+            constraints = await self.get_table_constraints(table_id)
             return self.factory.table_class(
                 name=table_id,
                 columns=columns,
@@ -289,7 +292,7 @@ class AnsiExplorer(Explorer):
                 name=table_id, columns=columns, primary_key=primary_key
             )
 
-    async def get_namespace_meta(self, namespace_id: LocalId) -> Namespace:
+    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         tables: list[Table] = []
 
         # create namespace using qualified IDs
@@ -302,7 +305,7 @@ class AnsiExplorer(Explorer):
         )
         if table_names:
             for table_name in table_names:
-                table = await self.get_table_meta(
+                table = await self.get_table(
                     self.get_qualified_id(namespace_id.local_id, table_name)
                 )
                 tables.append(table)
@@ -323,7 +326,7 @@ class AnsiExplorer(Explorer):
             for table_name in table_names:
                 table_name = table_name.removeprefix(f"{namespace_id.local_id}__")
 
-                table = await self.get_table_meta(
+                table = await self.get_table(
                     self.get_qualified_id(namespace_id.local_id, table_name)
                 )
                 tables.append(table)

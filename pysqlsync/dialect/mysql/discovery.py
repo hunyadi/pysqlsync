@@ -1,12 +1,18 @@
+from dataclasses import dataclass
+
 from pysqlsync.base import BaseContext, DiscoveryError
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.discovery import AnsiConstraintMeta, AnsiExplorer
+from pysqlsync.formation.discovery import (
+    AnsiColumnMeta,
+    AnsiConstraintMeta,
+    AnsiExplorer,
+)
 from pysqlsync.formation.object_types import (
+    Column,
     Constraint,
     ConstraintReference,
     ForeignConstraint,
 )
-from pysqlsync.model.data_types import SqlVariableBinaryType, SqlVariableCharacterType
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
 
 from .data_types import (
@@ -15,6 +21,11 @@ from .data_types import (
     MySQLVariableCharacterType,
 )
 from .object_types import MySQLObjectFactory
+
+
+@dataclass
+class MySQLColumnMeta(AnsiColumnMeta):
+    column_comment: str
 
 
 class MySQLExplorer(AnsiExplorer):
@@ -49,7 +60,42 @@ class MySQLExplorer(AnsiExplorer):
         else:
             return PrefixedId(None, name)
 
-    async def _get_table_constraints(
+    async def get_columns(self, table_id: SupportsQualifiedId) -> list[Column]:
+        column_meta = await self.conn.query_all(
+            MySQLColumnMeta,
+            "SELECT\n"
+            "    column_name AS column_name,\n"
+            "    column_type AS data_type,\n"
+            "    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable,\n"
+            "    character_maximum_length AS character_maximum_length,\n"
+            "    numeric_precision AS numeric_precision,\n"
+            "    numeric_scale AS numeric_scale,\n"
+            "    datetime_precision AS datetime_precision,\n"
+            "    column_comment AS column_comment\n"
+            "FROM information_schema.columns AS col\n"
+            f"WHERE {self._where_table(table_id, 'col')}\n"
+            "ORDER BY ordinal_position",
+        )
+
+        columns: list[Column] = []
+        for col in column_meta:
+            columns.append(
+                self.factory.column_class(
+                    LocalId(col.column_name),
+                    self.discovery.sql_data_type_from_spec(
+                        col.data_type,
+                        character_maximum_length=col.character_maximum_length,
+                        numeric_precision=col.numeric_precision,
+                        numeric_scale=col.numeric_scale,
+                        datetime_precision=col.datetime_precision,
+                    ),
+                    bool(col.nullable),
+                    description=col.column_comment or None,
+                )
+            )
+        return columns
+
+    async def get_table_constraints(
         self, table_id: SupportsQualifiedId
     ) -> list[Constraint]:
         constraint_meta = await self.conn.query_all(

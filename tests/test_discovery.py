@@ -3,11 +3,7 @@ import unittest
 import tests.tables as tables
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
-from pysqlsync.formation.py_to_sql import (
-    DataclassConverterOptions,
-    NamespaceMapping,
-    dataclass_to_table,
-)
+from pysqlsync.formation.py_to_sql import NamespaceMapping, dataclass_to_table
 from pysqlsync.model.id_types import LocalId
 from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 
@@ -26,14 +22,14 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def test_table(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             current_namespace = await conn.current_schema()
-            options = DataclassConverterOptions(
-                namespaces=NamespaceMapping({tables: current_namespace})
-            )
+            options = conn.connection.generator.converter.options
+            options.namespaces = NamespaceMapping({tables: current_namespace})
+
             table_def = dataclass_to_table(tables.NumericTable, options=options)
             await conn.execute(str(table_def))
 
             explorer = self.engine.create_explorer(conn)
-            table_ref = await explorer.get_table_meta(
+            table_ref = await explorer.get_table(
                 QualifiedId(current_namespace, tables.NumericTable.__name__)
             )
 
@@ -44,19 +40,19 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def test_relation(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             current_namespace = await conn.current_schema()
-            options = DataclassConverterOptions(
-                namespaces=NamespaceMapping({tables: current_namespace})
-            )
+            options = conn.connection.generator.converter.options
+            options.namespaces = NamespaceMapping({tables: current_namespace})
+
             address_def = dataclass_to_table(tables.Address, options=options)
             await conn.execute(str(address_def))
             person_def = dataclass_to_table(tables.Person, options=options)
             await conn.execute(str(person_def))
 
             explorer = self.engine.create_explorer(conn)
-            address_ref = await explorer.get_table_meta(
+            address_ref = await explorer.get_table(
                 QualifiedId(current_namespace, tables.Address.__name__)
             )
-            person_ref = await explorer.get_table_meta(
+            person_ref = await explorer.get_table(
                 QualifiedId(current_namespace, tables.Person.__name__)
             )
 
@@ -72,13 +68,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         ) as conn:
             generator = conn.connection.generator
 
-            # create schema in separate batch (Microsoft SQL Server cannot create schema in same batch)
-            await conn.create_schema(LocalId("sample"))
-
             # create objects in the database
-            generator.state.namespaces.add(
-                generator.factory.namespace_class(LocalId("sample"))
-            )
             execute_stmt = generator.create(tables=[tables.UserTable])
             if execute_stmt is None:
                 self.fail()
@@ -91,15 +81,13 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 self.fail()
 
             catalog = conn.connection.generator.state
-            create_ns = (
-                catalog.namespaces["sample"]
-                if "sample" in catalog.namespaces
-                else catalog.namespaces[""]
-            )
+            create_ns = catalog.namespaces[
+                "sample" if "sample" in catalog.namespaces else ""
+            ]
 
             # discover actual schema
             explorer = self.engine.create_explorer(conn)
-            discover_ns = await explorer.get_namespace_meta(LocalId("sample"))
+            discover_ns = await explorer.get_namespace(LocalId("sample"))
             discover_stmt = str(discover_ns)
 
             self.maxDiff = None
