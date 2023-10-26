@@ -64,7 +64,6 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
                 deleted_at=datetime.now(),
-                # workflow_state=tables.WorkflowState.inactive,
                 uuid=uuid.uuid4(),
                 name="Dr. Levente Hunyadi",
                 short_name="Levente",
@@ -111,18 +110,30 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             )
             await conn.upsert_rows(
                 table,
-                field_types=(int, str),
-                records=[(1, "active"), (2, "inactive"), (3, "deleted")],
+                field_types=(int, str, str),
+                records=[
+                    (1, "active", None),
+                    (2, "inactive", None),
+                    (3, "deleted", None),
+                ],
             )
             await conn.upsert_rows(
                 table,
-                field_types=(int, str),
-                records=[(4, "active"), (5, "inactive"), (6, "inactive")],
+                field_types=(int, str, str),
+                records=[
+                    (4, "active", None),
+                    (5, "inactive", None),
+                    (6, "inactive", None),
+                ],
             )
             await conn.upsert_rows(
                 table,
-                field_types=(int, str),
-                records=[(7, "deleted"), (8, "deleted"), (9, "deleted")],
+                field_types=(int, str, str),
+                records=[
+                    (7, "deleted", "active"),
+                    (8, "deleted", "inactive"),
+                    (9, "deleted", "deleted"),
+                ],
             )
             self.assertEqual(
                 await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable";'), 9

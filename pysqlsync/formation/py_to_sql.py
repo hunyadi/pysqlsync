@@ -297,6 +297,8 @@ class DataclassConverter:
                 sql_type = copy.copy(substitute)
             elif unadorned_type is str:
                 sql_type = SqlVariableCharacterType()
+            elif unadorned_type is float:
+                sql_type = SqlFloatType()
             elif unadorned_type is decimal.Decimal:
                 sql_type = SqlDecimalType()
             elif unadorned_type is datetime.datetime:

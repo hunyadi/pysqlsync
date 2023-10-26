@@ -43,6 +43,7 @@ class PostgreSQLGenerator(BaseGenerator):
         value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append("ON CONFLICT DO NOTHING")
+        statements.append(";")
         return "\n".join(statements)
 
     def get_table_upsert_stmt(self, table: Table) -> str:
@@ -61,4 +62,5 @@ class PostgreSQLGenerator(BaseGenerator):
             statements.append(",\n".join(defs))
         else:
             statements.append(f"ON CONFLICT ({table.primary_key}) DO NOTHING")
+        statements.append(";")
         return "\n".join(statements)

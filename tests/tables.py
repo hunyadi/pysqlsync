@@ -3,12 +3,15 @@ import http
 import ipaddress
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from typing import Optional
+from decimal import Decimal
+from typing import Literal, Optional, Union
 from uuid import UUID
 
 from strong_typing.auxiliary import (
     Annotated,
     MaxLength,
+    Precision,
+    TimePrecision,
     float32,
     float64,
     int8,
@@ -56,10 +59,27 @@ class NumericTable:
 
 
 @dataclass(slots=True)
-class FloatTable:
+class FixedPrecisionFloatTable:
     id: PrimaryKey[int]
     float_32: float32
     float_64: float64
+    optional_float_32: Optional[float32]
+    optional_float_64: Optional[float64]
+
+
+@dataclass(slots=True)
+class VariablePrecisionFloatTable:
+    id: PrimaryKey[int]
+    float_value: float
+    float_precision: Annotated[float, Precision(5, 2)]
+
+
+@dataclass(slots=True)
+class DecimalTable:
+    id: PrimaryKey[int]
+    decimal_value: Decimal
+    optional_decimal: Optional[Decimal]
+    decimal_precision: Annotated[Decimal, Precision(5, 2)]
 
 
 @dataclass(slots=True)
@@ -78,12 +98,14 @@ class DateTimeTable:
     iso_date: date
     iso_time: time
     optional_date_time: Optional[datetime]
+    timestamp_precision: Annotated[datetime, TimePrecision(6)]
 
 
 @dataclass(slots=True)
 class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
+    optional_state: Optional[WorkflowState]
 
 
 @dataclass(slots=True)
@@ -91,6 +113,14 @@ class IPAddressTable:
     id: PrimaryKey[int]
     ipv4: ipaddress.IPv4Address
     ipv6: ipaddress.IPv6Address
+    optional_ipv4: Optional[ipaddress.IPv4Address]
+    optional_ipv6: Optional[ipaddress.IPv6Address]
+
+
+@dataclass(slots=True)
+class PromotionTable:
+    id: PrimaryKey[int]
+    string_value = Union[Literal["unknown"], str]
 
 
 @dataclass(slots=True)
@@ -105,7 +135,6 @@ class UserTable:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime
-    # workflow_state: WorkflowState
     uuid: UUID
     name: str
     short_name: str

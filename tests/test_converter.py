@@ -82,6 +82,11 @@ class TestConverter(unittest.TestCase):
                     SqlUserDefinedType(QualifiedId(None, "WorkflowState")),
                     False,
                 ),
+                Column(
+                    LocalId("optional_state"),
+                    SqlUserDefinedType(QualifiedId(None, "WorkflowState")),
+                    True,
+                ),
             ],
         )
 
@@ -97,6 +102,7 @@ class TestConverter(unittest.TestCase):
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
                 Column(LocalId("state"), SqlIntegerType(4), False),
+                Column(LocalId("optional_state"), SqlIntegerType(4), True),
             ],
         )
         enum_def = catalog.get_table(QualifiedId(None, tables.WorkflowState.__name__))

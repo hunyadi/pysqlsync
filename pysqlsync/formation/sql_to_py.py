@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import decimal
 import keyword
 import sys
 import types
@@ -50,6 +51,8 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
         if sql_type.precision is not None:
             return Annotated[float, Precision(sql_type.precision)]
         return float
+    elif isinstance(sql_type, SqlDecimalType):
+        return decimal.Decimal
     elif isinstance(sql_type, SqlTimestampType):
         if sql_type.precision is not None:
             return Annotated[datetime.datetime, TimePrecision(sql_type.precision)]

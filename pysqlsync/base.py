@@ -638,17 +638,20 @@ class BaseContext(abc.ABC):
     ) -> dict[str, int]:
         "Merges new values into a lookup table and returns the entire updated table."
 
+        if not values:
+            return dict()
+
         await self.execute_all(
             self.connection.generator.get_table_merge_stmt(table),
             list((value,) for value in values),
         )
-        column_names = ", ".join(  # join on one element
-            str(column.name) for column in table.get_value_columns()
-        )
+
+        value_name = table.get_value_columns()[0].name
+        index_name = table.get_primary_column().name
         LOGGER.debug("adding new enumeration values: {}")
         results = await self.query_all(
             tuple[str, int],
-            f"SELECT {column_names}, {table.get_primary_column().name} FROM {table.name}",
+            f"SELECT {value_name}, {index_name} FROM {table.name}",
         )
         return dict(results)  # type: ignore
 

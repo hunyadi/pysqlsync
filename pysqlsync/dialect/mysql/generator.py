@@ -69,6 +69,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(
             f"ON DUPLICATE KEY UPDATE {table.primary_key} = {table.primary_key}"
         )
+        statements.append(";")
         return "\n".join(statements)
 
     def get_table_upsert_stmt(self, table: Table) -> str:
@@ -83,7 +84,7 @@ class MySQLGenerator(BaseGenerator):
             statements.append(",\n".join(defs))
         else:
             statements.append(_field_update(table.primary_key))
-
+        statements.append(";")
         return "\n".join(statements)
 
     def get_field_extractor(
