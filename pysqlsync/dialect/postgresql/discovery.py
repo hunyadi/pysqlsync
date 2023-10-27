@@ -7,6 +7,7 @@ from pysqlsync.formation.data_types import (
     SqlArrayType,
     SqlDiscovery,
     SqlDiscoveryOptions,
+    quote,
 )
 from pysqlsync.formation.discovery import DiscoveryError
 from pysqlsync.formation.object_types import (
@@ -17,10 +18,11 @@ from pysqlsync.formation.object_types import (
     ForeignConstraint,
     Namespace,
     Table,
-    quote,
+    UniqueConstraint,
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
+from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
 
 
@@ -34,12 +36,11 @@ class PostgreSQLColumnMeta:
     column_name: str
     type_schema: str
     type_name: str
+    type_def: str
     is_nullable: bool
     is_array: bool
-    character_maximum_length: int
-    numeric_precision: int
-    numeric_scale: int
-    datetime_precision: int
+    is_identity: bool
+    default_value: str
     description: str
 
 
@@ -65,7 +66,9 @@ class PostgreSQLExplorer(Explorer):
 
     def __init__(self, conn: BaseContext) -> None:
         super().__init__(conn)
-        self.discovery = SqlDiscovery()
+        self.discovery = SqlDiscovery(
+            SqlDiscoveryOptions(substitutions={"jsonb": PostgreSQLJsonType()})
+        )
         self.factory = PostgreSQLObjectFactory()
 
     async def get_table_names(self) -> list[QualifiedId]:
@@ -133,20 +136,19 @@ class PostgreSQLExplorer(Explorer):
             "    att.attname AS column_name,\n"
             "    typ_nsp.nspname AS type_schema,\n"
             "    typ.typname AS type_name,\n"
+            "    pg_catalog.format_type(att.atttypid, att.atttypmod) AS type_def,\n"
             "    NOT att.attnotnull AS is_nullable,\n"
-            "    attndims != 0 AS is_array,\n"
-            "    col.character_maximum_length AS character_maximum_length,\n"
-            "    col.numeric_precision AS numeric_precision,\n"
-            "    col.numeric_scale AS numeric_scale,\n"
-            "    col.datetime_precision AS datetime_precision,\n"
+            "    att.attndims != 0 AS is_array,\n"
+            "    att.attidentity IN ('a', 'd') AS is_identity,\n"
+            "    pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS default_value,\n"
             "    dsc.description AS description\n"
             "FROM pg_catalog.pg_attribute AS att\n"
             "    INNER JOIN pg_catalog.pg_type AS typ ON att.atttypid = typ.oid\n"
             "    INNER JOIN pg_catalog.pg_namespace AS typ_nsp ON typ.typnamespace = typ_nsp.oid\n"
             "    INNER JOIN pg_catalog.pg_class AS cls ON att.attrelid = cls.oid\n"
             "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
+            "    LEFT JOIN pg_catalog.pg_attrdef AS def ON def.adrelid = cls.oid AND def.adnum = att.attnum\n"
             "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = att.attnum\n"
-            "    INNER JOIN information_schema.columns col ON nsp.nspname = col.table_schema AND cls.relname = col.table_name AND att.attname = col.column_name\n"
             f"WHERE {self._where_table(table_id)} AND (att.attnum > 0)\n"
             "ORDER BY att.attnum",
         )
@@ -154,12 +156,9 @@ class PostgreSQLExplorer(Explorer):
         columns: list[Column] = []
         for col in column_records:
             data_type = self.discovery.sql_data_type_from_spec(
-                col.type_name,
-                col.type_schema,
-                character_maximum_length=col.character_maximum_length,
-                numeric_precision=col.numeric_precision,
-                numeric_scale=col.numeric_scale,
-                datetime_precision=None,
+                type_name=col.type_name,
+                type_schema=col.type_schema,
+                type_def=col.type_def,
             )
             if col.is_array:
                 data_type = SqlArrayType(data_type)
@@ -168,7 +167,9 @@ class PostgreSQLExplorer(Explorer):
                     LocalId(col.column_name),
                     data_type,
                     bool(col.is_nullable),
-                    description=col.description,
+                    identity=col.is_identity,
+                    default=col.default_value,
+                    description=col.description or None,
                 )
             )
 
@@ -193,7 +194,7 @@ class PostgreSQLExplorer(Explorer):
             "    CROSS JOIN UNNEST(con.conkey, con.confkey) AS tgt(pkeycol, fkeycol)\n"
             "    INNER JOIN pg_catalog.pg_class AS cls ON con.conrelid = cls.oid\n"
             "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
-            f"WHERE {self._where_table(table_id)} AND con.contype IN ('p', 'f')\n"
+            f"WHERE {self._where_table(table_id)} AND con.contype IN ('p', 'u', 'f')\n"
             ") AS cons\n"
             "    INNER JOIN pg_catalog.pg_attribute AS att_s ON cons.pkeyrel = att_s.attrelid AND cons.pkeycol = att_s.attnum\n"
             "    LEFT JOIN pg_catalog.pg_class AS cls_t ON cons.fkeyrel = cls_t.oid\n"
@@ -210,6 +211,15 @@ class PostgreSQLExplorer(Explorer):
                         f"composite primary key in table: {table_id}"
                     )
                 primary_key = LocalId(con.source_column)
+            elif con.constraint_type == b"u":
+                if con.constraint_name in constraints:
+                    raise NotImplementedError(
+                        f"composite unique key in table: {table_id}"
+                    )
+                constraints[con.constraint_name] = UniqueConstraint(
+                    LocalId(con.constraint_name),
+                    LocalId(con.source_column),
+                )
             elif con.constraint_type == b"f":
                 if con.constraint_name in constraints:
                     raise NotImplementedError(

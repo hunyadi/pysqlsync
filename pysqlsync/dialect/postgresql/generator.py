@@ -1,6 +1,9 @@
+from strong_typing.core import JsonType
+
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import FormationError, Table
 from pysqlsync.formation.py_to_sql import (
+    ArrayMode,
     DataclassConverter,
     DataclassConverterOptions,
     EnumMode,
@@ -8,6 +11,7 @@ from pysqlsync.formation.py_to_sql import (
     StructMode,
 )
 
+from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
 
 
@@ -28,8 +32,12 @@ class PostgreSQLGenerator(BaseGenerator):
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.TYPE,
                 struct_mode=options.struct_mode or StructMode.TYPE,
+                array_mode=options.array_mode or ArrayMode.ARRAY,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
+                substitutions={
+                    JsonType: PostgreSQLJsonType(),
+                },
                 skip_annotations=options.skip_annotations,
                 factory=self.factory,
             )

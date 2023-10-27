@@ -70,7 +70,9 @@ class SqlIntegerType(SqlDataType):
     width: int
 
     def __str__(self) -> str:
-        if self.width == 2:
+        if self.width == 1:
+            return "tinyint"
+        elif self.width == 2:
             return "smallint"
         elif self.width == 4:
             return "integer"
@@ -258,7 +260,7 @@ class SqlIntervalType(SqlDataType):
 @dataclass
 class SqlJsonType(SqlDataType):
     def __str__(self) -> str:
-        return "jsonb"
+        return "json"
 
 
 @dataclass

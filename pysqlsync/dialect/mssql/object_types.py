@@ -14,9 +14,7 @@ class MSSQLColumn(Column):
     @property
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable else ""
-        default = (
-            f" DEFAULT {constant(self.default)}" if self.default is not None else ""
-        )
+        default = f" DEFAULT {self.default}" if self.default is not None else ""
         identity = " IDENTITY" if self.identity else ""
         return f"{self.data_type}{nullable}{default}{identity}"
 

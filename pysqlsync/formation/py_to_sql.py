@@ -8,7 +8,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Iterable, Optional, TypeVar
+from typing import Annotated, Iterable, Optional, TypeVar
 
 from strong_typing.auxiliary import (
     float32,
@@ -66,19 +66,19 @@ from .object_types import (
     DiscriminatedConstraint,
     EnumType,
     ForeignConstraint,
-    Namespace,
     ObjectFactory,
     StructMember,
     StructType,
     Table,
     UniqueConstraint,
-    constant,
 )
 
 T = TypeVar("T")
 
 ENUM_NAME_LENGTH: int = 64
 "Maximum length for an enumeration string value."
+
+ENUM_LABEL_TYPE = Annotated[str, MaxLength(ENUM_NAME_LENGTH)]
 
 
 def is_unique(items: Iterable[T]) -> bool:
@@ -110,6 +110,19 @@ def dataclass_fields_as_required(
         )
         ref = evaluate_member_type(data_type, cls)
         yield DataclassField(field.name, ref)
+
+
+@dataclasses.dataclass
+class DataclassEnumField:
+    name: str
+    type: type[enum.Enum]
+
+
+def dataclass_enum_fields(cls: type[DataclassInstance]) -> Iterable[DataclassEnumField]:
+    for field in dataclass_fields_as_required(cls):
+        field_type = unwrap_annotated_type(field.type)
+        if is_type_enum(field_type):
+            yield DataclassEnumField(field.name, field_type)
 
 
 class NamespaceMapping:
@@ -145,7 +158,7 @@ class EnumMode(enum.Enum):
     "Enumeration types are converted into inline SQL ENUM definitions."
 
     RELATION = "relation"
-    "Enumeration types are converted into foreign/primary key relations, and reference a lookup table."
+    "Enumeration types are converted into foreign/primary key relations (reference constraint) with a lookup table."
 
     CHECK = "check"
     "Enumeration types are converted into their value type, with a CHECK constraint on the column."
@@ -164,8 +177,13 @@ class StructMode(enum.Enum):
 
 @enum.unique
 class ArrayMode(enum.Enum):
+    "Determines how to treat sequence types."
+
     ARRAY = "array"
+    "Convert Python list type as SQL array type."
+
     JSON = "json"
+    "Convert Python list type to SQL JSON type (or its representation type)."
 
 
 @dataclass
@@ -382,6 +400,13 @@ class DataclassConverter:
             item_type = unwrap_generic_list(typ)
             if is_simple_type(item_type):
                 if self.options.array_mode is ArrayMode.ARRAY:
+                    if (
+                        is_type_enum(item_type)
+                        and self.options.enum_mode is EnumMode.RELATION
+                    ):
+                        raise TypeError(
+                            "array of enumeration type cannot expand into a relation with a reference constraint"
+                        )
                     return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
                 elif self.options.array_mode is ArrayMode.JSON:
                     return self.member_to_sql_data_type(JsonType, cls)
@@ -476,30 +501,28 @@ class DataclassConverter:
 
         # checks
         if self.options.enum_mode is EnumMode.RELATION:
-            for field in dataclass_fields_as_required(cls):
-                if is_type_enum(field.type):
-                    constraints.append(
-                        ForeignConstraint(
-                            LocalId(f"fk_{cls.__name__}_{field.name}"),
-                            LocalId(field.name),
-                            ConstraintReference(
-                                self.create_qualified_id(
-                                    field.type.__module__, field.type.__name__
-                                ),
-                                LocalId("id"),
+            for enum_field in dataclass_enum_fields(cls):
+                constraints.append(
+                    ForeignConstraint(
+                        LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                        LocalId(enum_field.name),
+                        ConstraintReference(
+                            self.create_qualified_id(
+                                enum_field.type.__module__, enum_field.type.__name__
                             ),
+                            LocalId("id"),
                         ),
-                    )
+                    ),
+                )
         elif self.options.enum_mode is EnumMode.CHECK:
-            for field in dataclass_fields_as_required(cls):
-                if is_type_enum(field.type):
-                    enum_values = ", ".join(constant(e.value) for e in field.type)
-                    constraints.append(
-                        CheckConstraint(
-                            LocalId(f"ch_{cls.__name__}_{field.name}"),
-                            f"{LocalId(field.name)} IN ({enum_values})",
-                        ),
-                    )
+            for enum_field in dataclass_enum_fields(cls):
+                enum_values = ", ".join(constant(e.value) for e in enum_field.type)
+                constraints.append(
+                    CheckConstraint(
+                        LocalId(f"ch_{cls.__name__}_{enum_field.name}"),
+                        f"{LocalId(enum_field.name)} IN ({enum_values})",
+                    ),
+                )
 
         return self.options.factory.table_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
@@ -643,16 +666,12 @@ class DataclassConverter:
         # create tables for enumerations
         if self.options.enum_mode is EnumMode.RELATION:
             for entity in table_types:
-                for field in dataclass_fields_as_required(entity):
-                    if not is_type_enum(field.type):
-                        continue
-
-                    enum_type = field.type
-                    table_defs = tables.setdefault(enum_type.__module__, [])
+                for enum_field in dataclass_enum_fields(entity):
+                    table_defs = tables.setdefault(enum_field.type.__module__, [])
                     table_defs.append(
                         self.options.factory.table_class(
                             self.create_qualified_id(
-                                enum_type.__module__, enum_type.__name__
+                                enum_field.type.__module__, enum_field.type.__name__
                             ),
                             [
                                 self.options.factory.column_class(
@@ -663,14 +682,16 @@ class DataclassConverter:
                                 ),
                                 self.options.factory.column_class(
                                     LocalId("value"),
-                                    SqlVariableCharacterType(ENUM_NAME_LENGTH),
+                                    self.member_to_sql_data_type(
+                                        ENUM_LABEL_TYPE, type(None)
+                                    ),
                                     False,
                                 ),
                             ],
                             primary_key=LocalId("id"),
                             constraints=[
                                 UniqueConstraint(
-                                    LocalId(f"uq_{enum_type.__name__}"),
+                                    LocalId(f"uq_{enum_field.type.__name__}"),
                                     LocalId("value"),
                                 )
                             ],

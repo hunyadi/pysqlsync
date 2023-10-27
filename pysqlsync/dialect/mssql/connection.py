@@ -103,6 +103,21 @@ class MSSQLContext(BaseContext):
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 
+        constraints = await self.query_all(
+            tuple[str, str],
+            "SELECT table_name, constraint_name\n"
+            "FROM information_schema.table_constraints\n"
+            f"WHERE constraint_type = 'FOREIGN KEY' AND table_schema = {quote(namespace.id)};",
+        )
+        if constraints:
+            stmts: list[str] = []
+            for constraint in constraints:
+                table_name, constraint_name = typing.cast(tuple[str, str], constraint)
+                stmts.append(
+                    f"ALTER TABLE {QualifiedId(namespace.id, table_name)} DROP CONSTRAINT {LocalId(constraint_name)};"
+                )
+            await self.execute("\n".join(stmts))
+
         tables = await self.query_all(
             str,
             "SELECT table_name\n"

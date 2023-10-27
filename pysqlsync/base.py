@@ -13,7 +13,7 @@ from strong_typing.name import python_type_to_str
 
 from .formation.inspection import get_entity_types
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
-from .formation.py_to_sql import DataclassConverter, EnumMode, StructMode
+from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
@@ -45,6 +45,7 @@ class GeneratorOptions:
 
     enum_mode: Optional[EnumMode] = None
     struct_mode: Optional[StructMode] = None
+    array_mode: Optional[ArrayMode] = None
     namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(
         default_factory=dict
     )
@@ -234,6 +235,13 @@ class BaseGenerator(abc.ABC):
 
         return lambda field: enum_dict[field]
 
+    def get_enum_list_transformer(
+        self, enum_dict: dict[str, int]
+    ) -> Callable[[Any], Any]:
+        "Returns a callable function object that looks up assigned integer values based on a list of enumeration string values."
+
+        return lambda field: [enum_dict[item] for item in field]
+
 
 class QueryException(RuntimeError):
     query: str
@@ -243,7 +251,8 @@ class QueryException(RuntimeError):
         self.query = query
 
     def __str__(self) -> str:
-        return f"error executing query:\n{self.query}"
+        query = f"{self.query[:1000]}..." if len(self.query) > 1000 else self.query
+        return f"error executing query:\n{query}"
 
 
 @dataclass
@@ -541,6 +550,8 @@ class BaseContext(abc.ABC):
             statement,
             record_generator,
         )
+        if isinstance(records, Sized):
+            LOGGER.info(f"{len(records)} rows have been inserted")
 
     async def upsert_rows(
         self,
@@ -567,6 +578,8 @@ class BaseContext(abc.ABC):
             statement,
             record_generator,
         )
+        if isinstance(records, Sized):
+            LOGGER.info(f"{len(records)} rows have been inserted or updated")
 
     async def _generate_records(
         self,
@@ -606,15 +619,25 @@ class BaseContext(abc.ABC):
         transformers: list[Optional[Callable[[Any], Any]]] = []
         for index, column, field_type in zip(range(len(columns)), columns, field_types):
             transformer = generator.get_value_transformer(column, field_type)
-            if field_type is str and table.is_relation(column.name):
+            if table.is_relation(column.name):
                 relation = generator.state.get_referenced_table(table.name, column.name)
                 if relation.is_lookup_table():
-                    values = set(record[index] for record in records)
-                    values.discard(None)  # do not insert NULL into referenced table
-                    enum_dict: dict[str, int] = await self._merge_lookup_table(
-                        relation, values
-                    )
-                    transformer = generator.get_enum_transformer(enum_dict)
+                    enum_dict: dict[str, int]
+
+                    if field_type is str:
+                        # a single enumeration value represented as a string
+                        values = set(record[index] for record in records)
+                        values.discard(None)  # do not insert NULL into referenced table
+                        enum_dict = await self._merge_lookup_table(relation, values)
+                        transformer = generator.get_enum_transformer(enum_dict)
+                    elif field_type is list:
+                        # a list of enumeration values represented as a list of strings
+                        values = set()
+                        for record in records:
+                            values.update(record[index])
+                        values.discard(None)  # do not insert NULL into referenced table
+                        enum_dict = await self._merge_lookup_table(relation, values)
+                        transformer = generator.get_enum_list_transformer(enum_dict)
 
             transformers.append(transformer)
 

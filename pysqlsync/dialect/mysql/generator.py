@@ -13,7 +13,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType
+from pysqlsync.model.data_types import SqlFixedBinaryType, SqlIntegerType
 from pysqlsync.model.id_types import LocalId
 
 from .data_types import MySQLDateTimeType, MySQLVariableCharacterType
@@ -38,16 +38,21 @@ class MySQLGenerator(BaseGenerator):
             raise FormationError(
                 f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
             )
+        if options.array_mode is ArrayMode.ARRAY:
+            raise FormationError(
+                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
+            )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=options.struct_mode or StructMode.JSON,
-                array_mode=ArrayMode.JSON,
+                array_mode=options.array_mode or ArrayMode.JSON,
                 qualified_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
                 substitutions={
+                    bool: SqlIntegerType(1),
                     datetime.datetime: MySQLDateTimeType(),
                     uuid.UUID: SqlFixedBinaryType(16),
                     str: MySQLVariableCharacterType(16777215),

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from pysqlsync.base import BaseContext, DiscoveryError
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
@@ -25,6 +26,8 @@ from .object_types import MySQLObjectFactory
 
 @dataclass
 class MySQLColumnMeta(AnsiColumnMeta):
+    column_type: str
+    extra: str
     column_comment: str
 
 
@@ -36,10 +39,12 @@ class MySQLExplorer(AnsiExplorer):
                 SqlDiscoveryOptions(
                     substitutions={
                         "datetime": MySQLDateTimeType(),
+                        "varchar": MySQLVariableCharacterType(),
                         "tinytext": MySQLVariableCharacterType(limit=255),
                         "text": MySQLVariableCharacterType(limit=65535),
                         "mediumtext": MySQLVariableCharacterType(limit=16777215),
                         "longtext": MySQLVariableCharacterType(limit=4294967295),
+                        "varbinary": MySQLVariableBinaryType(),
                         "tinyblob": MySQLVariableBinaryType(storage=255),
                         "blob": MySQLVariableBinaryType(storage=65535),
                         "mediumblob": MySQLVariableBinaryType(storage=16777215),
@@ -55,7 +60,7 @@ class MySQLExplorer(AnsiExplorer):
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
         if "__" in name:
-            parts = name.split("__", 2)
+            parts = name.split("__", 1)
             return PrefixedId(parts[0], parts[1])
         else:
             return PrefixedId(None, name)
@@ -65,12 +70,14 @@ class MySQLExplorer(AnsiExplorer):
             MySQLColumnMeta,
             "SELECT\n"
             "    column_name AS column_name,\n"
-            "    column_type AS data_type,\n"
+            "    data_type AS data_type,\n"
             "    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable,\n"
             "    character_maximum_length AS character_maximum_length,\n"
             "    numeric_precision AS numeric_precision,\n"
             "    numeric_scale AS numeric_scale,\n"
             "    datetime_precision AS datetime_precision,\n"
+            "    column_type AS column_type,\n"
+            "    extra AS extra,\n"
             "    column_comment AS column_comment\n"
             "FROM information_schema.columns AS col\n"
             f"WHERE {self._where_table(table_id, 'col')}\n"
@@ -83,21 +90,23 @@ class MySQLExplorer(AnsiExplorer):
                 self.factory.column_class(
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
-                        col.data_type,
+                        type_name=col.data_type,
+                        type_def=col.column_type,
                         character_maximum_length=col.character_maximum_length,
                         numeric_precision=col.numeric_precision,
                         numeric_scale=col.numeric_scale,
                         datetime_precision=col.datetime_precision,
                     ),
                     bool(col.nullable),
+                    identity="auto_increment" in col.extra,
                     description=col.column_comment or None,
                 )
             )
         return columns
 
-    async def get_table_constraints(
+    async def get_referential_constraints(
         self, table_id: SupportsQualifiedId
-    ) -> list[Constraint]:
+    ) -> list[ForeignConstraint]:
         constraint_meta = await self.conn.query_all(
             AnsiConstraintMeta,
             "SELECT\n"
@@ -117,7 +126,7 @@ class MySQLExplorer(AnsiExplorer):
             f"WHERE {self._where_table(table_id, 'ref')} AND {self._where_table(table_id, 'kcu')}\n",
         )
 
-        constraints: dict[str, Constraint] = {}
+        constraints: dict[str, ForeignConstraint] = {}
         for con in constraint_meta:
             if con.fk_constraint_name in constraints:
                 raise DiscoveryError(f"composite foreign key in table: {table_id}")
@@ -129,5 +138,17 @@ class MySQLExplorer(AnsiExplorer):
                     LocalId(con.uq_column_name),
                 ),
             )
-
         return list(constraints.values())
+
+    async def get_table_description(
+        self, table_id: SupportsQualifiedId
+    ) -> Optional[str]:
+        return (
+            await self.conn.query_one(
+                str,
+                "SELECT table_comment\n"
+                "FROM information_schema.tables AS tab\n"
+                f"WHERE {self._where_table(table_id, 'tab')}",
+            )
+            or None
+        )

@@ -24,23 +24,30 @@ def get_create_stmt(table: type[DataclassInstance], dialect: str) -> str:
 class TestGenerator(unittest.TestCase):
     def test_create_boolean_table(self) -> None:
         self.maxDiff = None
-        for dialect in ["postgresql", "mysql"]:
-            with self.subTest(dialect=dialect):
-                self.assertMultiLineEqual(
-                    get_create_stmt(tables.BooleanTable, dialect=dialect),
-                    'CREATE TABLE "BooleanTable" (\n'
-                    '"id" bigint NOT NULL,\n'
-                    '"boolean" boolean NOT NULL,\n'
-                    '"nullable_boolean" boolean,\n'
-                    'PRIMARY KEY ("id")\n'
-                    ");",
-                )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.BooleanTable, dialect="postgresql"),
+            'CREATE TABLE "BooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean" boolean NOT NULL,\n'
+            '"nullable_boolean" boolean,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
         self.assertMultiLineEqual(
             get_create_stmt(tables.BooleanTable, dialect="mssql"),
             'CREATE TABLE "BooleanTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"boolean" bit NOT NULL,\n'
             '"nullable_boolean" bit,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.BooleanTable, dialect="mysql"),
+            'CREATE TABLE "BooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean" tinyint NOT NULL,\n'
+            '"nullable_boolean" tinyint,\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )
@@ -168,7 +175,7 @@ class TestGenerator(unittest.TestCase):
             '"iso_date" date NOT NULL,\n'
             '"iso_time" time NOT NULL,\n'
             '"optional_date_time" datetime,\n'
-            '"timestamp_precision" datetime NOT NULL,\n'
+            '"timestamp_precision" datetime(6) NOT NULL,\n'
             'PRIMARY KEY ("id")\n'
             ");",
         )

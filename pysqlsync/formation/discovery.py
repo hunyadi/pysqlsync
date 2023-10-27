@@ -15,6 +15,7 @@ from .object_types import (
     Namespace,
     ObjectFactory,
     Table,
+    UniqueConstraint,
 )
 
 LOGGER = logging.getLogger("pysqlsync")
@@ -29,6 +30,14 @@ class AnsiColumnMeta:
     numeric_precision: Optional[int]
     numeric_scale: Optional[int]
     datetime_precision: Optional[int]
+
+
+@dataclass
+class AnsiUniqueMeta:
+    constraint_name: str
+    table_schema: str
+    table_name: str
+    column_name: str
 
 
 @dataclass
@@ -172,7 +181,7 @@ class AnsiExplorer(Explorer):
             columns.append(
                 self.factory.column_class(
                     LocalId(column_name),
-                    self.discovery.sql_data_type_from_spec(data_type),
+                    self.discovery.sql_data_type_from_spec(type_name=data_type),
                     bool(nullable),
                 )
             )
@@ -200,7 +209,7 @@ class AnsiExplorer(Explorer):
                 self.factory.column_class(
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
-                        col.data_type,
+                        type_name=col.data_type,
                         character_maximum_length=col.character_maximum_length,
                         numeric_precision=col.numeric_precision,
                         numeric_scale=col.numeric_scale,
@@ -230,9 +239,36 @@ class AnsiExplorer(Explorer):
             raise DiscoveryError(f"composite primary key in table: {table_id}")
         return LocalId(primary_meta[0])
 
-    async def get_table_constraints(
+    async def get_unique_constraints(
         self, table_id: SupportsQualifiedId
-    ) -> list[Constraint]:
+    ) -> list[UniqueConstraint]:
+        constraint_meta = await self.conn.query_all(
+            AnsiUniqueMeta,
+            "SELECT\n"
+            "    kcu.constraint_name AS constraint_name,\n"
+            "    kcu.table_schema AS table_schema,\n"
+            "    kcu.table_name AS table_name,\n"
+            "    kcu.column_name AS column_name\n"
+            "FROM information_schema.table_constraints AS tab\n"
+            "    INNER JOIN information_schema.key_column_usage AS kcu\n"
+            "        ON tab.constraint_catalog = kcu.constraint_catalog AND tab.constraint_schema = kcu.constraint_schema AND tab.constraint_name = kcu.constraint_name\n"
+            f"WHERE {self._where_table(table_id, 'tab')} AND {self._where_table(table_id, 'kcu')} AND\n"
+            "    tab.constraint_type = 'UNIQUE'\n"
+            "ORDER BY kcu.ordinal_position",
+        )
+
+        constraints: dict[str, UniqueConstraint] = {}
+        for con in constraint_meta:
+            if con.constraint_name in constraints:
+                raise DiscoveryError(f"composite unique key in table: {table_id}")
+            constraints[con.constraint_name] = UniqueConstraint(
+                LocalId(con.constraint_name), LocalId(con.column_name)
+            )
+        return list(constraints.values())
+
+    async def get_referential_constraints(
+        self, table_id: SupportsQualifiedId
+    ) -> list[ForeignConstraint]:
         constraint_meta = await self.conn.query_all(
             AnsiConstraintMeta,
             "SELECT\n"
@@ -252,10 +288,11 @@ class AnsiExplorer(Explorer):
             "    INNER JOIN information_schema.key_column_usage AS kcu2\n"
             "        ON kcu2.constraint_catalog = ref.unique_constraint_catalog AND kcu2.constraint_schema = ref.unique_constraint_schema AND kcu2.constraint_name = ref.unique_constraint_name\n"
             f"WHERE {self._where_table(table_id, 'kcu1')} AND\n"
-            "    kcu1.ordinal_position = kcu2.ordinal_position",
+            "    kcu1.ordinal_position = kcu2.ordinal_position\n"
+            "ORDER BY kcu1.ordinal_position",
         )
 
-        constraints: dict[str, Constraint] = {}
+        constraints: dict[str, ForeignConstraint] = {}
         for con in constraint_meta:
             if con.fk_constraint_name in constraints:
                 raise DiscoveryError(f"composite foreign key in table: {table_id}")
@@ -267,8 +304,12 @@ class AnsiExplorer(Explorer):
                     LocalId(con.uq_column_name),
                 ),
             )
-
         return list(constraints.values())
+
+    async def get_table_description(
+        self, table_id: SupportsQualifiedId
+    ) -> Optional[str]:
+        return None
 
     async def get_table(self, table_id: SupportsQualifiedId) -> Table:
         if not await self.has_table(table_id):
@@ -278,12 +319,16 @@ class AnsiExplorer(Explorer):
 
         if await self.has_constraints():
             primary_key = await self.get_table_primary_key(table_id)
-            constraints = await self.get_table_constraints(table_id)
+            constraints: list[Constraint] = []
+            constraints.extend(await self.get_unique_constraints(table_id))
+            constraints.extend(await self.get_referential_constraints(table_id))
+            description = await self.get_table_description(table_id)
             return self.factory.table_class(
                 name=table_id,
                 columns=columns,
                 primary_key=primary_key,
                 constraints=constraints or None,
+                description=description,
             )
         else:
             # assume first column is the primary key

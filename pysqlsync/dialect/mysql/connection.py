@@ -84,11 +84,12 @@ class MySQLContext(BaseContext):
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 
-        statement = await self.query_one(
+        tables = await self.query_all(
             str,
-            "SELECT CONCAT('DROP TABLE IF EXISTS ', GROUP_CONCAT(table_name), ';') AS statement\n"
+            "SELECT table_name\n"
             "FROM information_schema.tables\n"
             f"WHERE table_schema = DATABASE() AND table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~';",
         )
-        if statement:
-            await self.execute(statement)
+        if tables:
+            table_list = ", ".join(str(LocalId(table)) for table in tables)
+            await self.execute(f"DROP TABLE IF EXISTS {table_list};")

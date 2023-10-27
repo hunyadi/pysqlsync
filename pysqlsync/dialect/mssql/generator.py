@@ -39,12 +39,16 @@ class MSSQLGenerator(BaseGenerator):
             raise FormationError(
                 f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
             )
+        if options.array_mode is ArrayMode.ARRAY:
+            raise FormationError(
+                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
+            )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.RELATION,
                 struct_mode=options.struct_mode or StructMode.JSON,
-                array_mode=ArrayMode.JSON,
+                array_mode=options.array_mode or ArrayMode.JSON,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
                 substitutions={

@@ -1,4 +1,5 @@
 import typing
+from dataclasses import dataclass
 from typing import Optional
 
 from pysqlsync.formation.object_types import (
@@ -7,10 +8,8 @@ from pysqlsync.formation.object_types import (
     MutableObject,
     ObjectFactory,
     Table,
-    constant,
-    quote,
 )
-from pysqlsync.model.data_types import SqlEnumType
+from pysqlsync.model.data_types import SqlEnumType, quote
 
 
 class MySQLTable(Table):
@@ -48,6 +47,7 @@ class MySQLTable(Table):
 
         source_desc = source.short_description
         target_desc = target.short_description
+
         if source_desc is None:
             if target_desc is not None:
                 statements.append(
@@ -64,6 +64,7 @@ class MySQLTable(Table):
         return "\n".join(statements) if statements else None
 
 
+@dataclass(eq=True)
 class MySQLColumn(Column):
     @property
     def data_spec(self) -> str:
@@ -73,16 +74,13 @@ class MySQLColumn(Column):
             else ""
         )
         nullable = " NOT NULL" if not self.nullable else ""
-        default = (
-            f" DEFAULT {constant(self.default)}" if self.default is not None else ""
-        )
+        default = f" DEFAULT {self.default}" if self.default is not None else ""
         identity = " AUTO_INCREMENT" if self.identity else ""
-        description = (
-            f" COMMENT {self.comment()}" if self.description is not None else ""
-        )
+        description = f" COMMENT {self.comment}" if self.description is not None else ""
         return f"{self.data_type}{charset}{nullable}{default}{identity}{description}"
 
-    def mutate_column_stmt(self, source: Column) -> list[str]:
+    def mutate_column_stmt(self, src: Column) -> list[str]:
+        source = typing.cast(MySQLColumn, src)
         target = self
         statements: list[str] = []
         if (
@@ -90,11 +88,12 @@ class MySQLColumn(Column):
             or source.nullable != target.nullable
             or source.default != target.default
             or source.identity != target.identity
-            or source.description != target.description
+            or source.comment != target.comment
         ):
             statements.append(f"MODIFY COLUMN {source.name} {target.data_spec}")
         return statements
 
+    @property
     def comment(self) -> Optional[str]:
         if self.description is not None:
             description = (

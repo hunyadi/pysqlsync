@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import re
 
@@ -62,34 +63,51 @@ class SqlDiscovery:
         elif type_name == "uuid":  # PostgreSQL-specific
             return SqlUuidType()
 
+        if type_schema is not None:
+            return SqlUserDefinedType(QualifiedId(type_schema, type_name))
+
+        return None
+
+    def sql_data_type_from_def(self, type_def: str) -> Optional[SqlDataType]:
         m = re.fullmatch(
-            r"^(?:decimal|numeric)[(](\d+),\s*(\d+)[)]$", type_name, re.IGNORECASE
+            r"^(?:decimal|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE
         )
         if m is not None:
             return SqlDecimalType(int(m.group(1)), int(m.group(2)))
 
-        m = re.fullmatch(r"^timestamp[(](\d+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(
+            r"^timestamp[(](\d+)[)]\s*(with(?:out)? time zone)?$",
+            type_def,
+            re.IGNORECASE,
+        )
         if m is not None:
-            return SqlTimestampType(int(m.group(1)), False)
+            if m.group(2) == "with time zone":
+                return SqlTimestampType(int(m.group(1)), True)
+            else:
+                return SqlTimestampType(int(m.group(1)), False)
 
-        m = re.fullmatch(r"^char[(](\d+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(r"^char[(](\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlFixedCharacterType(int(m.group(1)))
 
-        m = re.fullmatch(r"^varchar[(](\d+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(
+            r"^(?:varchar|character varying)[(](\d+)[)]$", type_def, re.IGNORECASE
+        )
         if m is not None:
             return SqlVariableCharacterType(int(m.group(1)))
 
-        m = re.fullmatch(r"^binary[(](\d+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(r"^binary[(](\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlFixedBinaryType(int(m.group(1)))
 
-        m = re.fullmatch(r"^varbinary[(](\d+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(
+            r"^(?:varbinary|binary varying)[(](\d+)[)]$", type_def, re.IGNORECASE
+        )
         if m is not None:
             return SqlVariableBinaryType(int(m.group(1)))
 
         # MySQL and Oracle
-        m = re.fullmatch(r"^enum[(](.+)[)]$", type_name, re.IGNORECASE)
+        m = re.fullmatch(r"^enum[(](.+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             value_list = m.group(1)
             values = [
@@ -97,16 +115,14 @@ class SqlDiscovery:
             ]
             return SqlEnumType(values)
 
-        if type_schema is not None:
-            return SqlUserDefinedType(QualifiedId(type_schema, type_name))
-
         return None
 
     def sql_data_type_from_spec(
         self,
+        *,
         type_name: str,
         type_schema: Optional[str] = None,
-        *,
+        type_def: Optional[str] = None,
         character_maximum_length: Optional[int] = None,
         numeric_precision: Optional[int] = None,
         numeric_scale: Optional[int] = None,
@@ -115,8 +131,11 @@ class SqlDiscovery:
         "Determines the column type from SQL column attribute data extracted from the information schema table."
 
         sql_type: Optional[SqlDataType] = None
-        if type_schema is None:
-            sql_type = self.options.substitutions.get(type_name)
+        if type_schema is None or type_schema == "pg_catalog":
+            sql_type = copy.copy(self.options.substitutions.get(type_name))
+
+        if sql_type is None and type_def is not None:
+            sql_type = self.sql_data_type_from_def(type_def)
 
         if sql_type is None:
             sql_type = self.sql_data_type_from_name(type_name, type_schema)

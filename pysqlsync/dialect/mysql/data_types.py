@@ -7,7 +7,11 @@ from pysqlsync.model.data_types import (
 
 class MySQLDateTimeType(SqlTimestampType):
     def __str__(self) -> str:
-        return "datetime"
+        if self.precision is not None:
+            precision = f"({self.precision})"
+        else:
+            precision = ""
+        return f"datetime{precision}"
 
 
 class MySQLVariableCharacterType(SqlVariableCharacterType):
@@ -15,10 +19,8 @@ class MySQLVariableCharacterType(SqlVariableCharacterType):
         if self.limit is None:
             return "mediumtext"
 
-        if self.limit < 256:
+        if self.limit < 65536:
             return f"varchar({self.limit})"
-        elif self.limit < 65536:
-            return f"text"
         elif self.limit < 16777216:
             return "mediumtext"
         elif self.limit < 4294967296:
@@ -32,10 +34,8 @@ class MySQLVariableBinaryType(SqlVariableBinaryType):
         if self.storage is None:
             return "mediumblob"
 
-        if self.storage < 256:
+        if self.storage < 65536:
             return f"varbinary({self.storage})"
-        elif self.storage < 65536:
-            return "blob"
         elif self.storage < 16777216:
             return "mediumblob"
         elif self.storage < 4294967296:
