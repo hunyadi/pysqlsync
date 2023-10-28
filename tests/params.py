@@ -15,6 +15,8 @@ class TestEngineBase(abc.ABC):
 
 
 class PostgreSQLBase(TestEngineBase):
+    "Base class for testing PostgreSQL features."
+
     @property
     def engine(self) -> BaseEngine:
         return get_dialect("postgresql")
@@ -31,6 +33,8 @@ class PostgreSQLBase(TestEngineBase):
 
 
 class MSSQLBase(TestEngineBase):
+    "Base class for testing Microsoft SQL Server features."
+
     @property
     def engine(self) -> BaseEngine:
         return get_dialect("mssql")
@@ -47,6 +51,8 @@ class MSSQLBase(TestEngineBase):
 
 
 class MySQLBase(TestEngineBase):
+    "Base class for testing MySQL features."
+
     @property
     def engine(self) -> BaseEngine:
         return get_dialect("mysql")

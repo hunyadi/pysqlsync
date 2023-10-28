@@ -19,11 +19,6 @@ LOGGER = logging.getLogger("pysqlsync.mssql")
 class MSSQLConnection(BaseConnection):
     """
     Represents a connection to a Microsoft SQL Server.
-
-    If Microsoft SQL Server is run in a Docker container in a Linux/MacOS environment, use:
-    ```
-    docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<YourStrong@Passw0rd>" -p 1433:1433 --name sql1 --hostname sql1 -d mcr.microsoft.com/mssql/server:2022-latest
-    ```
     """
 
     native: pyodbc.Connection

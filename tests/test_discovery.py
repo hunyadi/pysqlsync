@@ -18,6 +18,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.execute('DROP TABLE IF EXISTS "NumericTable";')
             await conn.execute('DROP TABLE IF EXISTS "Person";')
             await conn.execute('DROP TABLE IF EXISTS "Address";')
+            await conn.drop_schema(LocalId("sample"))
 
     async def test_table(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -98,24 +99,15 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
 
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.drop_schema(LocalId("sample"))
+    pass
 
 
 class TestMSSQLDiscovery(MSSQLBase, TestDiscovery):
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.drop_schema(LocalId("sample"))
+    pass
 
 
 class TestMySQLDiscovery(MySQLBase, TestDiscovery):
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.drop_schema(LocalId("sample"))
+    pass
 
 
 del TestDiscovery

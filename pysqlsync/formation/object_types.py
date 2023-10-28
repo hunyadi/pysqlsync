@@ -86,25 +86,23 @@ class EnumType(QualifiedObject, MutableObject):
         target = self
         self.check_identity(source)
 
-        source_values = set(source.values)
-        target_values = set(target.values)
-
-        if source_values - target_values:
+        removed_values = [
+            value for value in source.values if value not in target.values
+        ]
+        if removed_values:
             raise FormationError(
-                f"operation not permitted; cannot drop values in an enumeration: {''.join(source_values - target_values)}"
+                f"operation not permitted; cannot drop values in an enumeration: {''.join(removed_values)}"
             )
 
-        diff_values = list(target_values - source_values)
-        diff_values.sort()
-        return (
-            (
+        added_values = [value for value in target.values if value not in source.values]
+        if added_values:
+            return (
                 f"ALTER TYPE {source.name}\n"
-                + ",\n".join(f"ADD VALUE {quote(v)}" for v in diff_values)
+                + ",\n".join(f"ADD VALUE {quote(v)}" for v in added_values)
                 + ";"
             )
-            if diff_values
-            else None
-        )
+        else:
+            return None
 
     def __str__(self) -> str:
         return self.create_stmt()
@@ -496,6 +494,9 @@ class Table(QualifiedObject, MutableObject):
     def alter_table_stmt(self, statements: list[str]) -> str:
         return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"
 
+    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+        return target.mutate_stmt(source)
+
     def mutate_stmt(self, src: MutableObject) -> Optional[str]:
         source = typing.cast(Table, src)
         target = self
@@ -509,7 +510,7 @@ class Table(QualifiedObject, MutableObject):
                 if source_column is None:
                     statements.append(target_column.create_stmt())
                 else:
-                    statement = target_column.mutate_stmt(source_column)
+                    statement = self.mutate_column_stmt(source_column, target_column)
                     if statement:
                         statements.append(statement)
         except ColumnFormationError as e:

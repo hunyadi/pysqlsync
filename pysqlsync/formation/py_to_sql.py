@@ -237,6 +237,10 @@ class DataclassConverter:
             return PrefixedId(mapped_name, object_name)
 
     def simple_type_to_sql_data_type(self, typ: TypeLike) -> SqlDataType:
+        substitute = self.options.substitutions.get(typ)
+        if substitute is not None:
+            return substitute
+
         if typ is bool:
             return SqlBooleanType()
         if typ is int:

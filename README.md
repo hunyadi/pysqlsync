@@ -102,10 +102,44 @@ When performing *structure synchronization*, *pysqlsync* morphs a database sourc
 
 Once database structure has been morphed into the desired state, *data synchronization* helps keep a local database state in sync with a remote database state. *pysqlsync* implements insert and upsert functions to handle lists of tuples of data. Each tuple corresponds to a table row, and each tuple member is a column entry. Data in each column may have to be transformed to be suitable for the database dialect, e.g. MySQL would have to transform a `UUID` into a `BINARY(16)`, represented in Python as `bytes` because it has no `uuid` type. These transformation functions are derived in advance such that there is minimum CPU load to process a record (one of possibly billions). Loading data from network/disk to memory may use an efficient parser implementation such as [tsv2py](https://github.com/hunyadi/tsv2py), which significantly speeds up parse time for composite types such as `datetime` or `UUID` with the help of SIMD CPU instructions.
 
+## Formation
+
+Formation is the process of generating a series of SQL statements from a collection of Python data-class definitions. Several formation modes are supported.
+
+### Enumerations
+
+`EnumMode` determines how Python enumeration types (subclasses of `enum.Enum`) are converted into database object types. Possible options for the target of an enumeration type are:
+
+* a SQL `ENUM` type created with `CREATE TYPE ... AS ENUM ( ... )` (PostgreSQL), or
+* an inline SQL `ENUM` definition, e.g. `ENUM('a', 'b', 'c')` (MySQL and Oracle), or
+* a SQL data type corresponding to the enumeration value type, and a `CHECK` constraint on the column to block invalid values, or
+* a foreign/primary key relation (reference constraint), coupled with a lookup table, in which the lookup table consists of an identity column acting as the primary key and a unique column storing the enumeration values.
+
+### Data-classes
+
+`StructMode` determines how to convert composite types that are not mapped into SQL tables. A data-class type may be converted into
+
+* a composite SQL type with `CREATE TYPE ... AS ( ... )` (PostgreSQL), or
+* the SQL `json` type (PostgreSQL), or
+* a text type, e.g. `varchar`, which holds the data as serialized JSON.
+
+### Lists
+
+`ArrayMode` determines how to treat sequence types, such as Python lists, i.e. whether to represent them as
+
+* a SQL `array` type (PostgreSQL), or
+* a JSON array stored in a column with the SQL data type `json` (PostgreSQL), or
+* a serialized JSON string stored in a text column type, e.g. `varchar`.
+
+### Modules
+
+`GeneratorOptions` allows you to pass a mapping between module types and SQL schema identifiers. Objects in each Python module would be transformed into SQL objects in the corresponding SQL schema (namespace).
+
 ## Database standard and engine support
 
 * ANSI (when calling `str()` on Python objects such as `Table`, `Column` or `Constraint`)
 * PostgreSQL (via `asyncpg`)
+* Microsoft SQL Server (via `pyodbc`)
 * MySQL (via `aiomysql`)
 
 ## Python classes for database objects

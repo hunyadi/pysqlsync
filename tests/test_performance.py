@@ -24,7 +24,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
-    RECORD_COUNT = 10000
+    RECORD_COUNT = 100000
 
     @property
     def options(self) -> GeneratorOptions:

@@ -31,7 +31,7 @@ class MSSQLGenerator(BaseGenerator):
     def __init__(self, options: GeneratorOptions) -> None:
         super().__init__(options, MSSQLObjectFactory())
 
-        if options.enum_mode is EnumMode.TYPE:
+        if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
             raise FormationError(
                 f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
             )

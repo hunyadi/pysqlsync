@@ -17,6 +17,8 @@ from pysqlsync.formation.object_types import (
     EnumType,
     ForeignConstraint,
     Namespace,
+    StructMember,
+    StructType,
     Table,
     UniqueConstraint,
 )
@@ -24,6 +26,20 @@ from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
+
+
+@dataclass
+class PostgreSQLStructMeta:
+    description: str
+
+
+@dataclass
+class PostgreSQLMemberMeta:
+    member_name: str
+    type_schema: str
+    type_name: str
+    type_def: str
+    description: str
 
 
 @dataclass
@@ -80,14 +96,24 @@ class PostgreSQLExplorer(Explorer):
         )
         return [QualifiedId(row[0], row[1]) for row in rows]  # type: ignore
 
-    @staticmethod
-    def _where_table(table_id: SupportsQualifiedId) -> str:
+    @classmethod
+    def _where_relation(cls, relation_id: SupportsQualifiedId, kinds: list[str]) -> str:
         conditions: list[str] = []
-        conditions.append(f"cls.relname = {quote(table_id.local_id)}")
-        if table_id.scope_id is not None:
-            conditions.append(f"nsp.nspname = {quote(table_id.scope_id)}")
-        conditions.append("cls.relkind = 'r' OR cls.relkind = 'v'")
+        conditions.append(f"cls.relname = {quote(relation_id.local_id)}")
+        if relation_id.scope_id is not None:
+            conditions.append(f"nsp.nspname = {quote(relation_id.scope_id)}")
+        conditions.append(
+            " OR ".join(f"(cls.relkind = {quote(kind)})" for kind in kinds)
+        )
         return " AND ".join(f"({c})" for c in conditions)
+
+    @classmethod
+    def _where_struct(cls, struct_id: SupportsQualifiedId) -> str:
+        return cls._where_relation(struct_id, ["c"])
+
+    @classmethod
+    def _where_table(cls, table_id: SupportsQualifiedId) -> str:
+        return cls._where_relation(table_id, ["r", "v"])
 
     async def has_table(self, table_id: SupportsQualifiedId) -> bool:
         rows = await self.conn.query_all(
@@ -119,8 +145,58 @@ class PostgreSQLExplorer(Explorer):
         )
         return len(rows) > 0 and rows[0] > 0
 
+    async def get_struct(self, struct_id: SupportsQualifiedId) -> StructType:
+        struct_record = await self.conn.query_one(
+            PostgreSQLStructMeta,
+            "SELECT\n"
+            "    dsc.description AS description\n"
+            "FROM pg_catalog.pg_class AS cls\n"
+            "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
+            "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = 0\n"
+            f"WHERE {self._where_struct(struct_id)}",
+        )
+
+        member_records = await self.conn.query_all(
+            PostgreSQLMemberMeta,
+            "SELECT\n"
+            "    att.attname AS member_name,\n"
+            "    typ_nsp.nspname AS type_schema,\n"
+            "    typ.typname AS type_name,\n"
+            "    pg_catalog.format_type(att.atttypid, att.atttypmod) AS type_def,\n"
+            "    dsc.description AS description\n"
+            "FROM pg_catalog.pg_attribute AS att\n"
+            "    INNER JOIN pg_catalog.pg_type AS typ ON att.atttypid = typ.oid\n"
+            "    INNER JOIN pg_catalog.pg_namespace AS typ_nsp ON typ.typnamespace = typ_nsp.oid\n"
+            "    INNER JOIN pg_catalog.pg_class AS cls ON att.attrelid = cls.oid\n"
+            "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
+            "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = att.attnum\n"
+            f"WHERE {self._where_struct(struct_id)} AND (att.attnum > 0)\n"
+            "ORDER BY att.attnum",
+        )
+
+        members: list[StructMember] = []
+        for mem in member_records:
+            data_type = self.discovery.sql_data_type_from_spec(
+                type_name=mem.type_name,
+                type_schema=mem.type_schema,
+                type_def=mem.type_def,
+            )
+            members.append(
+                StructMember(
+                    LocalId(mem.member_name),
+                    data_type,
+                    description=mem.description or None,
+                )
+            )
+
+        return self.factory.struct_class(
+            name=struct_id,
+            members=members,
+            description=struct_record.description,
+        )
+
     async def get_table(self, table_id: SupportsQualifiedId) -> Table:
-        table_records = await self.conn.query_one(
+        table_record = await self.conn.query_one(
             PostgreSQLTableMeta,
             "SELECT\n"
             "    dsc.description AS description\n"
@@ -163,7 +239,7 @@ class PostgreSQLExplorer(Explorer):
             if col.is_array:
                 data_type = SqlArrayType(data_type)
             columns.append(
-                Column(
+                self.factory.column_class(
                     LocalId(col.column_name),
                     data_type,
                     bool(col.is_nullable),
@@ -242,7 +318,7 @@ class PostgreSQLExplorer(Explorer):
             columns=columns,
             primary_key=primary_key,
             constraints=list(constraints.values()) or None,
-            description=table_records.description,
+            description=table_record.description,
         )
 
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
@@ -268,6 +344,19 @@ class PostgreSQLExplorer(Explorer):
                 )
             )
 
+        struct_names = await self.conn.query_all(
+            str,
+            "SELECT cls.relname\n"
+            "FROM pg_catalog.pg_class AS cls INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
+            f"WHERE nsp.nspname = {quote(namespace_id.id)} AND (cls.relkind = 'c')\n"
+            ";",
+        )
+
+        structs: list[StructType] = []
+        for struct_name in struct_names:
+            struct = await self.get_struct(QualifiedId(namespace_id.id, struct_name))
+            structs.append(struct)
+
         table_names = await self.conn.query_all(
             str,
             "SELECT cls.relname\n"
@@ -283,7 +372,7 @@ class PostgreSQLExplorer(Explorer):
 
         if tables:
             return self.factory.namespace_class(
-                namespace_id, enums=enums, structs=[], tables=tables
+                namespace_id, enums=enums, structs=structs, tables=tables
             )
         else:
             return self.factory.namespace_class()

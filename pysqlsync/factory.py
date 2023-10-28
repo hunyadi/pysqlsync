@@ -1,4 +1,5 @@
 import importlib
+import importlib.resources
 import logging
 import os.path
 import re
@@ -40,6 +41,8 @@ def unregister_dialect(engine_name: str) -> None:
 
 
 def get_dialect(engine_name: str) -> BaseEngine:
+    "Looks up a database engine dialect based on its reference name."
+
     try:
         engine_factory = _engines[engine_name]
     except KeyError:
@@ -49,28 +52,28 @@ def get_dialect(engine_name: str) -> BaseEngine:
 
 
 def discover_dialects() -> None:
-    with os.scandir(
-        os.path.join(os.path.dirname(__file__), "dialect")
-    ) as plugin_iterator:
-        for entry in plugin_iterator:
-            if entry.name.startswith((".", "__")) or not entry.is_dir():
-                continue
+    "Discovers database engine dialects bundled with this package."
 
-            module = importlib.import_module(
-                f".dialect.{entry.name}.engine", package=__package__
-            )
-            classes = [
-                cls
-                for cls in get_module_classes(module)
-                if re.match(r"^\w+Engine$", cls.__name__)
-            ]
-            engine_type = typing.cast(type[BaseEngine], classes.pop())
-            engine_factory = engine_type()
-            LOGGER.info(
-                f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
-            )
+    resources = importlib.resources.files(__package__).joinpath("dialect").iterdir()
+    for resource in resources:
+        if resource.name.startswith((".", "__")) or not resource.is_dir():
+            continue
 
-            register_dialect(engine_factory.name, engine_factory)
+        module = importlib.import_module(
+            f".dialect.{resource.name}.engine", package=__package__
+        )
+        classes = [
+            cls
+            for cls in get_module_classes(module)
+            if re.match(r"^\w+Engine$", cls.__name__)
+        ]
+        engine_type = typing.cast(type[BaseEngine], classes.pop())
+        engine_factory = engine_type()
+        LOGGER.info(
+            f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
+        )
+
+        register_dialect(engine_factory.name, engine_factory)
 
 
 discover_dialects()
