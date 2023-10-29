@@ -12,13 +12,14 @@ from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.properties import get_class_properties
 from tests import tables
 from tests.measure import Timer
+from tests.model.event import EventRecord
 
 
 def generate_input_file(data_file_path: str, record_count: int) -> None:
     "Generates data and writes a file to be used as input for performance testing."
 
     generator = Generator()
-    items = random_objects(tables.EventRecord, record_count)
+    items = random_objects(EventRecord, record_count)
     with open(data_file_path, "wb") as f:
         generator.generate_file(f, (dataclasses.astuple(item) for item in items))
 
@@ -44,10 +45,10 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
     async def test_rows_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([tables.EventRecord])
+            await conn.create_objects([EventRecord])
 
-            table = conn.get_table(tables.EventRecord)
-            column_types = get_class_properties(tables.EventRecord).tsv_types
+            table = conn.get_table(EventRecord)
+            column_types = get_class_properties(EventRecord).tsv_types
             parser = Parser(column_types)
 
             with Timer("read file"):

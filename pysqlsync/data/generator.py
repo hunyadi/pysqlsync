@@ -75,16 +75,22 @@ def random_date(start: datetime.date, end: datetime.date) -> datetime.date:
     return start + datetime.timedelta(days=random.randrange(days))
 
 
-def random_time(start: datetime.time, end: datetime.time) -> datetime.time:
+def random_time(
+    start: Optional[datetime.time] = None, end: Optional[datetime.time] = None
+) -> datetime.time:
     """
     Returns a random time between two time objects.
     """
 
-    ts_end = time_today(end)
+    if start is None:
+        start = datetime.time(0, 0, 0, tzinfo=datetime.timezone.utc)
+    if end is None:
+        end = datetime.time(23, 59, 59, tzinfo=datetime.timezone.utc)
+
     ts_start = time_today(start)
+    ts_end = time_today(end)
     delta = ts_end - ts_start
-    seconds = delta.days * 86400 + delta.seconds
-    ts = ts_start + datetime.timedelta(seconds=random.randrange(seconds))
+    ts = ts_start + datetime.timedelta(seconds=random.randrange(delta.seconds))
     return ts.timetz()
 
 
@@ -248,6 +254,8 @@ class RandomGenerator:
                 datetime.date(1982, 10, 23),
                 datetime.date.today(),
             )
+        elif plain_type is datetime.time:
+            return lambda _: random_time()
         elif plain_type is str:
             min_length_tag = get_annotation(field_type, MinLength)
             min_length = min_length_tag.value if min_length_tag is not None else 0
@@ -256,7 +264,7 @@ class RandomGenerator:
             return lambda _: random_alphanumeric_str(min_length, max_length)
         elif plain_type is decimal.Decimal:
             precision = get_annotation(field_type, Precision)
-            significant_digits = precision.significant_digits if precision else 18
+            significant_digits = precision.significant_digits if precision else 10
             decimal_digits = precision.decimal_digits if precision else 0
             return lambda _: random_decimal(significant_digits, decimal_digits)
         elif plain_type is uuid.UUID:

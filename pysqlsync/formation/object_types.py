@@ -9,6 +9,10 @@ from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
 
+class MappingError(RuntimeError):
+    "Raised when a Python class cannot map to a database entity."
+
+
 class FormationError(RuntimeError):
     "Raised when a source state cannot mutate into a target state."
 
@@ -733,6 +737,9 @@ class Catalog(MutableObject):
         :param table_id: Identifies the table in the catalog.
         :returns: The table identified by the qualified name.
         """
+
+        if not self.namespaces:
+            raise MappingError("empty namespace")
 
         return self.namespaces[table_id.scope_id or ""].tables[table_id.local_id]
 

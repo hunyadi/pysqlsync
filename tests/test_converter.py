@@ -49,6 +49,12 @@ class TestConverter(unittest.TestCase):
             [
                 Column(LocalId("id"), SqlIntegerType(8), False),
                 Column(
+                    LocalId("name"),
+                    SqlVariableCharacterType(),
+                    False,
+                    description="The person's full name.",
+                ),
+                Column(
                     LocalId("address"),
                     SqlIntegerType(8),
                     False,

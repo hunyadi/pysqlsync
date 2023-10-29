@@ -60,14 +60,10 @@ class TestGenerator(unittest.TestCase):
                     get_create_stmt(tables.NumericTable, dialect=dialect),
                     'CREATE TABLE "NumericTable" (\n'
                     '"id" bigint NOT NULL,\n'
-                    '"signed_integer_8" smallint NOT NULL,\n'
-                    '"signed_integer_16" smallint NOT NULL,\n'
-                    '"signed_integer_32" integer NOT NULL,\n'
-                    '"signed_integer_64" bigint NOT NULL,\n'
-                    '"unsigned_integer_8" smallint NOT NULL,\n'
-                    '"unsigned_integer_16" smallint NOT NULL,\n'
-                    '"unsigned_integer_32" integer NOT NULL,\n'
-                    '"unsigned_integer_64" bigint NOT NULL,\n'
+                    '"integer_8" smallint NOT NULL,\n'
+                    '"integer_16" smallint NOT NULL,\n'
+                    '"integer_32" integer NOT NULL,\n'
+                    '"integer_64" bigint NOT NULL,\n'
                     '"integer" bigint NOT NULL,\n'
                     '"nullable_integer" bigint,\n'
                     'PRIMARY KEY ("id")\n'
@@ -289,13 +285,33 @@ class TestGenerator(unittest.TestCase):
             ");\n"
             'CREATE TABLE "Person" (\n'
             '"id" bigint NOT NULL,\n'
+            '"name" text NOT NULL,\n'
             '"address" bigint NOT NULL,\n'
             'PRIMARY KEY ("id")\n'
             ");\n"
             """COMMENT ON TABLE "Person" IS 'A person.';\n"""
+            """COMMENT ON COLUMN "Person"."name" IS 'The person''s full name.';\n"""
             """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';\n"""
             'ALTER TABLE "Person"\n'
             'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")\n'
+            ";",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.Person, dialect="mssql"),
+            'CREATE TABLE "Address" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"city" varchar(max) NOT NULL,\n'
+            '"state" varchar(max),\n'
+            'PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "Person" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"name" varchar(max) NOT NULL,\n'
+            """"address" bigint NOT NULL,\n"""
+            'PRIMARY KEY ("id")\n'
+            ");\n"
+            'ALTER TABLE "Person" ADD\n'
+            'CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")\n'
             ";",
         )
         self.assertMultiLineEqual(
@@ -308,6 +324,7 @@ class TestGenerator(unittest.TestCase):
             ");\n"
             'CREATE TABLE "Person" (\n'
             '"id" bigint NOT NULL,\n'
+            """"name" mediumtext NOT NULL COMMENT 'The person''s full name.',\n"""
             """"address" bigint NOT NULL COMMENT 'The address of the person''s permanent residence.',\n"""
             'PRIMARY KEY ("id")\n'
             ")\n"
