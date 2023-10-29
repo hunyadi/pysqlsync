@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Optional, overload
 
-from ..model.data_types import SqlDataType, quote
+from ..model.data_types import SqlDataType, constant
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
@@ -75,7 +75,7 @@ class EnumType(QualifiedObject, MutableObject):
         self.values = values
 
     def create_stmt(self) -> str:
-        vals = ", ".join(quote(val) for val in self.values)
+        vals = ", ".join(constant(val) for val in self.values)
         return f"CREATE TYPE {self.name} AS ENUM ({vals});"
 
     def drop_stmt(self) -> str:
@@ -98,7 +98,7 @@ class EnumType(QualifiedObject, MutableObject):
         if added_values:
             return (
                 f"ALTER TYPE {source.name}\n"
-                + ",\n".join(f"ADD VALUE {quote(v)}" for v in added_values)
+                + ",\n".join(f"ADD VALUE {constant(v)}" for v in added_values)
                 + ";"
             )
         else:

@@ -732,18 +732,44 @@ class Explorer(abc.ABC):
         generator = self.conn.connection.generator
         generator.state = await self.get_catalog_meta(namespace=namespace)
 
-    async def synchronize(self, module: types.ModuleType) -> None:
+    @overload
+    async def synchronize(self, *, module: types.ModuleType) -> None:
+        ...
+
+    @overload
+    async def synchronize(self, *, modules: list[types.ModuleType]) -> None:
+        ...
+
+    async def synchronize(
+        self,
+        *,
+        module: Optional[types.ModuleType] = None,
+        modules: Optional[list[types.ModuleType]] = None,
+    ) -> None:
         "Synchronizes a current source state with a desired target state."
+
+        if module is None and modules is None:
+            raise TypeError("required: one of parameters `module` and `modules`")
+        if module is not None and modules is not None:
+            raise TypeError("disallowed: both parameters `module` and `modules`")
+
+        if modules is not None:
+            entity_modules = modules
+        elif module is not None:
+            entity_modules = [module]
+        else:
+            raise NotImplementedError()
 
         generator = self.conn.connection.generator
 
         # determine target database schema
         generator.reset()
-        generator.create(tables=get_entity_types([module]))
+        generator.create(tables=get_entity_types(entity_modules))
         target_state = generator.state
 
         # acquire current database schema
-        await self.acquire(namespace=module.__name__)
+        for m in entity_modules:
+            await self.acquire(namespace=m.__name__)
 
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)

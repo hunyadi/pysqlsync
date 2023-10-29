@@ -10,7 +10,6 @@ from typing import Annotated, Any
 from strong_typing.inspection import (
     DataclassInstance,
     TypeLike,
-    enum_value_types,
     get_annotation,
     is_dataclass_type,
     is_type_enum,
@@ -50,19 +49,22 @@ def tsv_type(plain_type: TypeLike) -> type:
     "Python type that represents the TSV storage type for this data."
 
     if is_type_enum(plain_type):
-        value_types = set(enum_value_types(plain_type))
-        if len(value_types) != 1:
-            raise TypeError("inconsistent enumeration value types")
-        return value_types.pop()
+        return str
     elif is_type_literal(plain_type):
         literal_types = set(tsv_type(t) for t in unwrap_literal_types(plain_type))
         if len(literal_types) != 1:
-            raise TypeError("inconsistent literal value types")
+            raise TypeError(f"inconsistent literal value types: {literal_types}")
         return literal_types.pop()
     elif is_type_union(plain_type):
         union_types = set(tsv_type(t) for t in unwrap_union_types(plain_type))
         if len(union_types) != 1:
-            raise TypeError("inconsistent union types")
+            if (
+                len(union_types) == 2
+                and ipaddress.IPv4Address in union_types
+                and ipaddress.IPv6Address in union_types
+            ):
+                return typing.cast(type, plain_type)
+            raise TypeError(f"inconsistent union types: {union_types}")
         return union_types.pop()
     elif is_dataclass_type(plain_type):
         return dict

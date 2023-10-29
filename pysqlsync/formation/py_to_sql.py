@@ -81,6 +81,15 @@ ENUM_NAME_LENGTH: int = 64
 ENUM_LABEL_TYPE = Annotated[str, MaxLength(ENUM_NAME_LENGTH)]
 
 
+def enum_value_type(enum_type: type[enum.Enum]) -> type:
+    value_types = enum_value_types(enum_type)
+    if len(value_types) > 1:
+        raise TypeError(
+            f"inconsistent enumeration value types for type {enum_type.__name__}: {value_types}"
+        )
+    return value_types.pop()
+
+
 def is_unique(items: Iterable[T]) -> bool:
     "Uniqueness check of unhashable iterables."
 
@@ -344,12 +353,7 @@ class DataclassConverter:
             typ = unadorned_type
 
         if is_type_enum(typ):
-            value_types = enum_value_types(typ)
-            if len(value_types) > 1:
-                raise TypeError(
-                    f"inconsistent enumeration value types for type {typ.__name__}: {value_types}"
-                )
-            value_type = value_types.pop()
+            value_type = enum_value_type(typ)
 
             if self.options.enum_mode is EnumMode.TYPE:
                 return SqlUserDefinedType(
