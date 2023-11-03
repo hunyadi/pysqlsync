@@ -5,17 +5,60 @@ import io
 import re
 import textwrap
 import typing
+from types import ModuleType
 from typing import TextIO
 
 from strong_typing.docstring import has_docstring, parse_type
-from strong_typing.inspection import DataclassInstance
+from strong_typing.inspection import (
+    DataclassInstance,
+    get_module_classes,
+    is_dataclass_type,
+    is_type_enum,
+)
 from strong_typing.name import python_type_to_str
+
+
+def module_to_stream(module: ModuleType, target: TextIO) -> None:
+    "Generates Python code of all declared types in a module."
+
+    print("from __future__ import annotations", file=target)
+    print("import dataclasses", file=target)
+    print("import enum", file=target)
+    print("from datetime import datetime, date, time", file=target)
+    print("from decimal import Decimal", file=target)
+    print("from uuid import UUID", file=target)
+    print(
+        "from typing import Annotated, Dict, List, Literal, Optional, Union",
+        file=target,
+    )
+    print(
+        "from strong_typing.auxiliary import int16, int32, int64, float32, float64, MaxLength, Precision, TimePrecision",
+        file=target,
+    )
+    print(file=target)
+
+    for cls in get_module_classes(module):
+        if is_type_enum(cls):
+            enum_class_to_stream(cls, target)
+        elif is_dataclass_type(cls):
+            dataclass_to_stream(cls, target)
+        else:
+            raise NotImplementedError()
+        print(file=target)
+
+
+def module_to_code(module: ModuleType) -> str:
+    "Generates Python code of all declared types in a module."
+
+    with io.StringIO() as out:
+        module_to_stream(module, out)
+        return out.getvalue()
 
 
 def dataclass_to_stream(typ: type[DataclassInstance], target: TextIO) -> None:
     "Generates Python code corresponding to a dataclass type."
 
-    print("@dataclass", file=target)
+    print("@dataclasses.dataclass", file=target)
     print(f"class {typ.__name__}:", file=target)
 
     # check if class has a doc-string other than the auto-generated string assigned by @dataclass
