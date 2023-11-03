@@ -3,6 +3,8 @@ import ipaddress
 import uuid
 from typing import Any, Callable, Optional
 
+from typing_extensions import override
+
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Column, FormationError, Table
 from pysqlsync.formation.py_to_sql import (
@@ -64,6 +66,7 @@ class MySQLGenerator(BaseGenerator):
             )
         )
 
+    @override
     def get_table_merge_stmt(self, table: Table) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
@@ -77,6 +80,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(";")
         return "\n".join(statements)
 
+    @override
     def get_table_upsert_stmt(self, table: Table) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
@@ -92,6 +96,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(";")
         return "\n".join(statements)
 
+    @override
     def get_field_extractor(
         self, column: Column, field_name: str, field_type: type
     ) -> Callable[[Any], Any]:
@@ -102,6 +107,7 @@ class MySQLGenerator(BaseGenerator):
 
         return super().get_field_extractor(column, field_name, field_type)
 
+    @override
     def get_value_transformer(
         self, column: Column, field_type: type
     ) -> Optional[Callable[[Any], Any]]:

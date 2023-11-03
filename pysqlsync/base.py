@@ -542,6 +542,32 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into the database table.
         """
 
+        if isinstance(records, Sized):
+            LOGGER.debug(f"insert {len(records)} rows into {table.name}")
+        else:
+            LOGGER.debug(f"insert into {table.name}")
+
+        await self._insert_rows(
+            table, records, field_types=field_types, field_names=field_names
+        )
+
+        if isinstance(records, Sized):
+            LOGGER.info(f"{len(records)} rows have been inserted into {table.name}")
+
+    async def _insert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        """
+        Inserts rows in a database table, ignoring duplicate keys.
+
+        Override in engine-specific derived classes.
+        """
+
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
@@ -550,8 +576,6 @@ class BaseContext(abc.ABC):
             statement,
             record_generator,
         )
-        if isinstance(records, Sized):
-            LOGGER.info(f"{len(records)} rows have been inserted")
 
     async def upsert_rows(
         self,
@@ -570,6 +594,34 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into or updated in the database table.
         """
 
+        if isinstance(records, Sized):
+            LOGGER.debug(f"upsert {len(records)} rows into {table.name}")
+        else:
+            LOGGER.debug(f"upsert into {table.name}")
+
+        await self._upsert_rows(
+            table, records, field_types=field_types, field_names=field_names
+        )
+
+        if isinstance(records, Sized):
+            LOGGER.info(
+                f"{len(records)} rows have been inserted or updated into {table.name}"
+            )
+
+    async def _upsert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        """
+        Inserts or updates rows in a database table.
+
+        Override in engine-specific derived classes.
+        """
+
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
@@ -578,8 +630,6 @@ class BaseContext(abc.ABC):
             statement,
             record_generator,
         )
-        if isinstance(records, Sized):
-            LOGGER.info(f"{len(records)} rows have been inserted or updated")
 
     async def _generate_records(
         self,

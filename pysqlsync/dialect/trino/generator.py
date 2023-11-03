@@ -1,3 +1,5 @@
+from typing_extensions import override
+
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Table
 from pysqlsync.formation.py_to_sql import (
@@ -24,8 +26,10 @@ class TrinoGenerator(BaseGenerator):
             )
         )
 
+    @override
     def get_table_merge_stmt(self, table: Table) -> str:
         raise NotImplementedError()
 
+    @override
     def get_table_upsert_stmt(self, table: Table) -> str:
         raise NotImplementedError()

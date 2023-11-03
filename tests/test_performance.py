@@ -1,16 +1,17 @@
 import dataclasses
+import logging
 import os.path
 import unittest
 
 from params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 from tsv.helper import Generator, Parser
 
+import tests.model.event
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.properties import get_class_properties
-from tests import tables
 from tests.measure import Timer
 from tests.model.event import EventRecord
 
@@ -30,7 +31,8 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     @property
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(
-            enum_mode=EnumMode.RELATION, namespaces={tables: "performance_test"}
+            enum_mode=EnumMode.RELATION,
+            namespaces={tests.model.event: "performance_test"},
         )
 
     @classmethod
@@ -59,7 +61,7 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     data = parser.parse_file(f)
 
             with Timer(f"insert into {self.engine.name} database table"):
-                await conn.upsert_rows(table, field_types=column_types, records=data)
+                await conn.insert_rows(table, field_types=column_types, records=data)
 
             self.assertEqual(
                 await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};"),
@@ -84,4 +86,14 @@ class TestMySQLConnection(MySQLBase, TestPerformance):
 del TestPerformance
 
 if __name__ == "__main__":
+    import logging
+    import os.path
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    ch = logging.FileHandler(os.path.join(os.path.dirname(__file__), "test.log"), "w")
+    ch.setLevel(logging.DEBUG)
+    logger.addHandler(ch)
+
     unittest.main()

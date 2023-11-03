@@ -5,6 +5,7 @@ from typing import Any, Iterable, Optional, TypeVar
 
 import pyodbc
 from strong_typing.inspection import is_dataclass_type
+from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import quote
@@ -64,17 +65,20 @@ class MSSQLContext(BaseContext):
         return typing.cast(MSSQLConnection, self.connection).native
 
     @thread_dispatch
+    @override
     def _execute(self, statement: str) -> None:
         with self.native_connection.cursor() as cur:
             cur.execute(statement)
 
     @thread_dispatch
+    @override
     def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
             cur.executemany(statement, args)
 
     @thread_dispatch
+    @override
     def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
@@ -84,9 +88,11 @@ class MSSQLContext(BaseContext):
             else:
                 return self._resultset_unwrap_tuple(signature, records)
 
+    @override
     async def current_schema(self) -> Optional[str]:
         return await self.query_one(str, "SELECT SCHEMA_NAME();")
 
+    @override
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")
 
@@ -95,6 +101,7 @@ class MSSQLContext(BaseContext):
             f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(namespace.id)} ) EXEC('CREATE SCHEMA {namespace}');"
         )
 
+    @override
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 

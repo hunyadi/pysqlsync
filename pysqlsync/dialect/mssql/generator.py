@@ -4,6 +4,7 @@ import uuid
 from typing import Any, Callable, Optional
 
 from strong_typing.core import JsonType
+from typing_extensions import override
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Column, FormationError, Table
@@ -65,6 +66,7 @@ class MSSQLGenerator(BaseGenerator):
             )
         )
 
+    @override
     def get_table_insert_stmt(self, table: Table) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
@@ -94,6 +96,7 @@ class MSSQLGenerator(BaseGenerator):
 
         return statements
 
+    @override
     def get_table_merge_stmt(self, table: Table) -> str:
         columns = [column for column in table.columns.values() if not column.identity]
         statements = self._get_merge_preamble(table, columns)
@@ -106,6 +109,7 @@ class MSSQLGenerator(BaseGenerator):
         statements.append(";")
         return "\n".join(statements)
 
+    @override
     def get_table_upsert_stmt(self, table: Table) -> str:
         columns = [column for column in table.columns.values() if not column.identity]
         statements: list[str] = self._get_merge_preamble(table, columns)
@@ -124,6 +128,7 @@ class MSSQLGenerator(BaseGenerator):
         statements.append(";")
         return "\n".join(statements)
 
+    @override
     def get_field_extractor(
         self, column: Column, field_name: str, field_type: type
     ) -> Callable[[Any], Any]:
@@ -134,6 +139,7 @@ class MSSQLGenerator(BaseGenerator):
 
         return super().get_field_extractor(column, field_name, field_type)
 
+    @override
     def get_value_transformer(
         self, column: Column, field_type: type
     ) -> Optional[Callable[[Any], Any]]:

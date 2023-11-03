@@ -2,13 +2,14 @@ import dataclasses
 import logging
 import types
 import typing
-from collections.abc import Sized
 from typing import Any, Iterable, Optional, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
+from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.formation.object_types import Table
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -21,13 +22,20 @@ class PostgreSQLConnection(BaseConnection):
 
     async def __aenter__(self) -> BaseContext:
         LOGGER.info(f"connecting to {self.params}")
-        self.native = await asyncpg.connect(
+        conn = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
             user=self.params.username,
             password=self.params.password,
             database=self.params.database,
         )
+
+        ver = conn.get_server_version()
+        LOGGER.info(
+            f"PostgreSQL version {ver.major}.{ver.minor}.{ver.micro} {ver.releaselevel}"
+        )
+
+        self.native = conn
         return PostgreSQLContext(self)
 
     async def __aexit__(
@@ -47,14 +55,17 @@ class PostgreSQLContext(BaseContext):
     def native_connection(self) -> asyncpg.Connection:
         return typing.cast(PostgreSQLConnection, self.connection).native
 
+    @override
     async def _execute(self, statement: str) -> None:
         await self.native_connection.execute(statement)
 
+    @override
     async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
         await self.native_connection.executemany(statement, args)
 
+    @override
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
         if is_dataclass_type(signature):
@@ -62,18 +73,37 @@ class PostgreSQLContext(BaseContext):
         else:
             return self._resultset_unwrap_tuple(signature, records)  # type: ignore
 
+    @override
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
-        if isinstance(data, Sized):
-            LOGGER.debug(f"insert {len(data)} rows into {table}")
-        else:
-            LOGGER.debug(f"insert into {table}")
-
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator
         records = generator.get_dataclasses_as_records(data)
-        await self.native_connection.copy_records_to_table(
+        result = await self.native_connection.copy_records_to_table(
             table_name=table.__name__,
             columns=tuple(field.name for field in dataclasses.fields(table)),
             records=records,
         )
+        LOGGER.debug(result)
+
+    @override
+    async def _insert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        result = await self.native_connection.copy_records_to_table(
+            schema_name=table.name.scope_id,
+            table_name=table.name.local_id,
+            columns=field_names
+            if field_names is not None
+            else list(str(col.name.local_id) for col in table.columns.values()),
+            records=record_generator,
+        )
+        LOGGER.debug(result)

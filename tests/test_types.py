@@ -45,7 +45,7 @@ class TestTypes(unittest.TestCase):
     def test_dataclass(self) -> None:
         self.assertMultiLineEqual(
             dataclass_to_code(Example),
-            "@dataclass\n"
+            "@dataclasses.dataclass\n"
             "class Example:\n"
             '    """\n'
             "    Documentation string.\n"

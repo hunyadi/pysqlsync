@@ -27,7 +27,7 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             )
             await conn.execute('DROP TABLE "DataTable";')
 
-    async def test_insert(self) -> None:
+    async def test_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
@@ -42,7 +42,7 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.execute_all(statement, records)
             await conn.drop_objects()
 
-    async def test_bulk_insert(self) -> None:
+    async def test_bulk_upsert(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
