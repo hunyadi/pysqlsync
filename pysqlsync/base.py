@@ -651,19 +651,7 @@ class BaseContext(abc.ABC):
         :param field_names: Label for each record field.
         """
 
-        if field_names is not None:
-            columns: list[Column] = []
-
-            for field_name in field_names:
-                column = table.columns.get(field_name, None)
-                if column is None:
-                    raise ValueError(
-                        f"column {LocalId(field_name)} not found in table {table.name}"
-                    )
-                columns.append(column)
-        else:
-            columns = list(table.columns.values())
-
+        columns = table.get_columns(field_names)
         generator = self.connection.generator
 
         transformers: list[Optional[Callable[[Any], Any]]] = []

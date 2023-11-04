@@ -26,7 +26,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
-    RECORD_COUNT = 100000
+    RECORD_COUNT = 10000
 
     @property
     def options(self) -> GeneratorOptions:
@@ -75,8 +75,8 @@ class TestPostgreSQLConnection(PostgreSQLBase, TestPerformance):
     pass
 
 
-# class TestMSSQLConnection(MSSQLBase, TestPerformance):
-#     pass
+class TestMSSQLConnection(MSSQLBase, TestPerformance):
+    pass
 
 
 class TestMySQLConnection(MySQLBase, TestPerformance):

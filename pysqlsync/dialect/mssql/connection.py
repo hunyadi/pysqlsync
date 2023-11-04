@@ -8,9 +8,12 @@ from strong_typing.inspection import is_dataclass_type
 from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.util.dispatch import thread_dispatch
+
+from .data_types import sql_to_odbc_type
 
 T = TypeVar("T")
 
@@ -133,3 +136,51 @@ class MSSQLContext(BaseContext):
             await self.execute(f"DROP TABLE IF EXISTS {table_list};")
 
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace};")
+
+    @thread_dispatch
+    def _execute_typed(
+        self,
+        statement: str,
+        records: Iterable[tuple[Any, ...]],
+        table: Table,
+        field_names: Optional[tuple[str, ...]],
+    ) -> None:
+        with self.native_connection.cursor() as cur:
+            cur.fast_executemany = True
+            cur.setinputsizes(
+                [
+                    sql_to_odbc_type(column.data_type)
+                    for column in table.get_columns(field_names)
+                ]
+            )
+            cur.executemany(statement, records)
+
+    @override
+    async def _insert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        statement = self.connection.generator.get_table_insert_stmt(table)
+        await self._execute_typed(statement, record_generator, table, field_names)
+
+    @override
+    async def _upsert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        statement = self.connection.generator.get_table_upsert_stmt(table)
+        await self._execute_typed(statement, record_generator, table, field_names)

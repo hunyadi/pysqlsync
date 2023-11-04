@@ -16,7 +16,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType, SqlVariableCharacterType
+from pysqlsync.model.data_types import SqlFixedBinaryType
 
 from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLVariableCharacterType
 from .object_types import MSSQLObjectFactory
@@ -57,7 +57,7 @@ class MSSQLGenerator(BaseGenerator):
                     datetime.datetime: MSSQLDateTimeType(),
                     str: MSSQLVariableCharacterType(),
                     uuid.UUID: SqlFixedBinaryType(16),
-                    JsonType: SqlVariableCharacterType(),
+                    JsonType: MSSQLVariableCharacterType(),
                     ipaddress.IPv4Address: SqlFixedBinaryType(4),
                     ipaddress.IPv6Address: SqlFixedBinaryType(16),
                 },

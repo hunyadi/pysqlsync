@@ -387,6 +387,26 @@ class Table(QualifiedObject, MutableObject):
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
+    def get_columns(
+        self, field_names: Optional[tuple[str, ...]] = None
+    ) -> list[Column]:
+        "Returns columns of a table in a desired order."
+
+        if field_names is not None:
+            columns: list[Column] = []
+
+            for field_name in field_names:
+                column = self.columns.get(field_name, None)
+                if column is None:
+                    raise ValueError(
+                        f"column {LocalId(field_name)} not found in table {self.name}"
+                    )
+                columns.append(column)
+
+            return columns
+        else:
+            return list(self.columns.values())
+
     def is_primary_column(self, column_id: LocalId) -> bool:
         "True if the specified column is a primary key."
 
