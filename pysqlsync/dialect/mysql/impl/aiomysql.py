@@ -1,13 +1,12 @@
 import logging
-import types
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import Any, Iterable, TypeVar
 
 import aiomysql
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
-from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.util.typing import override
 
 from ..connection import MySQLContextBase
 
@@ -20,7 +19,8 @@ LOGGER = logging.getLogger("pysqlsync.mysql.aiomysql")
 class MySQLConnection(BaseConnection):
     native: aiomysql.Connection
 
-    async def __aenter__(self) -> BaseContext:
+    @override
+    async def open(self) -> BaseContext:
         LOGGER.info(f"connecting to {self.params} (with aiomysql)")
         sql_mode = ",".join(
             [
@@ -40,12 +40,8 @@ class MySQLConnection(BaseConnection):
         )
         return MySQLContext(self)
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
-    ) -> None:
+    @override
+    async def close(self) -> None:
         self.native.close()
 
 

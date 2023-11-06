@@ -1,7 +1,7 @@
 import enum
 import unittest
 from dataclasses import dataclass
-from typing import Annotated, Optional, TypeAlias, TypeVar
+from typing import Annotated, Optional, TypeVar
 
 from pysqlsync.python_types import dataclass_to_code, enum_class_to_code
 
@@ -12,7 +12,7 @@ class TypeTag:
 
 
 T = TypeVar("T")
-TypeWrapper: TypeAlias = Annotated[T, TypeTag()]
+TypeWrapper = Annotated[T, TypeTag()]
 
 
 @dataclass

@@ -287,17 +287,23 @@ class BaseConnection(abc.ABC):
         self.generator = generator
         self.params = params
 
-    @abc.abstractmethod
     async def __aenter__(self) -> "BaseContext":
-        ...
+        return await self.open()
 
-    @abc.abstractmethod
     async def __aexit__(
         self,
         exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[types.TracebackType],
     ) -> None:
+        await self.close()
+
+    @abc.abstractmethod
+    async def open(self) -> "BaseContext":
+        ...
+
+    @abc.abstractmethod
+    async def close(self) -> None:
         ...
 
 

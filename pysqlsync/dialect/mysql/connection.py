@@ -4,11 +4,11 @@ import typing
 from typing import Optional, TypeVar
 
 from strong_typing.inspection import DataclassInstance
-from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.util.typing import override
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -45,20 +45,5 @@ if typing.TYPE_CHECKING:
         pass
 
 else:
-    if not hasattr(sys.modules[__name__], "MySQLConnection"):
-        try:
-            from .impl.aiomysql import MySQLConnection as MySQLConnection
-            from .impl.aiomysql import MySQLContext as MySQLContext
-
-            LOGGER.info("aiomysql is installed.")
-        except ImportError:
-            pass
-
-    if not hasattr(sys.modules[__name__], "MySQLConnection"):
-        try:
-            from .impl.mysqlclient import MySQLConnection as MySQLConnection
-            from .impl.mysqlclient import MySQLContext as MySQLContext
-
-            LOGGER.info("mysqlclient is installed.")
-        except ImportError:
-            pass
+    from .impl.aiomysql import MySQLConnection as MySQLConnection
+    from .impl.aiomysql import MySQLContext as MySQLContext

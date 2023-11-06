@@ -3,8 +3,6 @@ import ipaddress
 import uuid
 from typing import Any, Callable, Optional
 
-from typing_extensions import override
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Column, FormationError, Table
 from pysqlsync.formation.py_to_sql import (
@@ -17,6 +15,7 @@ from pysqlsync.formation.py_to_sql import (
 )
 from pysqlsync.model.data_types import SqlFixedBinaryType, SqlIntegerType
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.util.typing import override
 
 from .data_types import MySQLDateTimeType, MySQLVariableCharacterType
 from .object_types import MySQLObjectFactory

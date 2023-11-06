@@ -1,5 +1,4 @@
 from strong_typing.core import JsonType
-from typing_extensions import override
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import FormationError, Table
@@ -11,6 +10,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
+from pysqlsync.util.typing import override
 
 from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory

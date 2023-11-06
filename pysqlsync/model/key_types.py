@@ -1,4 +1,4 @@
-from typing import Annotated, TypeAlias, TypeVar
+from typing import Annotated, TypeVar
 
 T = TypeVar("T")
 
@@ -10,4 +10,4 @@ class PrimaryKeyTag:
         return "PrimaryKey"
 
 
-PrimaryKey: TypeAlias = Annotated[T, PrimaryKeyTag()]
+PrimaryKey = Annotated[T, PrimaryKeyTag()]

@@ -59,21 +59,25 @@ def discover_dialects() -> None:
         if resource.name.startswith((".", "__")) or not resource.is_dir():
             continue
 
-        module = importlib.import_module(
-            f".dialect.{resource.name}.engine", package=__package__
-        )
-        classes = [
-            cls
-            for cls in get_module_classes(module)
-            if re.match(r"^\w+Engine$", cls.__name__)
-        ]
-        engine_type = typing.cast(type[BaseEngine], classes.pop())
-        engine_factory = engine_type()
-        LOGGER.info(
-            f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
-        )
+        try:
+            module = importlib.import_module(
+                f".dialect.{resource.name}.engine", package=__package__
+            )
+            classes = [
+                cls
+                for cls in get_module_classes(module)
+                if re.match(r"^\w+Engine$", cls.__name__)
+            ]
+            engine_type = typing.cast(type[BaseEngine], classes.pop())
+            engine_factory = engine_type()
+            LOGGER.info(
+                f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
+            )
 
-        register_dialect(engine_factory.name, engine_factory)
+            register_dialect(engine_factory.name, engine_factory)
+
+        except ImportError:
+            pass
 
 
 discover_dialects()

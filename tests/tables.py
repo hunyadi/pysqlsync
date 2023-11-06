@@ -28,14 +28,14 @@ class WorkflowState(enum.Enum):
     deleted = "deleted"
 
 
-@dataclass(slots=True)
+@dataclass
 class BooleanTable:
     id: PrimaryKey[int]
     boolean: bool
     nullable_boolean: Optional[bool]
 
 
-@dataclass(slots=True)
+@dataclass
 class NumericTable:
     id: PrimaryKey[int]
 
@@ -48,7 +48,7 @@ class NumericTable:
     nullable_integer: Optional[int]
 
 
-@dataclass(slots=True)
+@dataclass
 class FixedPrecisionFloatTable:
     id: PrimaryKey[int]
     float_32: float32
@@ -57,14 +57,14 @@ class FixedPrecisionFloatTable:
     optional_float_64: Optional[float64]
 
 
-@dataclass(slots=True)
+@dataclass
 class VariablePrecisionFloatTable:
     id: PrimaryKey[int]
     float_value: float
     float_precision: Annotated[float, Precision(5, 2)]
 
 
-@dataclass(slots=True)
+@dataclass
 class DecimalTable:
     id: PrimaryKey[int]
     decimal_value: Decimal
@@ -72,7 +72,7 @@ class DecimalTable:
     decimal_precision: Annotated[Decimal, Precision(5, 2)]
 
 
-@dataclass(slots=True)
+@dataclass
 class StringTable:
     id: PrimaryKey[int]
     arbitrary_length_string: str
@@ -81,7 +81,7 @@ class StringTable:
     nullable_maximum_length_string: Optional[Annotated[str, MaxLength(128)]]
 
 
-@dataclass(slots=True)
+@dataclass
 class DateTimeTable:
     id: PrimaryKey[int]
     iso_date_time: datetime
@@ -91,14 +91,14 @@ class DateTimeTable:
     timestamp_precision: Annotated[datetime, TimePrecision(6)]
 
 
-@dataclass(slots=True)
+@dataclass
 class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
     optional_state: Optional[WorkflowState]
 
 
-@dataclass(slots=True)
+@dataclass
 class IPAddressTable:
     id: PrimaryKey[int]
     ipv4: ipaddress.IPv4Address
@@ -107,19 +107,19 @@ class IPAddressTable:
     optional_ipv6: Optional[ipaddress.IPv6Address]
 
 
-@dataclass(slots=True)
+@dataclass
 class PromotionTable:
     id: PrimaryKey[int]
     string_value = Union[Literal["unknown"], str]
 
 
-@dataclass(slots=True)
+@dataclass
 class DataTable:
     id: PrimaryKey[int]
     data: str
 
 
-@dataclass(slots=True)
+@dataclass
 class UserTable:
     id: PrimaryKey[int]
     created_at: datetime

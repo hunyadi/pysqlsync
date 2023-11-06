@@ -3,7 +3,6 @@ import logging
 import os.path
 import unittest
 
-from params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 from tsv.helper import Generator, Parser
 
 import tests.model.event
@@ -14,6 +13,7 @@ from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.properties import get_class_properties
 from tests.measure import Timer
 from tests.model.event import EventRecord
+from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 
 
 def generate_input_file(data_file_path: str, record_count: int) -> None:
@@ -26,7 +26,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
 
 
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
-    RECORD_COUNT = 10000
+    RECORD_COUNT = 100000
 
     @property
     def options(self) -> GeneratorOptions:
@@ -65,7 +65,7 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(
                 await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};"),
-                self.__class__.RECORD_COUNT,
+                len(data),
             )
 
             await conn.drop_objects()

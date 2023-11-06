@@ -1,17 +1,16 @@
 import logging
-import types
 import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import pyodbc
 from strong_typing.inspection import is_dataclass_type
-from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.util.dispatch import thread_dispatch
+from pysqlsync.util.typing import override
 
 from .data_types import sql_to_odbc_type
 
@@ -27,7 +26,9 @@ class MSSQLConnection(BaseConnection):
 
     native: pyodbc.Connection
 
-    async def __aenter__(self) -> BaseContext:
+    @override
+    @thread_dispatch
+    def open(self) -> BaseContext:
         LOGGER.info(f"connecting to {self.params}")
         params = {
             "DRIVER": "{ODBC Driver 18 for SQL Server}",
@@ -50,12 +51,9 @@ class MSSQLConnection(BaseConnection):
         self.native = conn
         return MSSQLContext(self)
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
-    ) -> None:
+    @override
+    @thread_dispatch
+    def close(self) -> None:
         self.native.close()
 
 
@@ -67,21 +65,21 @@ class MSSQLContext(BaseContext):
     def native_connection(self) -> pyodbc.Connection:
         return typing.cast(MSSQLConnection, self.connection).native
 
-    @thread_dispatch
     @override
+    @thread_dispatch
     def _execute(self, statement: str) -> None:
         with self.native_connection.cursor() as cur:
             cur.execute(statement)
 
-    @thread_dispatch
     @override
+    @thread_dispatch
     def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
             cur.executemany(statement, args)
 
-    @thread_dispatch
     @override
+    @thread_dispatch
     def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()

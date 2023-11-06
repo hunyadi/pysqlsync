@@ -35,11 +35,11 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
         return repr(list(self._items.values()))
 
     @overload
-    def get(self, key: str, /) -> ObjectItem | None:
+    def get(self, key: str, /) -> Optional[ObjectItem]:
         ...
 
     @overload
-    def get(self, key: str, /, default: ObjectItem | T) -> ObjectItem | T:
+    def get(self, key: str, /, default: Union[ObjectItem, T]) -> Union[ObjectItem, T]:
         ...
 
     def get(

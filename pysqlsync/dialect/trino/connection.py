@@ -1,13 +1,12 @@
-import types
 import typing
 from typing import Any, Iterable, Optional, TypeVar
 
 import aiotrino
 from strong_typing.inspection import is_dataclass_type
-from typing_extensions import override
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.formation.object_types import Table
+from pysqlsync.util.typing import override
 
 T = TypeVar("T")
 
@@ -15,7 +14,8 @@ T = TypeVar("T")
 class TrinoConnection(BaseConnection):
     native: aiotrino.dbapi.Connection
 
-    async def __aenter__(self) -> BaseContext:
+    @override
+    async def open(self) -> BaseContext:
         self.native = aiotrino.dbapi.connect(
             host=self.params.host,
             port=self.params.port,
@@ -28,12 +28,8 @@ class TrinoConnection(BaseConnection):
         )
         return TrinoContext(self)
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
-    ) -> None:
+    @override
+    async def close(self) -> None:
         await self.native.close()
 
 

@@ -1,5 +1,3 @@
-from typing_extensions import override
-
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.object_types import Table
 from pysqlsync.formation.py_to_sql import (
@@ -10,6 +8,7 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
+from pysqlsync.util.typing import override
 
 
 class TrinoGenerator(BaseGenerator):

@@ -3,8 +3,6 @@ import unittest
 from dataclasses import dataclass
 from io import BytesIO
 
-from strong_typing.inspection import dataclass_fields
-
 import tests.tables as tables
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter
