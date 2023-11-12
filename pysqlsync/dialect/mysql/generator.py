@@ -18,6 +18,7 @@ from pysqlsync.model.id_types import LocalId
 from pysqlsync.util.typing import override
 
 from .data_types import MySQLDateTimeType, MySQLVariableCharacterType
+from .mutation import MySQLMutator
 from .object_types import MySQLObjectFactory
 
 
@@ -29,7 +30,7 @@ class MySQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, MySQLObjectFactory())
+        super().__init__(options, MySQLObjectFactory(), MySQLMutator())
 
         if options.enum_mode is EnumMode.TYPE:
             raise FormationError(

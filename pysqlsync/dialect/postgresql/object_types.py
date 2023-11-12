@@ -1,13 +1,6 @@
 import re
-import typing
-from typing import Optional
 
-from pysqlsync.formation.object_types import (
-    MutableObject,
-    ObjectFactory,
-    StructType,
-    Table,
-)
+from pysqlsync.formation.object_types import ObjectFactory, StructType, Table
 
 _sql_quoted_str_table = str.maketrans(
     {
@@ -48,45 +41,6 @@ class PostgreSQLTable(Table):
                 )
         return "\n".join(statements)
 
-    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
-        source = typing.cast(Table, src)
-        target = self
-
-        statements: list[str] = []
-        statement = super().mutate_stmt(src)
-        if statement is not None:
-            statements.append(statement)
-
-        for target_column in target.columns.values():
-            source_column = source.columns.get(target_column.name.id)
-
-            source_desc = (
-                source_column.description if source_column is not None else None
-            )
-            target_desc = target_column.description
-
-            if target_desc is None:
-                if source_desc is not None:
-                    statements.append(
-                        f"COMMENT ON COLUMN {self.name}.{target_column.name} IS NULL;"
-                    )
-            else:
-                if source_desc != target_desc:
-                    statements.append(
-                        f"COMMENT ON COLUMN {self.name}.{target_column.name} IS {sql_quoted_string(target_desc)};"
-                    )
-
-        if target.description is None:
-            if source.description is not None:
-                statements.append(f"COMMENT ON TABLE {self.name} IS NULL;")
-        else:
-            if source.description != target.description:
-                statements.append(
-                    f"COMMENT ON TABLE {self.name} IS {sql_quoted_string(target.description)};"
-                )
-
-        return "\n".join(statements)
-
 
 class PostgreSQLStructType(StructType):
     def create_stmt(self) -> str:
@@ -103,9 +57,6 @@ class PostgreSQLStructType(StructType):
                     f"COMMENT ON COLUMN {self.name}.{member.name} IS {sql_quoted_string(member.description)};"
                 )
         return "\n".join(statements)
-
-    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
-        return super().mutate_stmt(src)
 
 
 class PostgreSQLObjectFactory(ObjectFactory):

@@ -12,6 +12,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_ty
 from strong_typing.name import python_type_to_str
 
 from .formation.inspection import get_entity_types
+from .formation.mutation import Mutator
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
 from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
@@ -65,14 +66,19 @@ class BaseGenerator(abc.ABC):
 
     options: GeneratorOptions
     factory: ObjectFactory
+    mutator: Mutator
     converter: DataclassConverter
     state: Catalog
 
     def __init__(
-        self, options: GeneratorOptions, factory: Optional[ObjectFactory] = None
+        self,
+        options: GeneratorOptions,
+        factory: Optional[ObjectFactory] = None,
+        mutator: Optional[Mutator] = None,
     ) -> None:
         self.options = options
         self.factory = factory if factory is not None else ObjectFactory()
+        self.mutator = mutator if mutator is not None else Mutator()
         self.reset()
 
     def reset(self) -> None:
@@ -135,7 +141,7 @@ class BaseGenerator(abc.ABC):
     def get_mutate_stmt(self, target: Catalog) -> Optional[str]:
         "Returns a SQL statement to mutate a source state into a target state."
 
-        return target.mutate_stmt(self.state)
+        return self.mutator.mutate_catalog_stmt(self.state, target)
 
     def get_table_insert_stmt(self, table: Table) -> str:
         "Returns a SQL statement to insert new records in a database table."

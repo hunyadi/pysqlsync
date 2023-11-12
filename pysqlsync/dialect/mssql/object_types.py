@@ -1,13 +1,7 @@
 from typing import Optional
 
-from pysqlsync.formation.object_types import (
-    Column,
-    ColumnFormationError,
-    Namespace,
-    ObjectFactory,
-    Table,
-)
-from pysqlsync.model.data_types import constant, quote
+from pysqlsync.formation.object_types import Column, Namespace, ObjectFactory, Table
+from pysqlsync.model.data_types import quote
 
 
 class MSSQLColumn(Column):
@@ -17,23 +11,6 @@ class MSSQLColumn(Column):
         default = f" DEFAULT {self.default}" if self.default is not None else ""
         identity = " IDENTITY" if self.identity else ""
         return f"{self.data_type}{nullable}{default}{identity}"
-
-    def mutate_column_stmt(self, source: Column) -> list[str]:
-        target = self
-        if source.identity != target.identity:
-            raise ColumnFormationError(
-                f"operation not permitted; cannot add or drop identity property",
-                source.name,
-            )
-
-        statements: list[str] = []
-        if (
-            source.data_type != target.data_type
-            or source.nullable != target.nullable
-            or source.default != target.default
-        ):
-            statements.append(f"ALTER COLUMN {source.name} {target.data_spec}")
-        return statements
 
 
 class MSSQLTable(Table):

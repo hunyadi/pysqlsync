@@ -13,6 +13,7 @@ from pysqlsync.formation.py_to_sql import (
 from pysqlsync.util.typing import override
 
 from .data_types import PostgreSQLJsonType
+from .mutation import PostgreSQLMutator
 from .object_types import PostgreSQLObjectFactory
 
 
@@ -22,7 +23,7 @@ class PostgreSQLGenerator(BaseGenerator):
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, PostgreSQLObjectFactory())
+        super().__init__(options, PostgreSQLObjectFactory(), PostgreSQLMutator())
 
         if options.enum_mode is EnumMode.INLINE:
             raise FormationError(

@@ -1,11 +1,9 @@
-import typing
 from dataclasses import dataclass
 from typing import Optional
 
 from pysqlsync.formation.object_types import (
     Column,
     FormationError,
-    MutableObject,
     ObjectFactory,
     Table,
 )
@@ -36,33 +34,6 @@ class MySQLTable(Table):
         )
         return f"CREATE TABLE {self.name} (\n{definition}\n){comment};"
 
-    def mutate_stmt(self, src: MutableObject) -> Optional[str]:
-        statements: list[str] = []
-        stmt = super().mutate_stmt(src)
-        if stmt is not None:
-            statements.append(stmt)
-
-        source = typing.cast(MySQLTable, src)
-        target = self
-
-        source_desc = source.short_description
-        target_desc = target.short_description
-
-        if source_desc is None:
-            if target_desc is not None:
-                statements.append(
-                    f"ALTER TABLE {self.name} COMMENT = {quote(target_desc)};"
-                )
-        else:
-            if target_desc is None:
-                statements.append(f"ALTER TABLE {self.name} COMMENT = {quote('')};")
-            elif source_desc != target_desc:
-                statements.append(
-                    f"ALTER TABLE {self.name} COMMENT = {quote(target_desc)};"
-                )
-
-        return "\n".join(statements) if statements else None
-
 
 @dataclass(eq=True)
 class MySQLColumn(Column):
@@ -78,20 +49,6 @@ class MySQLColumn(Column):
         identity = " AUTO_INCREMENT" if self.identity else ""
         description = f" COMMENT {self.comment}" if self.description is not None else ""
         return f"{self.data_type}{charset}{nullable}{default}{identity}{description}"
-
-    def mutate_column_stmt(self, src: Column) -> list[str]:
-        source = typing.cast(MySQLColumn, src)
-        target = self
-        statements: list[str] = []
-        if (
-            source.data_type != target.data_type
-            or source.nullable != target.nullable
-            or source.default != target.default
-            or source.identity != target.identity
-            or source.comment != target.comment
-        ):
-            statements.append(f"MODIFY COLUMN {source.name} {target.data_spec}")
-        return statements
 
     @property
     def comment(self) -> Optional[str]:

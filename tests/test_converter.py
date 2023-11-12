@@ -3,6 +3,7 @@ import unittest
 
 import tests.empty as empty
 import tests.tables as tables
+from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.formation.py_to_sql import (
     ENUM_NAME_LENGTH,
@@ -185,7 +186,7 @@ class TestConverter(unittest.TestCase):
             Column(LocalId("social_url"), SqlVariableCharacterType(), False)
         )
         self.assertEqual(
-            target.mutate_stmt(source),
+            Mutator().mutate_catalog_stmt(source, target),
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
             'ALTER TABLE "public"."UserTable"\n'

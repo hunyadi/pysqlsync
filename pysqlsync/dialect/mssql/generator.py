@@ -19,6 +19,7 @@ from pysqlsync.model.data_types import SqlFixedBinaryType
 from pysqlsync.util.typing import override
 
 from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLVariableCharacterType
+from .mutation import MSSQLMutator
 from .object_types import MSSQLObjectFactory
 
 
@@ -30,7 +31,7 @@ class MSSQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, MSSQLObjectFactory())
+        super().__init__(options, MSSQLObjectFactory(), MSSQLMutator())
 
         if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
             raise FormationError(
