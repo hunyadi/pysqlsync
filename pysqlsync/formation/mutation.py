@@ -1,4 +1,4 @@
-import abc
+from dataclasses import dataclass
 from typing import Callable, Mapping, Optional, TypeVar
 
 from ..model.id_types import SupportsName
@@ -16,10 +16,32 @@ from .object_types import (
     TableFormationError,
 )
 
-T = TypeVar("T", bound=DatabaseObject)
+
+@dataclass
+class MutatorOptions:
+    """
+    Options for synchronizing an existing source state with a desired target state.
+
+    :param allow_drop_enum: Permit dropping enumeration types.
+    :param allow_drop_struct: Permit dropping (non-table) structure types.
+    :param allow_drop_table: Permit dropping tables.
+    :param allow_drop_namespace: Permit dropping namespaces (database schemas) and all objects within.
+    """
+
+    allow_drop_enum: bool = True
+    allow_drop_struct: bool = True
+    allow_drop_table: bool = True
+    allow_drop_namespace: bool = True
 
 
-class Mutator(abc.ABC):
+class Mutator:
+    "Morphs an existing source state into a desired target state."
+
+    options: MutatorOptions
+
+    def __init__(self, options: Optional[MutatorOptions] = None) -> None:
+        self.options = options or MutatorOptions()
+
     def check_identity(self, source: SupportsName, target: SupportsName) -> None:
         if source.name != target.name:
             raise FormationError(f"object mismatch: {source.name} != {target.name}")
@@ -119,17 +141,25 @@ class Mutator(abc.ABC):
                 "failed to drop columns in table", target.name
             ) from e
 
-        if source.constraints and not target.constraints:
-            for constraint in source.constraints:
-                if constraint.is_alter_table():
-                    statements.append(f"DROP CONSTRAINT {constraint.name}")
-        elif not source.constraints and target.constraints:
-            for constraint in target.constraints:
-                if constraint.is_alter_table():
-                    statements.append(f"ADD CONSTRAINT {constraint.spec}")
-        elif source.constraints and target.constraints:
-            for target_constraint in target.constraints:
-                ...
+        for name, source_constraint in source.constraints.items():
+            if name in target.constraints:
+                continue
+
+            if source_constraint.is_alter_table():
+                statements.append(f"DROP CONSTRAINT {source_constraint.name}")
+
+        for name, target_constraint in target.constraints.items():
+            if name in source.constraints:
+                source_constraint = source.constraints[name]
+
+                if source_constraint != target_constraint:
+                    raise TableFormationError(
+                        f"failed to mutate constraint `{name}`", target.name
+                    )
+                continue
+
+            if target_constraint.is_alter_table():
+                statements.append(f"ADD CONSTRAINT {target_constraint.spec}")
 
         if statements:
             return source.alter_table_stmt(statements)
@@ -163,9 +193,12 @@ class Mutator(abc.ABC):
             _mutate_diff(self.mutate_table_stmt, source.tables, target.tables)
         )
 
-        statements.extend(_drop_diff(source.tables, target.tables))
-        statements.extend(_drop_diff(source.structs, target.structs))
-        statements.extend(_drop_diff(source.enums, target.enums))
+        if self.options.allow_drop_table:
+            statements.extend(_drop_diff(source.tables, target.tables))
+        if self.options.allow_drop_struct:
+            statements.extend(_drop_diff(source.structs, target.structs))
+        if self.options.allow_drop_enum:
+            statements.extend(_drop_diff(source.enums, target.enums))
 
         return "\n".join(statements) if statements else None
 
@@ -189,22 +222,28 @@ class Mutator(abc.ABC):
                 statement = source.namespaces[id].drop_constraints_stmt()
                 if statement:
                     statements.append(statement)
-        statements.extend(_drop_diff(source.namespaces, target.namespaces))
+
+        if self.options.allow_drop_namespace:
+            statements.extend(_drop_diff(source.namespaces, target.namespaces))
+
         return "\n".join(statements) if statements else None
 
 
-def _create_diff(source: Mapping[str, T], target: Mapping[str, T]) -> list[str]:
+Obj = TypeVar("Obj", bound=DatabaseObject)
+
+
+def _create_diff(source: Mapping[str, Obj], target: Mapping[str, Obj]) -> list[str]:
     return [target[id].create_stmt() for id in target.keys() if id not in source.keys()]
 
 
-def _drop_diff(source: Mapping[str, T], target: Mapping[str, T]) -> list[str]:
+def _drop_diff(source: Mapping[str, Obj], target: Mapping[str, Obj]) -> list[str]:
     return [source[id].drop_stmt() for id in source.keys() if id not in target.keys()]
 
 
 def _mutate_diff(
-    mutate_fn: Callable[[T, T], Optional[str]],
-    source: Mapping[str, T],
-    target: Mapping[str, T],
+    mutate_fn: Callable[[Obj, Obj], Optional[str]],
+    source: Mapping[str, Obj],
+    target: Mapping[str, Obj],
 ) -> list[str]:
     statements: list[str] = []
 

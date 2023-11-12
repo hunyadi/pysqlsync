@@ -3,7 +3,7 @@ import unittest
 
 import tests.empty as empty
 import tests.tables as tables
-from pysqlsync.formation.mutation import Mutator
+from pysqlsync.formation.mutation import Mutator, MutatorOptions
 from pysqlsync.formation.object_types import Column, StructMember
 from pysqlsync.formation.py_to_sql import (
     ENUM_NAME_LENGTH,
@@ -180,8 +180,10 @@ class TestConverter(unittest.TestCase):
         target = copy.deepcopy(source)
         target_ns = target.namespaces["public"]
         target_ns.enums["WorkflowState"].values.append("unknown")
+        target_ns.structs.remove("Coordinates")
         target_ns.tables.remove("Employee")
         target_ns.tables["UserTable"].columns.remove("homepage_url")
+        target_ns.tables["UserTable"].columns["short_name"].nullable = True
         target_ns.tables["UserTable"].columns.add(
             Column(LocalId("social_url"), SqlVariableCharacterType(), False)
         )
@@ -190,9 +192,27 @@ class TestConverter(unittest.TestCase):
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
             'ALTER TABLE "public"."UserTable"\n'
+            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'ADD COLUMN "social_url" text NOT NULL,\n'
             'DROP COLUMN "homepage_url";\n'
-            'DROP TABLE "public"."Employee";',
+            'DROP TABLE "public"."Employee";\n'
+            'DROP TYPE "public"."Coordinates";',
+        )
+        self.assertEqual(
+            Mutator(
+                MutatorOptions(
+                    allow_drop_enum=False,
+                    allow_drop_struct=False,
+                    allow_drop_table=False,
+                    allow_drop_namespace=False,
+                )
+            ).mutate_catalog_stmt(source, target),
+            'ALTER TYPE "public"."WorkflowState"\n'
+            "ADD VALUE 'unknown';\n"
+            'ALTER TABLE "public"."UserTable"\n'
+            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
+            'ADD COLUMN "social_url" text NOT NULL,\n'
+            'DROP COLUMN "homepage_url";',
         )
 
 

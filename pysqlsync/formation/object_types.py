@@ -273,7 +273,7 @@ class Table(DatabaseObject, QualifiedObject):
 
     columns: ObjectDict[Column]
     primary_key: LocalId
-    constraints: Optional[list[Constraint]]
+    constraints: ObjectDict[Constraint]
     description: Optional[str]
 
     def __init__(
@@ -288,15 +288,14 @@ class Table(DatabaseObject, QualifiedObject):
         super().__init__(name)
         self.columns = ObjectDict(columns)
         self.primary_key = primary_key
-        self.constraints = constraints
+        self.constraints = ObjectDict(constraints or [])
         self.description = description
 
     def __str__(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
         defs.append(f"PRIMARY KEY ({self.primary_key})")
-        if self.constraints is not None:
-            defs.extend(str(c) for c in self.constraints)
+        defs.extend(str(c) for c in self.constraints.values())
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
@@ -346,13 +345,12 @@ class Table(DatabaseObject, QualifiedObject):
     def is_unique_column(self, column_id: LocalId) -> bool:
         "True if a unique constraint is applied to the specified column."
 
-        if self.constraints is not None:
-            for constraint in self.constraints:
-                if not isinstance(constraint, UniqueConstraint):
-                    continue
-                if column_id != constraint.unique_column:
-                    continue
-                return True
+        for constraint in self.constraints.values():
+            if not isinstance(constraint, UniqueConstraint):
+                continue
+            if column_id != constraint.unique_column:
+                continue
+            return True
 
         return False
 
@@ -395,26 +393,24 @@ class Table(DatabaseObject, QualifiedObject):
     def is_relation(self, column_id: LocalId) -> bool:
         "Checks whether the column is a foreign key relation."
 
-        if self.constraints is not None:
-            for constraint in self.constraints:
-                if not isinstance(constraint, ForeignConstraint):
-                    continue
-                if column_id != constraint.foreign_column:
-                    continue
-                return True
+        for constraint in self.constraints.values():
+            if not isinstance(constraint, ForeignConstraint):
+                continue
+            if column_id != constraint.foreign_column:
+                continue
+            return True
 
         return False
 
     def get_reference(self, column_id: LocalId) -> ConstraintReference:
         "Returns a reference that a column points to."
 
-        if self.constraints is not None:
-            for constraint in self.constraints:
-                if not isinstance(constraint, ForeignConstraint):
-                    continue
-                if column_id != constraint.foreign_column:
-                    continue
-                return constraint.reference
+        for constraint in self.constraints.values():
+            if not isinstance(constraint, ForeignConstraint):
+                continue
+            if column_id != constraint.foreign_column:
+                continue
+            return constraint.reference
 
         raise KeyError(f"foreign constraint not found for column: {column_id}")
 
@@ -432,32 +428,30 @@ class Table(DatabaseObject, QualifiedObject):
         return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"
 
     def add_constraints_stmt(self) -> Optional[str]:
-        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+        if self.table_constraints:
             return (
                 f"ALTER TABLE {self.name}\n"
-                + ",\n".join(
-                    f"ADD CONSTRAINT {c.spec}"
-                    for c in self.constraints
-                    if c.is_alter_table()
-                )
+                + ",\n".join(f"ADD CONSTRAINT {c.spec}" for c in self.table_constraints)
                 + "\n;"
             )
         else:
             return None
 
     def drop_constraints_stmt(self) -> Optional[str]:
-        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+        if self.table_constraints:
             return (
                 f"ALTER TABLE {self.name}\n"
                 + ",\n".join(
-                    f"DROP CONSTRAINT {c.name}"
-                    for c in self.constraints
-                    if c.is_alter_table()
+                    f"DROP CONSTRAINT {c.name}" for c in self.table_constraints
                 )
                 + "\n;"
             )
         else:
             return None
+
+    @property
+    def table_constraints(self) -> list[Constraint]:
+        return [c for c in self.constraints.values() if c.is_alter_table()]
 
 
 @dataclass

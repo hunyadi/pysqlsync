@@ -31,7 +31,9 @@ class MSSQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, MSSQLObjectFactory(), MSSQLMutator())
+        super().__init__(
+            options, MSSQLObjectFactory(), MSSQLMutator(options.synchronization)
+        )
 
         if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
             raise FormationError(

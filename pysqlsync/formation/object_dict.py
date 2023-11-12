@@ -1,4 +1,4 @@
-from collections.abc import KeysView, Mapping, ValuesView
+from collections.abc import ItemsView, KeysView, Mapping, ValuesView
 from typing import Generic, Iterable, Iterator, Optional, TypeVar, Union, overload
 
 from ..model.id_types import SupportsName
@@ -61,3 +61,6 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
 
     def values(self) -> ValuesView[ObjectItem]:
         return self._items.values()
+
+    def items(self) -> ItemsView[str, ObjectItem]:
+        return self._items.items()

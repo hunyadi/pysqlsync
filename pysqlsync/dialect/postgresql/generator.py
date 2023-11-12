@@ -23,7 +23,11 @@ class PostgreSQLGenerator(BaseGenerator):
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, PostgreSQLObjectFactory(), PostgreSQLMutator())
+        super().__init__(
+            options,
+            PostgreSQLObjectFactory(),
+            PostgreSQLMutator(options.synchronization),
+        )
 
         if options.enum_mode is EnumMode.INLINE:
             raise FormationError(

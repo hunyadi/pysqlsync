@@ -20,28 +20,20 @@ class MSSQLTable(Table):
         )
 
     def add_constraints_stmt(self) -> Optional[str]:
-        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+        if self.table_constraints:
             return (
                 f"ALTER TABLE {self.name} ADD\n"
-                + ",\n".join(
-                    f"CONSTRAINT {c.spec}"
-                    for c in self.constraints
-                    if c.is_alter_table()
-                )
+                + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints)
                 + "\n;"
             )
         else:
             return None
 
     def drop_constraints_stmt(self) -> Optional[str]:
-        if self.constraints and any(c.is_alter_table() for c in self.constraints):
+        if self.table_constraints:
             return (
                 f"ALTER TABLE {self.name} DROP\n"
-                + ",\n".join(
-                    f"CONSTRAINT {c.name}"
-                    for c in self.constraints
-                    if c.is_alter_table()
-                )
+                + ",\n".join(f"CONSTRAINT {c.name}" for c in self.table_constraints)
                 + "\n;"
             )
         else:

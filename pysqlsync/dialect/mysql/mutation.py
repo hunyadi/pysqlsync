@@ -44,7 +44,6 @@ class MySQLMutator(Mutator):
         source = typing.cast(MySQLColumn, source_column)
         target = typing.cast(MySQLColumn, target_column)
 
-        statements: list[str] = []
         if (
             source.data_type != target.data_type
             or source.nullable != target.nullable
@@ -52,9 +51,6 @@ class MySQLMutator(Mutator):
             or source.identity != target.identity
             or source.comment != target.comment
         ):
-            statements.append(f"MODIFY COLUMN {source.name} {target.data_spec}")
-
-        if statements:
-            return ",\n".join(statements)
+            return f"MODIFY COLUMN {source.name} {target.data_spec}"
         else:
             return None

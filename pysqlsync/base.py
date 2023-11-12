@@ -12,7 +12,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_ty
 from strong_typing.name import python_type_to_str
 
 from .formation.inspection import get_entity_types
-from .formation.mutation import Mutator
+from .formation.mutation import Mutator, MutatorOptions
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
 from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
@@ -41,6 +41,7 @@ class GeneratorOptions:
     :param struct_mode: Conversion mode for composite types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
+    :param synchronization: Synchronization options.
     :param skip_annotations: Annotation classes to ignore on table column types.
     """
 
@@ -51,6 +52,7 @@ class GeneratorOptions:
         default_factory=dict
     )
     foreign_constraints: bool = True
+    synchronization: MutatorOptions = dataclasses.field(default_factory=MutatorOptions)
     skip_annotations: tuple[type, ...] = ()
 
 

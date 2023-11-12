@@ -12,15 +12,11 @@ class MSSQLMutator(Mutator):
                 source.name,
             )
 
-        statements: list[str] = []
         if (
             source.data_type != target.data_type
             or source.nullable != target.nullable
             or source.default != target.default
         ):
-            statements.append(f"ALTER COLUMN {source.name} {target.data_spec}")
-
-        if statements:
-            return ",\n".join(statements)
+            return f"ALTER COLUMN {source.name} {target.data_spec}"
         else:
             return None

@@ -30,7 +30,9 @@ class MySQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, MySQLObjectFactory(), MySQLMutator())
+        super().__init__(
+            options, MySQLObjectFactory(), MySQLMutator(options.synchronization)
+        )
 
         if options.enum_mode is EnumMode.TYPE:
             raise FormationError(

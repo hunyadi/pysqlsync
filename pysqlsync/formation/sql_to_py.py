@@ -118,21 +118,18 @@ class SqlConverter:
         elif column.nullable:
             field_type = Optional[field_type]
 
-        if table.constraints is not None:
-            for c in table.constraints:
-                if not isinstance(c, ReferenceConstraint):
-                    continue
+        for c in table.constraints.values():
+            if not isinstance(c, ReferenceConstraint):
+                continue
 
-                if column.name != c.foreign_column:
-                    continue
+            if column.name != c.foreign_column:
+                continue
 
-                if isinstance(c, ForeignConstraint):
-                    field_type = self.qual_to_module(c.reference.table)
-                elif isinstance(c, DiscriminatedConstraint):
-                    union_types = tuple(
-                        self.qual_to_module(r.table) for r in c.references
-                    )
-                    field_type = Union[union_types]
+            if isinstance(c, ForeignConstraint):
+                field_type = self.qual_to_module(c.reference.table)
+            elif isinstance(c, DiscriminatedConstraint):
+                union_types = tuple(self.qual_to_module(r.table) for r in c.references)
+                field_type = Union[union_types]  # type: ignore
 
         return (
             field_name,
