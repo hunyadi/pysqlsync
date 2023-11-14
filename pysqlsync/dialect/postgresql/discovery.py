@@ -3,12 +3,7 @@ from itertools import groupby
 from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
-from pysqlsync.formation.data_types import (
-    SqlArrayType,
-    SqlDiscovery,
-    SqlDiscoveryOptions,
-    quote,
-)
+from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import DiscoveryError
 from pysqlsync.formation.object_types import (
     Column,
@@ -22,6 +17,7 @@ from pysqlsync.formation.object_types import (
     Table,
     UniqueConstraint,
 )
+from pysqlsync.model.data_types import SqlArrayType, quote
 from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 
 from .data_types import PostgreSQLJsonType
@@ -92,7 +88,7 @@ class PostgreSQLExplorer(Explorer):
             tuple[str, str],
             "SELECT nsp.nspname, cls.relname\n"
             "FROM pg_catalog.pg_class AS cls INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
-            f"WHERE cls.relkind = 'r' OR cls.relkind = 'v'",
+            "WHERE cls.relkind = 'r' OR cls.relkind = 'v'",
         )
         return [QualifiedId(row[0], row[1]) for row in rows]  # type: ignore
 

@@ -1,5 +1,4 @@
 import dataclasses
-import logging
 import os.path
 import unittest
 
@@ -87,7 +86,6 @@ del TestPerformance
 
 if __name__ == "__main__":
     import logging
-    import os.path
 
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)

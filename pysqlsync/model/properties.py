@@ -22,7 +22,7 @@ from strong_typing.inspection import (
     unwrap_union_types,
 )
 
-from .key_types import PrimaryKey, PrimaryKeyTag
+from .key_types import PrimaryKeyTag
 
 
 def is_primary_key_type(field_type: TypeLike) -> bool:

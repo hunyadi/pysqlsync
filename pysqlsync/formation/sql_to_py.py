@@ -4,11 +4,13 @@ import decimal
 import keyword
 import sys
 import types
+from dataclasses import dataclass
 from io import StringIO
-from typing import Annotated, Any, Union
+from typing import Annotated, Any, Optional, Union
 from uuid import UUID
 
 from strong_typing.auxiliary import (
+    MaxLength,
     Precision,
     TimePrecision,
     float32,
@@ -20,7 +22,22 @@ from strong_typing.auxiliary import (
 from strong_typing.core import JsonType
 from strong_typing.inspection import DataclassInstance, TypeLike
 
-from ..model.data_types import *
+from ..model.data_types import (
+    SqlBooleanType,
+    SqlDataType,
+    SqlDateType,
+    SqlDecimalType,
+    SqlDoubleType,
+    SqlFloatType,
+    SqlIntegerType,
+    SqlJsonType,
+    SqlRealType,
+    SqlTimestampType,
+    SqlTimeType,
+    SqlUserDefinedType,
+    SqlUuidType,
+    SqlVariableCharacterType,
+)
 from ..model.id_types import SupportsQualifiedId
 from ..model.key_types import PrimaryKey
 from .object_types import (
@@ -129,7 +146,7 @@ class SqlConverter:
                 field_type = self.qual_to_module(c.reference.table)
             elif isinstance(c, DiscriminatedConstraint):
                 union_types = tuple(self.qual_to_module(r.table) for r in c.references)
-                field_type = Union[union_types]  # type: ignore
+                field_type = Union[union_types]
 
         return (
             field_name,

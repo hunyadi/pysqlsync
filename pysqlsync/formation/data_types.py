@@ -1,12 +1,32 @@
 import copy
 import dataclasses
 import re
+from typing import Optional
 
-from ..model.data_types import *
+from ..model.data_types import (
+    SqlBooleanType,
+    SqlDataType,
+    SqlDateType,
+    SqlDecimalType,
+    SqlDoubleType,
+    SqlEnumType,
+    SqlFixedBinaryType,
+    SqlFixedCharacterType,
+    SqlFloatType,
+    SqlIntegerType,
+    SqlJsonType,
+    SqlRealType,
+    SqlTimestampType,
+    SqlTimeType,
+    SqlUserDefinedType,
+    SqlUuidType,
+    SqlVariableBinaryType,
+    SqlVariableCharacterType,
+)
 from ..model.id_types import QualifiedId
 
 
-@dataclass
+@dataclasses.dataclass
 class SqlDiscoveryOptions:
     substitutions: dict[str, SqlDataType] = dataclasses.field(default_factory=dict)
 

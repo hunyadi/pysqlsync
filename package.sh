@@ -1,4 +1,6 @@
 set -e
+
+# Verify if the package builds successfully for all Python target versions
 if [ -d dist ]; then rm -rf dist; fi
 if [ -d pysqlsync.egg-info ]; then rm -rf pysqlsync.egg-info; fi
 python3 -m build

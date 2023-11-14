@@ -1,5 +1,4 @@
 import logging
-import sys
 import typing
 from typing import Optional, TypeVar
 
@@ -45,5 +44,5 @@ if typing.TYPE_CHECKING:
         pass
 
 else:
-    from .impl.aiomysql import MySQLConnection as MySQLConnection
-    from .impl.aiomysql import MySQLContext as MySQLContext
+    from .impl.aiomysql import MySQLConnection as MySQLConnection  # noqa: F401
+    from .impl.aiomysql import MySQLContext as MySQLContext  # noqa: F401

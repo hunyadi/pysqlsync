@@ -1,7 +1,7 @@
 import asyncio
-import concurrent.futures
 import functools
 import inspect
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Coroutine, TypeVar
 
 from .typing import ParamSpec
@@ -22,7 +22,7 @@ def thread_dispatch(fn: Callable[P, R]) -> Callable[P, Coroutine[None, None, R]]
     @functools.wraps(fn)
     async def invoke(*args: P.args, **kwargs: P.kwargs) -> R:
         loop = asyncio.get_running_loop()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        with ThreadPoolExecutor(max_workers=1) as pool:
             return await loop.run_in_executor(
                 pool, functools.partial(fn, *args, **kwargs)
             )

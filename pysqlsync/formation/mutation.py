@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Callable, Mapping, Optional, TypeVar
 
+from ..model.data_types import constant
 from ..model.id_types import SupportsName
-from .data_types import constant
 from .object_types import (
     Catalog,
     Column,

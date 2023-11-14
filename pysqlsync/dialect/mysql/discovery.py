@@ -10,7 +10,6 @@ from pysqlsync.formation.discovery import (
 )
 from pysqlsync.formation.object_types import (
     Column,
-    Constraint,
     ConstraintReference,
     ForeignConstraint,
 )
@@ -122,7 +121,9 @@ class MySQLExplorer(AnsiExplorer):
             "    kcu.ordinal_position AS uq_ordinal_position\n"
             "FROM information_schema.referential_constraints AS ref\n"
             "    INNER JOIN information_schema.key_column_usage AS kcu\n"
-            "        ON kcu.constraint_catalog = ref.constraint_catalog AND kcu.constraint_schema = ref.constraint_schema AND kcu.constraint_name = ref.constraint_name\n"
+            "        ON kcu.constraint_catalog = ref.constraint_catalog\n"
+            "            AND kcu.constraint_schema = ref.constraint_schema\n"
+            "            AND kcu.constraint_name = ref.constraint_name\n"
             f"WHERE {self._where_table(table_id, 'ref')} AND {self._where_table(table_id, 'kcu')}\n",
         )
 

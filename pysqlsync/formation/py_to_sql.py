@@ -11,6 +11,7 @@ import uuid
 from typing import Annotated, Iterable, Optional, TypeVar
 
 from strong_typing.auxiliary import (
+    MaxLength,
     float32,
     float64,
     int8,
@@ -46,8 +47,35 @@ from strong_typing.inspection import (
 )
 from strong_typing.topological import type_topological_sort
 
-from ..model.data_types import *
-from ..model.id_types import GlobalId, LocalId, PrefixedId, QualifiedId
+from ..model.data_types import (
+    CompatibilityError,
+    SqlArrayType,
+    SqlBooleanType,
+    SqlDataType,
+    SqlDateType,
+    SqlDecimalType,
+    SqlDoubleType,
+    SqlEnumType,
+    SqlFloatType,
+    SqlIntegerType,
+    SqlIntervalType,
+    SqlJsonType,
+    SqlRealType,
+    SqlTimestampType,
+    SqlTimeType,
+    SqlUserDefinedType,
+    SqlUuidType,
+    SqlVariableCharacterType,
+    compatible_type,
+    constant,
+)
+from ..model.id_types import (
+    GlobalId,
+    LocalId,
+    PrefixedId,
+    QualifiedId,
+    SupportsQualifiedId,
+)
 from ..model.properties import get_field_properties
 from .inspection import (
     dataclass_primary_key_name,
@@ -195,7 +223,7 @@ class ArrayMode(enum.Enum):
     "Convert Python list type to SQL JSON type (or its representation type)."
 
 
-@dataclass
+@dataclasses.dataclass
 class DataclassConverterOptions:
     """
     Configuration options for generating a SQL table definition from a Python dataclass.

@@ -1,5 +1,4 @@
 import ipaddress
-import typing
 import unittest
 from datetime import date, datetime, time, timezone
 

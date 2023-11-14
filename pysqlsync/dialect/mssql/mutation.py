@@ -8,7 +8,7 @@ class MSSQLMutator(Mutator):
     def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
         if source.identity != target.identity:
             raise ColumnFormationError(
-                f"operation not permitted; cannot add or drop identity property",
+                "operation not permitted; cannot add or drop identity property",
                 source.name,
             )
 

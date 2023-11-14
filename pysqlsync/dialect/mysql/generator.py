@@ -74,7 +74,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.columns.values() if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f"%s" for column in columns)
+        value_list = ", ".join("%s" for column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append(
             f"ON DUPLICATE KEY UPDATE {table.primary_key} = {table.primary_key}"
@@ -89,7 +89,7 @@ class MySQLGenerator(BaseGenerator):
         columns = [column for column in table.columns.values() if not column.identity]
         statements.append(_field_list([column.name for column in columns]))
         value_columns = table.get_value_columns()
-        statements.append(f"ON DUPLICATE KEY UPDATE")
+        statements.append("ON DUPLICATE KEY UPDATE")
         if value_columns:
             defs = [_field_update(column.name) for column in value_columns]
             statements.append(",\n".join(defs))
@@ -123,7 +123,7 @@ class MySQLGenerator(BaseGenerator):
 
 def _field_list(field_ids: list[LocalId]) -> str:
     field_list = ", ".join(str(field_id) for field_id in field_ids)
-    value_list = ", ".join(f"%s" for _ in field_ids)
+    value_list = ", ".join("%s" for _ in field_ids)
     if False:
         # compatible with MySQL 8.0.19 and later, slow with aiomysql 0.2.0 and earlier
         return f"({field_list}) VALUES ({value_list}) AS EXCLUDED"

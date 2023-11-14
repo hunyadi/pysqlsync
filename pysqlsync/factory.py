@@ -1,7 +1,6 @@
 import importlib
 import importlib.resources
 import logging
-import os.path
 import re
 import typing
 
