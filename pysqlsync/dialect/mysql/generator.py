@@ -69,10 +69,12 @@ class MySQLGenerator(BaseGenerator):
         )
 
     @override
-    def get_table_merge_stmt(self, table: Table) -> str:
+    def get_table_merge_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.columns.values() if not column.identity]
+        columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join("%s" for column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
@@ -83,10 +85,12 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(self, table: Table) -> str:
+    def get_table_upsert_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.columns.values() if not column.identity]
+        columns = [column for column in table.get_columns(order) if not column.identity]
         statements.append(_field_list([column.name for column in columns]))
         value_columns = table.get_value_columns()
         statements.append("ON DUPLICATE KEY UPDATE")

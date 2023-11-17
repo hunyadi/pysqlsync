@@ -165,8 +165,9 @@ class MSSQLContext(BaseContext):
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
-        statement = self.connection.generator.get_table_insert_stmt(table)
-        await self._execute_typed(statement, record_generator, table, field_names)
+        order = tuple(name for name in field_names if name) if field_names else None
+        statement = self.connection.generator.get_table_insert_stmt(table, order)
+        await self._execute_typed(statement, record_generator, table, order)
 
     @override
     async def _upsert_rows(
@@ -180,5 +181,6 @@ class MSSQLContext(BaseContext):
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
-        statement = self.connection.generator.get_table_upsert_stmt(table)
-        await self._execute_typed(statement, record_generator, table, field_names)
+        order = tuple(name for name in field_names if name) if field_names else None
+        statement = self.connection.generator.get_table_upsert_stmt(table, order)
+        await self._execute_typed(statement, record_generator, table, order)

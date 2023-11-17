@@ -308,7 +308,7 @@ class Table(DatabaseObject, QualifiedObject):
             columns: list[Column] = []
 
             for field_name in field_names:
-                column = self.columns.get(field_name, None)
+                column = self.columns.get(field_name)
                 if column is None:
                     raise ValueError(
                         f"column {LocalId(field_name)} not found in table {self.name}"
@@ -333,12 +333,14 @@ class Table(DatabaseObject, QualifiedObject):
 
         raise KeyError(f"no primary column in table: {self.name}")
 
-    def get_value_columns(self) -> list[Column]:
+    def get_value_columns(
+        self, field_names: Optional[tuple[str, ...]] = None
+    ) -> list[Column]:
         "Returns all columns that are not part of the primary key."
 
         return [
             column
-            for column in self.columns.values()
+            for column in self.get_columns(field_names)
             if column.name != self.primary_key
         ]
 

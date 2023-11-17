@@ -1,3 +1,5 @@
+from typing import Optional
+
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
@@ -50,10 +52,12 @@ class PostgreSQLGenerator(BaseGenerator):
         )
 
     @override
-    def get_table_merge_stmt(self, table: Table) -> str:
+    def get_table_merge_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.columns.values() if not column.identity]
+        columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
         statements.append(f"({column_list}) VALUES ({value_list})")
@@ -62,10 +66,12 @@ class PostgreSQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(self, table: Table) -> str:
+    def get_table_upsert_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.columns.values() if not column.identity]
+        columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
         statements.append(f"({column_list}) VALUES ({value_list})")

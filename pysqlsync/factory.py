@@ -3,10 +3,11 @@ import importlib.resources
 import logging
 import re
 import typing
+from urllib.parse import urlparse
 
 from strong_typing.inspection import get_module_classes
 
-from .base import BaseEngine
+from .base import BaseEngine, ConnectionParameters
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -48,6 +49,17 @@ def get_dialect(engine_name: str) -> BaseEngine:
         raise ValueError(f"unrecognized dialect: {engine_name}")
     else:
         return engine_factory
+
+
+def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
+    parts = urlparse(url)
+    return parts.scheme, ConnectionParameters(
+        host=parts.hostname,
+        port=parts.port,
+        username=parts.username,
+        password=parts.password,
+        database=parts.path.lstrip("/") if parts.path else None,
+    )
 
 
 def discover_dialects() -> None:

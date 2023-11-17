@@ -274,7 +274,7 @@ class RandomGenerator:
         elif plain_type is IPv6Address:
             return lambda _: random_ipv6addr()
         elif is_type_enum(plain_type):
-            return lambda _: random_enum(plain_type)  # type: ignore
+            return lambda _: random_enum(plain_type)
         elif is_type_literal(plain_type):
             literal_values = unwrap_literal_values(plain_type)
             if len(literal_values) > 1:

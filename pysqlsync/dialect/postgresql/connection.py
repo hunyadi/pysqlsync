@@ -94,12 +94,11 @@ class PostgreSQLContext(BaseContext):
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
+        order = tuple(name for name in field_names if name) if field_names else None
         result = await self.native_connection.copy_records_to_table(
             schema_name=table.name.scope_id,
             table_name=table.name.local_id,
-            columns=field_names
-            if field_names is not None
-            else list(str(col.name.local_id) for col in table.columns.values()),
+            columns=[str(col.name.local_id) for col in table.get_columns(order)],
             records=record_generator,
         )
         LOGGER.debug(result)

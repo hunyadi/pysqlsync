@@ -70,10 +70,12 @@ class MSSQLGenerator(BaseGenerator):
         )
 
     @override
-    def get_table_insert_stmt(self, table: Table) -> str:
+    def get_table_insert_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.columns.values() if not column.identity]
+        columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join("?" for _ in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
@@ -100,8 +102,10 @@ class MSSQLGenerator(BaseGenerator):
         return statements
 
     @override
-    def get_table_merge_stmt(self, table: Table) -> str:
-        columns = [column for column in table.columns.values() if not column.identity]
+    def get_table_merge_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
+        columns = [column for column in table.get_columns(order) if not column.identity]
         statements = self._get_merge_preamble(table, columns)
 
         statements.append("WHEN NOT MATCHED BY TARGET THEN")
@@ -113,8 +117,10 @@ class MSSQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(self, table: Table) -> str:
-        columns = [column for column in table.columns.values() if not column.identity]
+    def get_table_upsert_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
+        columns = [column for column in table.get_columns(order) if not column.identity]
         statements: list[str] = self._get_merge_preamble(table, columns)
 
         statements.append("WHEN MATCHED THEN")

@@ -113,12 +113,18 @@ class BaseGenerator(abc.ABC):
         if tables is None and modules is None:
             raise TypeError("one of arguments `tables` and `modules` is required")
 
-        if tables:
+        if tables is not None:
+            if not tables:
+                logging.warning("no tables to create")
+
             target = self.converter.dataclasses_to_catalog(tables)
             statement = self.get_mutate_stmt(target)
             self.state = target
             return statement
-        elif modules:
+        elif modules is not None:
+            if not modules:
+                logging.warning("no schemas to create")
+
             target = self.converter.modules_to_catalog(modules)
             statement = self.get_mutate_stmt(target)
             self.state = target
@@ -145,19 +151,25 @@ class BaseGenerator(abc.ABC):
 
         return self.mutator.mutate_catalog_stmt(self.state, target)
 
-    def get_table_insert_stmt(self, table: Table) -> str:
+    def get_table_insert_stmt(
+        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+    ) -> str:
         "Returns a SQL statement to insert new records in a database table."
 
-        return self.get_table_merge_stmt(table)
+        return self.get_table_merge_stmt(table, field_names)
 
     @abc.abstractmethod
-    def get_table_merge_stmt(self, table: Table) -> str:
+    def get_table_merge_stmt(
+        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+    ) -> str:
         "Returns a SQL statement to insert or ignore records in a database table."
 
         ...
 
     @abc.abstractmethod
-    def get_table_upsert_stmt(self, table: Table) -> str:
+    def get_table_upsert_stmt(
+        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+    ) -> str:
         "Returns a SQL statement to insert or update records in a database table."
 
         ...
@@ -585,7 +597,8 @@ class BaseContext(abc.ABC):
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
-        statement = self.connection.generator.get_table_insert_stmt(table)
+        order = tuple(name for name in field_names if name) if field_names else None
+        statement = self.connection.generator.get_table_insert_stmt(table, order)
         await self.execute_all(
             statement,
             record_generator,
@@ -639,7 +652,8 @@ class BaseContext(abc.ABC):
         record_generator = await self._generate_records(
             table, records, field_types=field_types, field_names=field_names
         )
-        statement = self.connection.generator.get_table_upsert_stmt(table)
+        order = tuple(name for name in field_names if name) if field_names else None
+        statement = self.connection.generator.get_table_upsert_stmt(table, order)
         await self.execute_all(
             statement,
             record_generator,
@@ -661,52 +675,111 @@ class BaseContext(abc.ABC):
 
         :param table: The database table descriptor.
         :param records: The records to insert or update.
-        :param field_types: Type of each record field.
-        :param field_names: Label for each record field.
+        :param field_types: Type of each record field. Use `types.NoneType` to omit a field.
+        :param field_names: Label for each record field. Use an empty string for an omitted field.
         """
 
-        columns = table.get_columns(field_names)
         generator = self.connection.generator
 
+        if field_names is None:
+            field_names = tuple(name for name in table.columns.keys())
+
+        indices: list[int] = []
         transformers: list[Optional[Callable[[Any], Any]]] = []
-        for index, column, field_type in zip(range(len(columns)), columns, field_types):
-            transformer = generator.get_value_transformer(column, field_type)
-            if table.is_relation(column.name):
-                relation = generator.state.get_referenced_table(table.name, column.name)
-                if relation.is_lookup_table():
-                    enum_dict: dict[str, int]
+        for index, field_type, field_name in zip(
+            range(len(field_types)), field_types, field_names
+        ):
+            if field_type is types.NoneType or not field_name:
+                continue
 
-                    if field_type is str:
-                        # a single enumeration value represented as a string
-                        values = set(record[index] for record in records)
-                        values.discard(None)  # do not insert NULL into referenced table
-                        enum_dict = await self._merge_lookup_table(relation, values)
-                        transformer = generator.get_enum_transformer(enum_dict)
-                    elif field_type is list:
-                        # a list of enumeration values represented as a list of strings
-                        values = set()
-                        for record in records:
-                            values.update(record[index])
-                        values.discard(None)  # do not insert NULL into referenced table
-                        enum_dict = await self._merge_lookup_table(relation, values)
-                        transformer = generator.get_enum_list_transformer(enum_dict)
-
+            indices.append(index)
+            transformer = await self._get_transformer(
+                table, records, generator, index, field_type, field_name
+            )
             transformers.append(transformer)
 
         if all(transformer is None for transformer in transformers):
-            return records
+            if len(indices) == len(field_types):
+                return records
+            else:
+                return (tuple(record[i] for i in indices) for record in records)
         else:
-            return (
-                tuple(
-                    (
-                        (transformer(field) if field is not None else None)
-                        if transformer is not None
-                        else field
+            if len(indices) == len(field_types):
+                return (
+                    tuple(
+                        (
+                            (transformer(field) if field is not None else None)
+                            if transformer is not None
+                            else field
+                        )
+                        for transformer, field in zip(transformers, record)
                     )
-                    for transformer, field in zip(transformers, record)
+                    for record in records
                 )
-                for record in records
+            else:
+                return (
+                    tuple(
+                        (
+                            (transformer(field) if field is not None else None)
+                            if transformer is not None
+                            else field
+                        )
+                        for transformer, field in zip(
+                            transformers, (record[i] for i in indices)
+                        )
+                    )
+                    for record in records
+                )
+
+    async def _get_transformer(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        generator: BaseGenerator,
+        index: int,
+        field_type: type,
+        field_name: str,
+    ) -> Optional[Callable[[Any], Any]]:
+        """
+        Creates a transformer for a record field.
+
+        :param table: The database table descriptor.
+        :param records: The records to insert or update.
+        :param generator: The generator that produces the transformer function.
+        :param index: Field index.
+        :param field_type: Type of field. Use `types.NoneType` to omit a field.
+        :param field_name: Label for field. Use an empty string for an omitted field.
+        """
+
+        column = table.columns.get(field_name)
+        if column is None:
+            raise ValueError(
+                f"column {LocalId(field_name)} not found in table {table.name}"
             )
+
+        transformer = generator.get_value_transformer(column, field_type)
+
+        if table.is_relation(column.name):
+            relation = generator.state.get_referenced_table(table.name, column.name)
+            if relation.is_lookup_table():
+                enum_dict: dict[str, int]
+
+                if field_type is str:
+                    # a single enumeration value represented as a string
+                    values = set(record[index] for record in records)
+                    values.discard(None)  # do not insert NULL into referenced table
+                    enum_dict = await self._merge_lookup_table(relation, values)
+                    return generator.get_enum_transformer(enum_dict)
+                elif field_type is list:
+                    # a list of enumeration values represented as a list of strings
+                    values = set()
+                    for record in records:
+                        values.update(record[index])
+                    values.discard(None)  # do not insert NULL into referenced table
+                    enum_dict = await self._merge_lookup_table(relation, values)
+                    return generator.get_enum_list_transformer(enum_dict)
+
+        return transformer
 
     async def _merge_lookup_table(
         self, table: Table, values: set[str]

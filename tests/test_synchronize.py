@@ -1,11 +1,14 @@
 import copy
+import random
 import unittest
 from dataclasses import dataclass
 from io import BytesIO
 
+from strong_typing.inspection import dataclass_fields
+
 import tests.tables as tables
 from pysqlsync.base import GeneratorOptions
-from pysqlsync.data.exchange import TextReader, TextWriter
+from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.inspection import get_entity_types
 from pysqlsync.formation.object_types import FormationError
@@ -92,23 +95,30 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             for entity_type in entity_types:
                 entities = random_objects(entity_type, 100)
 
+                # randomize order of columns in tabular file
+                field_names = [field.name for field in dataclass_fields(entity_type)]
+                random.shuffle(field_names)
+                field_mapping = {name: f"value.{name}" for name in field_names}
+
                 # generate random data and write records
                 with BytesIO() as stream:
-                    writer = TextWriter(stream, entity_type)
+                    writer = TextWriter(stream, entity_type, field_mapping)
                     writer.write_objects(entities)
                     data = stream.getvalue()
 
                 # read and parse data into records
                 with BytesIO(data) as stream:
-                    reader = TextReader(stream, entity_type)
-                    columns, field_types = reader.columns, reader.field_types
+                    reader = TextReader(
+                        stream, fields_to_types(entity_type, field_mapping)
+                    )
+                    _, field_types = reader.columns, reader.field_types
                     rows = reader.read_records()
 
                 # insert/update data in database table
                 table = conn.get_table(entity_type)
                 await conn.insert_rows(
                     table,
-                    field_names=columns,
+                    field_names=tuple(field_names),
                     field_types=field_types,
                     records=rows,
                 )
