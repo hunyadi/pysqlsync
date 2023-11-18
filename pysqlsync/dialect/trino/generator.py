@@ -38,3 +38,7 @@ class TrinoGenerator(BaseGenerator):
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
         raise NotImplementedError()
+
+    @override
+    def get_table_delete_stmt(self, table: Table) -> str:
+        raise NotImplementedError()

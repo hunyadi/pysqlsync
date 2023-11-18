@@ -141,7 +141,7 @@ class MSSQLContext(BaseContext):
         statement: str,
         records: Iterable[tuple[Any, ...]],
         table: Table,
-        field_names: Optional[tuple[str, ...]],
+        field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
@@ -184,3 +184,21 @@ class MSSQLContext(BaseContext):
         order = tuple(name for name in field_names if name) if field_names else None
         statement = self.connection.generator.get_table_upsert_stmt(table, order)
         await self._execute_typed(statement, record_generator, table, order)
+
+    @override
+    async def _delete_rows(
+        self, table: Table, key_type: type, key_values: Iterable[Any]
+    ) -> None:
+        generator = self.connection.generator
+        transformer = generator.get_value_transformer(
+            table.get_primary_column(), key_type
+        )
+        if transformer is not None:
+            records = ((transformer(key),) for key in key_values)
+        else:
+            records = ((key,) for key in key_values)
+
+        statement = generator.get_table_delete_stmt(table)
+        await self._execute_typed(
+            statement, records, table, (table.get_primary_column().name.local_id,)
+        )

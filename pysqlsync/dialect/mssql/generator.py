@@ -138,6 +138,10 @@ class MSSQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
+    def get_table_delete_stmt(self, table: Table) -> str:
+        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = ?"
+
+    @override
     def get_field_extractor(
         self, column: Column, field_name: str, field_type: type
     ) -> Callable[[Any], Any]:

@@ -86,3 +86,7 @@ class PostgreSQLGenerator(BaseGenerator):
             statements.append(f"ON CONFLICT ({table.primary_key}) DO NOTHING")
         statements.append(";")
         return "\n".join(statements)
+
+    @override
+    def get_table_delete_stmt(self, table: Table) -> str:
+        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = $1"

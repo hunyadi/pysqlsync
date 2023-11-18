@@ -14,7 +14,16 @@ from pysqlsync.formation.inspection import get_entity_types
 from pysqlsync.formation.object_types import FormationError
 from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.model.properties import get_field_properties
 from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
+
+
+def get_primary_key_name_type(entity_type: type) -> tuple[str, type]:
+    for field in dataclass_fields(entity_type):
+        props = get_field_properties(field.type)
+        if props.is_primary:
+            return field.name, props.tsv_type
+    raise TypeError(f"not an entity type: {entity_type}")
 
 
 @dataclass
@@ -114,7 +123,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     _, field_types = reader.columns, reader.field_types
                     rows = reader.read_records()
 
-                # insert/update data in database table
+                # insert data in database table
                 table = conn.get_table(entity_type)
                 await conn.insert_rows(
                     table,
@@ -122,6 +131,25 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     field_types=field_types,
                     records=rows,
                 )
+                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
+                self.assertEqual(count, len(entities))
+
+                # update data in database table
+                await conn.upsert_rows(
+                    table,
+                    field_names=tuple(field_names),
+                    field_types=field_types,
+                    records=rows,
+                )
+                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
+                self.assertEqual(count, len(entities))
+
+                # delete data from database table
+                primary_name, primary_type = get_primary_key_name_type(entity_type)
+                keys = [getattr(entity, primary_name) for entity in entities]
+                await conn.delete_rows(table, primary_type, keys)
+                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
+                self.assertEqual(count, 0)
 
 
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):

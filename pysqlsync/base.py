@@ -174,6 +174,12 @@ class BaseGenerator(abc.ABC):
 
         ...
 
+    @abc.abstractmethod
+    def get_table_delete_stmt(self, table: Table) -> str:
+        "Returns a SQL statement to delete rows from a database table."
+
+        ...
+
     def get_qualified_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
         return self.converter.create_qualified_id(table.__module__, table.__name__)
 
@@ -802,6 +808,48 @@ class BaseContext(abc.ABC):
             f"SELECT {value_name}, {index_name} FROM {table.name}",
         )
         return dict(results)  # type: ignore
+
+    async def delete_rows(
+        self, table: Table, key_type: type, key_values: Iterable[Any]
+    ) -> None:
+        """
+        Deletes rows from a database table.
+
+        :param table: The table to remove records from.
+        :param key_type: The data type of the key values.
+        :param key_values: The key values to look up in the table.
+        """
+
+        if isinstance(key_values, Sized):
+            LOGGER.debug(f"delete {len(key_values)} rows from {table.name}")
+        else:
+            LOGGER.debug(f"delete from {table.name}")
+
+        await self._delete_rows(table, key_type, key_values)
+
+        if isinstance(key_values, Sized):
+            LOGGER.info(f"{len(key_values)} rows have been deleted from {table.name}")
+
+    async def _delete_rows(
+        self, table: Table, key_type: type, key_values: Iterable[Any]
+    ) -> None:
+        """
+        Deletes rows from a database table.
+
+        Override in engine-specific derived classes.
+        """
+
+        generator = self.connection.generator
+        transformer = generator.get_value_transformer(
+            table.get_primary_column(), key_type
+        )
+        if transformer is not None:
+            records = ((transformer(key),) for key in key_values)
+        else:
+            records = ((key,) for key in key_values)
+
+        statement = generator.get_table_delete_stmt(table)
+        await self.execute_all(statement, records)
 
 
 class DiscoveryError(RuntimeError):
