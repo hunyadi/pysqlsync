@@ -854,8 +854,10 @@ class Explorer(abc.ABC):
         return Catalog(namespaces=[ns])
 
     async def acquire(self, *, namespace: str) -> None:
+        "Merges database objects in a namespace into the current model."
+
         generator = self.conn.connection.generator
-        generator.state = await self.get_catalog_meta(namespace=namespace)
+        generator.state.merge(await self.get_catalog_meta(namespace=namespace))
 
     @overload
     async def synchronize(self, *, module: types.ModuleType) -> None:
@@ -893,6 +895,7 @@ class Explorer(abc.ABC):
         target_state = generator.state
 
         # acquire current database schema
+        generator.reset()
         for m in entity_modules:
             await self.acquire(namespace=m.__name__)
 

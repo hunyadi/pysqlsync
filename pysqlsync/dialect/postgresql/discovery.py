@@ -326,7 +326,7 @@ class PostgreSQLExplorer(Explorer):
             "FROM pg_catalog.pg_type t\n"
             "    JOIN pg_catalog.pg_enum e ON t.oid = e.enumtypid\n"
             "    JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace\n"
-            f"WHERE n.nspname = {quote(namespace_id.id)}"
+            f"WHERE n.nspname = {quote(namespace_id.id)}\n"
             "ORDER BY enum_name, e.enumsortorder\n"
             ";",
         )

@@ -1,4 +1,5 @@
 import abc
+import copy
 from dataclasses import dataclass
 from typing import Optional, overload
 
@@ -538,6 +539,39 @@ class Namespace(DatabaseObject):
             items.append(f"DROP SCHEMA {self.name};")
         return "\n".join(items)
 
+    def merge(self, op: "Namespace") -> None:
+        "Merges the contents of two objects."
+
+        for enum_name, op_enum in op.enums.items():
+            self_enum = self.enums.get(enum_name)
+            if self_enum is not None:
+                if self_enum != op_enum:
+                    raise FormationError(
+                        f"different definitions for {self_enum.name} and {op_enum.name}"
+                    )
+            else:
+                self.enums.add(copy.deepcopy(op_enum))
+
+        for struct_name, op_struct in op.structs.items():
+            self_struct = self.structs.get(struct_name)
+            if self_struct is not None:
+                if self_struct != op_struct:
+                    raise FormationError(
+                        f"different definitions for {self_struct.name} and {op_struct.name}"
+                    )
+            else:
+                self.structs.add(copy.deepcopy(op_struct))
+
+        for table_name, op_table in op.tables.items():
+            self_table = self.tables.get(table_name)
+            if self_table is not None:
+                if self_table != op_table:
+                    raise FormationError(
+                        f"different definitions for {self_table.name} and {op_table.name}"
+                    )
+            else:
+                self.tables.add(copy.deepcopy(op_table))
+
     def __str__(self) -> str:
         return self.create_stmt()
 
@@ -597,6 +631,15 @@ class Catalog(DatabaseObject):
 
     def drop_stmt(self) -> str:
         return "\n".join(n.drop_stmt() for n in self.namespaces.values())
+
+    def merge(self, op: "Catalog") -> None:
+        "Merges the contents of two objects."
+
+        for name, op_ns in op.namespaces.items():
+            if name in self.namespaces:
+                self.namespaces[name].merge(op_ns)
+            else:
+                self.namespaces.add(copy.deepcopy(op_ns))
 
     def __str__(self) -> str:
         statements: list[str] = []
