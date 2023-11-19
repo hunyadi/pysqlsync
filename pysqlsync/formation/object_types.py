@@ -503,6 +503,9 @@ class Namespace(DatabaseObject):
     def create_schema_stmt(self) -> str:
         return f"CREATE SCHEMA {self.name};"
 
+    def drop_schema_stmt(self) -> str:
+        return f"DROP SCHEMA {self.name};"
+
     def create_stmt(self) -> str:
         items: list[str] = []
         if self.name.local_id:
@@ -538,7 +541,7 @@ class Namespace(DatabaseObject):
         items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
         items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
         if self.name.local_id:
-            items.append(f"DROP SCHEMA {self.name};")
+            items.append(self.drop_schema_stmt())
         return "\n".join(items)
 
     def merge(self, op: "Namespace") -> None:

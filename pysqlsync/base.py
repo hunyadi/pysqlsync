@@ -537,11 +537,15 @@ class BaseContext(abc.ABC):
 
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")
-        await self.execute(f"CREATE SCHEMA IF NOT EXISTS {namespace};")
+        factory = self.connection.generator.factory
+        stmt = factory.namespace_class(namespace).create_schema_stmt()
+        await self.execute(stmt)
 
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
-        await self.execute(f"DROP SCHEMA IF EXISTS {namespace} CASCADE;")
+        factory = self.connection.generator.factory
+        stmt = factory.namespace_class(namespace).drop_schema_stmt()
+        await self.execute(stmt)
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
         return self.connection.generator.state.get_table(
@@ -978,6 +982,11 @@ class Explorer(abc.ABC):
         generator.reset()
         for m in entity_modules:
             await self.acquire(namespace=m.__name__)
+        LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")
+        for ns in generator.state.namespaces.values():
+            LOGGER.debug(f"found {len(ns.enums)} enums in namespace {ns.name}")
+            LOGGER.debug(f"found {len(ns.structs)} structs in namespace {ns.name}")
+            LOGGER.debug(f"found {len(ns.tables)} tables in namespace {ns.name}")
 
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)

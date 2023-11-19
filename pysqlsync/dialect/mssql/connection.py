@@ -94,15 +94,6 @@ class MSSQLContext(BaseContext):
         return await self.query_one(str, "SELECT SCHEMA_NAME();")
 
     @override
-    async def create_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"create schema: {namespace}")
-
-        # Microsoft SQL Server requires a separate batch for creating a schema
-        await self.execute(
-            f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(namespace.id)} ) EXEC('CREATE SCHEMA {namespace}');"
-        )
-
-    @override
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 

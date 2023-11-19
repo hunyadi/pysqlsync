@@ -1,6 +1,6 @@
 import re
 
-from pysqlsync.formation.object_types import ObjectFactory, StructType, Table
+from pysqlsync.formation.object_types import Namespace, ObjectFactory, StructType, Table
 
 _sql_quoted_str_table = str.maketrans(
     {
@@ -59,6 +59,14 @@ class PostgreSQLStructType(StructType):
         return "\n".join(statements)
 
 
+class PostgreSQLNamespace(Namespace):
+    def create_schema_stmt(self) -> str:
+        return f"CREATE SCHEMA IF NOT EXISTS {self.name};"
+
+    def drop_schema_stmt(self) -> str:
+        return f"DROP SCHEMA IF EXISTS {self.name} CASCADE;"
+
+
 class PostgreSQLObjectFactory(ObjectFactory):
     @property
     def table_class(self) -> type[Table]:
@@ -67,3 +75,7 @@ class PostgreSQLObjectFactory(ObjectFactory):
     @property
     def struct_class(self) -> type[StructType]:
         return PostgreSQLStructType
+
+    @property
+    def namespace_class(self) -> type[Namespace]:
+        return PostgreSQLNamespace
