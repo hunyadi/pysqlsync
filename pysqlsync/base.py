@@ -207,39 +207,47 @@ class BaseGenerator(abc.ABC):
         table_object = self.state.get_table(self.get_qualified_id(table))
         return self.get_table_upsert_stmt(table_object)
 
-    def get_dataclass_as_record(self, item: DataclassInstance) -> tuple:
+    def get_dataclass_delete_stmt(self, table: type[DataclassInstance]) -> str:
+        "Returns a SQL statement to delete records from a database table."
+
+        table_object = self.state.get_table(self.get_qualified_id(table))
+        return self.get_table_delete_stmt(table_object)
+
+    def get_dataclass_as_record(
+        self, entity_type: type[D], item: D, *, skip_identity: bool = False
+    ) -> tuple:
         "Converts a data-class object into a record to insert into a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(item.__class__))
-        extractors = self._get_dataclass_extractors(table_object, item.__class__)
+        table_object = self.state.get_table(self.get_qualified_id(entity_type))
+        extractors = self._get_dataclass_extractors(
+            table_object, entity_type, skip_identity=skip_identity
+        )
         return tuple(extractor(item) for extractor in extractors)
 
     def get_dataclasses_as_records(
-        self, items: Iterable[DataclassInstance]
-    ) -> list[tuple]:
+        self,
+        entity_type: type[D],
+        items: Iterable[D],
+        *,
+        skip_identity: bool = False,
+    ) -> Iterable[tuple]:
         "Converts a list of data-class objects into a list of records to insert into a database table."
 
-        it = iter(items)
-        item = next(it)
-        table_object = self.state.get_table(self.get_qualified_id(item.__class__))
-        extractors = self._get_dataclass_extractors(table_object, item.__class__)
-
-        results = [tuple(extractor(item) for extractor in extractors)]
-        while True:
-            try:
-                item = next(it)
-            except StopIteration:
-                return results
-            results.append(tuple(extractor(item) for extractor in extractors))
+        table_object = self.state.get_table(self.get_qualified_id(entity_type))
+        extractors = self._get_dataclass_extractors(
+            table_object, entity_type, skip_identity=skip_identity
+        )
+        return (tuple(extractor(item) for extractor in extractors) for item in items)
 
     def _get_dataclass_extractors(
-        self, table: Table, class_type: type[DataclassInstance]
+        self, table: Table, entity_type: type[DataclassInstance], *, skip_identity: bool
     ) -> tuple[Callable[[Any], Any], ...]:
         "Returns a tuple of callable function objects that extracts each field of a data-class."
 
         return tuple(
             self.get_field_extractor(table.columns[field.name], field.name, field.type)
-            for field in dataclasses.fields(class_type)
+            for field in dataclasses.fields(entity_type)
+            if not (skip_identity and table.columns[field.name].identity)
         )
 
     def get_field_extractor(
@@ -559,15 +567,27 @@ class BaseContext(abc.ABC):
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts data in the database table corresponding to the dataclass type."
 
-        return await self.upsert_data(table, data)
+        generator = self.connection.generator
+        statement = generator.get_dataclass_insert_stmt(table)
+        records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
+        await self.execute_all(statement, records)
 
     async def upsert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
 
         generator = self.connection.generator
         statement = generator.get_dataclass_upsert_stmt(table)
-        records = generator.get_dataclasses_as_records(data)
+        records = generator.get_dataclasses_as_records(table, data, skip_identity=False)
         await self.execute_all(statement, records)
+
+    async def delete_data(
+        self, table: type[DataclassInstance], keys: Iterable[Any]
+    ) -> None:
+        "Inserts or updates data in the database table corresponding to the dataclass type."
+
+        generator = self.connection.generator
+        statement = generator.get_dataclass_delete_stmt(table)
+        await self.execute_all(statement, ((key,) for key in keys))
 
     async def insert_rows(
         self,

@@ -442,23 +442,26 @@ class TestGenerator(unittest.TestCase):
         )
 
         self.assertEqual(
-            generator.get_dataclass_as_record(tables.DataTable(123, "abc")),
+            generator.get_dataclass_as_record(
+                tables.DataTable, tables.DataTable(123, "abc")
+            ),
             (123, "abc"),
         )
         self.assertEqual(
             generator.get_dataclass_as_record(
-                tables.StringTable(1, "abc", None, "def", None)
+                tables.StringTable, tables.StringTable(1, "abc", None, "def", None)
             ),
             (1, "abc", None, "def", None),
         )
         self.assertEqual(
             generator.get_dataclass_as_record(
-                tables.StringTable(2, "abc", "def", "ghi", "jkl")
+                tables.StringTable, tables.StringTable(2, "abc", "def", "ghi", "jkl")
             ),
             (2, "abc", "def", "ghi", "jkl"),
         )
         self.assertEqual(
             generator.get_dataclass_as_record(
+                tables.DateTimeTable,
                 tables.DateTimeTable(
                     1,
                     datetime(1982, 10, 23, 23, 59, 59, tzinfo=timezone.utc),
@@ -466,7 +469,7 @@ class TestGenerator(unittest.TestCase):
                     time(23, 59, 59, tzinfo=timezone.utc),
                     None,
                     datetime(1984, 1, 1, 23, 59, 59, tzinfo=timezone.utc),
-                )
+                ),
             ),
             (
                 1,
@@ -479,19 +482,20 @@ class TestGenerator(unittest.TestCase):
         )
         self.assertEqual(
             generator.get_dataclass_as_record(
-                tables.EnumTable(1, tables.WorkflowState.active, None)
+                tables.EnumTable, tables.EnumTable(1, tables.WorkflowState.active, None)
             ),
             (1, "active", None),
         )
         self.assertEqual(
             generator.get_dataclass_as_record(
+                tables.IPAddressTable,
                 tables.IPAddressTable(
                     1,
                     ipaddress.IPv4Address("192.168.0.1"),
                     ipaddress.IPv6Address("2001:db8::"),
                     None,
                     None,
-                )
+                ),
             ),
             (
                 1,

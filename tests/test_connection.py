@@ -33,11 +33,12 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             generator = conn.connection.generator
             statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
             records = generator.get_dataclasses_as_records(
+                tables.DataTable,
                 [
                     tables.DataTable(1, "a"),
                     tables.DataTable(2, "b"),
                     tables.DataTable(3, "c"),
-                ]
+                ],
             )
             await conn.execute_all(statement, records)
             await conn.drop_objects()
@@ -49,10 +50,11 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
             for i in range(10):
                 records = generator.get_dataclasses_as_records(
+                    tables.DataTable,
                     [
                         tables.DataTable(i * 1000 + j, str(i * 1000 + j))
                         for j in range(1000)
-                    ]
+                    ],
                 )
                 await conn.execute_all(statement, records)
             await conn.drop_objects()

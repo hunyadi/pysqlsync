@@ -8,6 +8,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.formation.object_types import Table
+from pysqlsync.model.properties import is_identity_type
 from pysqlsync.util.typing import override
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -74,10 +75,16 @@ class PostgreSQLContext(BaseContext):
         if not is_dataclass_type(table):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator
-        records = generator.get_dataclasses_as_records(data)
+        table_name = generator.get_qualified_id(table)
+        records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
         result = await self.native_connection.copy_records_to_table(
-            table_name=table.__name__,
-            columns=tuple(field.name for field in dataclasses.fields(table)),
+            schema_name=table_name.scope_id,
+            table_name=table_name.local_id,
+            columns=tuple(
+                field.name
+                for field in dataclasses.fields(table)
+                if not is_identity_type(field.type)
+            ),
             records=records,
         )
         LOGGER.debug(result)

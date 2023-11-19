@@ -14,6 +14,7 @@ from pysqlsync.formation.inspection import get_entity_types
 from pysqlsync.formation.object_types import FormationError
 from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.model.key_types import DEFAULT
 from pysqlsync.model.properties import get_field_properties
 from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
 
@@ -91,7 +92,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     explorer = self.engine.create_explorer(conn)
                     await explorer.synchronize(module=tables)
 
-    async def test_insert_update_delete_data(self) -> None:
+    async def test_insert_update_delete_rows(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
@@ -99,60 +100,110 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
-
             entity_types = get_entity_types([tables])
+
             for entity_type in entity_types:
                 if entity_type.__name__ == tables.UniqueTable.__name__:
                     continue
 
-                entities = random_objects(entity_type, 100)
+                with self.subTest(entity=entity_type.__name__):
+                    entities = random_objects(entity_type, 100)
 
-                # randomize order of columns in tabular file
-                field_names = [field.name for field in dataclass_fields(entity_type)]
-                random.shuffle(field_names)
-                field_mapping = {name: f"value.{name}" for name in field_names}
+                    # randomize order of columns in tabular file
+                    field_names = [
+                        field.name for field in dataclass_fields(entity_type)
+                    ]
+                    random.shuffle(field_names)
+                    field_mapping = {name: f"value.{name}" for name in field_names}
 
-                # generate random data and write records
-                with BytesIO() as stream:
-                    writer = TextWriter(stream, entity_type, field_mapping)
-                    writer.write_objects(entities)
-                    data = stream.getvalue()
+                    # generate random data and write records
+                    with BytesIO() as stream:
+                        writer = TextWriter(stream, entity_type, field_mapping)
+                        writer.write_objects(entities)
+                        data = stream.getvalue()
 
-                # read and parse data into records
-                with BytesIO(data) as stream:
-                    reader = TextReader(
-                        stream, fields_to_types(entity_type, field_mapping)
+                    # read and parse data into records
+                    with BytesIO(data) as stream:
+                        reader = TextReader(
+                            stream, fields_to_types(entity_type, field_mapping)
+                        )
+                        _, field_types = reader.columns, reader.field_types
+                        rows = reader.read_records()
+
+                    # insert data in database table
+                    table = conn.get_table(entity_type)
+                    await conn.insert_rows(
+                        table,
+                        field_names=tuple(field_names),
+                        field_types=field_types,
+                        records=rows,
                     )
-                    _, field_types = reader.columns, reader.field_types
-                    rows = reader.read_records()
+                    count = await conn.query_one(
+                        int, f"SELECT COUNT(*) FROM {table.name}"
+                    )
+                    self.assertEqual(count, len(entities))
 
-                # insert data in database table
-                table = conn.get_table(entity_type)
-                await conn.insert_rows(
-                    table,
-                    field_names=tuple(field_names),
-                    field_types=field_types,
-                    records=rows,
-                )
-                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
-                self.assertEqual(count, len(entities))
+                    # update data in database table
+                    await conn.upsert_rows(
+                        table,
+                        field_names=tuple(field_names),
+                        field_types=field_types,
+                        records=rows,
+                    )
+                    count = await conn.query_one(
+                        int, f"SELECT COUNT(*) FROM {table.name}"
+                    )
+                    self.assertEqual(count, len(entities))
 
-                # update data in database table
-                await conn.upsert_rows(
-                    table,
-                    field_names=tuple(field_names),
-                    field_types=field_types,
-                    records=rows,
-                )
-                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
-                self.assertEqual(count, len(entities))
+                    # delete data from database table
+                    primary_name, primary_type = get_primary_key_name_type(entity_type)
+                    keys = [getattr(entity, primary_name) for entity in entities]
+                    await conn.delete_rows(table, primary_type, keys)
+                    count = await conn.query_one(
+                        int, f"SELECT COUNT(*) FROM {table.name}"
+                    )
+                    self.assertEqual(count, 0)
 
-                # delete data from database table
-                primary_name, primary_type = get_primary_key_name_type(entity_type)
-                keys = [getattr(entity, primary_name) for entity in entities]
-                await conn.delete_rows(table, primary_type, keys)
-                count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
-                self.assertEqual(count, 0)
+    async def test_identity_dataclass(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            cls = tables.UniqueTable
+            table_name = conn.connection.generator.get_qualified_id(cls)
+
+            await conn.create_objects([cls])
+
+            # insert 1 records, then insert 2 records
+            await conn.insert_data(cls, [cls(id=DEFAULT, unique="value 1")])
+            await conn.insert_data(
+                cls,
+                [
+                    cls(id=DEFAULT, unique="value 2"),
+                    cls(id=DEFAULT, unique="value 3"),
+                ],
+            )
+            count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table_name}")
+            self.assertEqual(count, 3)
+
+            # update 2 records and insert 3 records
+            # caveat: Microsoft SQL ignores explicit value for IDENTITY column when inserting new record
+            await conn.upsert_data(
+                cls,
+                [
+                    cls(id=2, unique="value 2"),
+                    cls(id=3, unique="value 3"),
+                    cls(id=4, unique="value 4"),
+                    cls(id=5, unique="value 5"),
+                    cls(id=6, unique="value 6"),
+                ],
+            )
+            count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table_name}")
+            self.assertEqual(count, 6)
+
+            # delete 1 record
+            await conn.delete_data(cls, [6])
+            count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table_name}")
+            self.assertEqual(count, 5)
+
+            await conn.drop_objects()
 
 
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
