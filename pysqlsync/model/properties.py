@@ -5,7 +5,7 @@ import ipaddress
 import typing
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated, Any, Union
 
 from strong_typing.inspection import (
     DataclassInstance,
@@ -22,13 +22,25 @@ from strong_typing.inspection import (
     unwrap_union_types,
 )
 
-from .key_types import PrimaryKeyTag
+from .key_types import DefaultTag, IdentityTag, PrimaryKeyTag, UniqueTag
 
 
 def is_primary_key_type(field_type: TypeLike) -> bool:
     "Checks if the field type is marked as the primary key of a table."
 
     return get_annotation(field_type, PrimaryKeyTag) is not None
+
+
+def is_identity_type(field_type: TypeLike) -> bool:
+    "Checks if the field type is marked as an identity column in a table."
+
+    return get_annotation(field_type, IdentityTag) is not None
+
+
+def is_unique_type(field_type: TypeLike) -> bool:
+    "Checks if the field type is marked as a unique column in a table."
+
+    return get_annotation(field_type, UniqueTag) is not None
 
 
 def get_primary_key_name(class_type: type[DataclassInstance]) -> str:
@@ -42,7 +54,7 @@ def get_primary_key_name(class_type: type[DataclassInstance]) -> str:
 
 
 def is_constraint(item: Any) -> bool:
-    return isinstance(item, PrimaryKeyTag)
+    return isinstance(item, (PrimaryKeyTag, IdentityTag, UniqueTag))
 
 
 def tsv_type(plain_type: TypeLike) -> type:
@@ -116,6 +128,8 @@ class FieldProperties:
     nullable: bool
     metadata: tuple[Any, ...]
     is_primary: bool
+    is_identity: bool
+    is_unique: bool
 
     @property
     def field_type(self) -> TypeLike:
@@ -135,34 +149,60 @@ class FieldProperties:
         return tsv_type(self.plain_type)
 
 
+def _get_field_metadata(field_type: TypeLike) -> list[Any]:
+    # field has a type of Annotated[T, ...]
+    return list(getattr(field_type, "__metadata__", ()))
+
+
 def get_field_properties(field_type: TypeLike) -> FieldProperties:
-    if is_type_optional(field_type):
+    "Extracts column properties such as primary key, identity or unique constraints."
+
+    metadata = _get_field_metadata(field_type)
+    plain_type = unwrap_annotated_type(field_type)
+
+    # check if field has DEFAULT as a union type member
+    if is_type_union(plain_type):
+        union_types = list(unwrap_union_types(plain_type))
+        if DefaultTag in union_types:
+            union_types.remove(DefaultTag)
+            plain_type = Union[tuple(union_types)]  # may cease to become a union type
+
+    # check if field is nullable
+    if is_type_optional(plain_type):
         nullable = True
-        field_type = unwrap_optional_type(field_type)
+        plain_type = unwrap_optional_type(plain_type)
     else:
         nullable = False
 
-    metadata = getattr(field_type, "__metadata__", None)
+    metadata.extend(_get_field_metadata(plain_type))
+    plain_type = unwrap_annotated_type(plain_type)
+
     if metadata is None:
         # field has a type without annotations or constraints
         return FieldProperties(
-            plain_type=field_type, nullable=nullable, metadata=(), is_primary=False
+            plain_type=plain_type,
+            nullable=nullable,
+            metadata=(),
+            is_primary=False,
+            is_identity=False,
+            is_unique=False,
         )
 
-    # field has a type of Annotated[T, ...]
-    plain_type = unwrap_annotated_type(field_type)
-
     # check for constraints
-    is_primary = is_primary_key_type(field_type)
+    is_primary = any(isinstance(m, PrimaryKeyTag) for m in metadata)
+    is_identity = any(isinstance(m, IdentityTag) for m in metadata)
+    is_unique = any(isinstance(m, UniqueTag) for m in metadata)
 
     # filter annotations that represent constraints
-    metadata = tuple(item for item in metadata if not is_constraint(item))
+    metadata = [item for item in metadata if not is_constraint(item)]
 
     return FieldProperties(
         plain_type=plain_type,
         nullable=nullable,
-        metadata=metadata,
+        metadata=tuple(metadata),
         is_primary=is_primary,
+        is_identity=is_identity,
+        is_unique=is_unique,
     )
 
 

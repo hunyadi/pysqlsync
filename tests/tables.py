@@ -19,7 +19,7 @@ from strong_typing.auxiliary import (
     int64,
 )
 
-from pysqlsync.model.key_types import PrimaryKey
+from pysqlsync.model.key_types import DEFAULT, Identity, PrimaryKey, Unique
 
 
 class WorkflowState(enum.Enum):
@@ -117,6 +117,16 @@ class PromotionTable:
 class DataTable:
     id: PrimaryKey[int]
     data: str
+
+
+@dataclass
+class UniqueTable:
+    id: PrimaryKey[Identity[int]]
+    unique: Unique[Annotated[str, MaxLength(64)]]
+
+
+UniqueTable(id=DEFAULT, unique="unique")
+UniqueTable(id=23, unique="unique")
 
 
 @dataclass

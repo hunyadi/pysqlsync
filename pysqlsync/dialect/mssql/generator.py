@@ -89,15 +89,13 @@ class MSSQLGenerator(BaseGenerator):
         value_list = ", ".join("?" for _ in columns)
         statements.append(f"USING (VALUES ({value_list})) AS source({column_list})")
 
-        match_columns = [
-            column
-            for column in table.columns.values()
-            if not column.identity and table.is_lookup_column(column.name)
-        ]
-        match_condition = " OR ".join(
-            f"target.{column.name} = source.{column.name}" for column in match_columns
-        )
-        statements.append(f"ON {match_condition}")
+        match_columns = [column for column in columns if table.is_lookup_column(column)]
+        if match_columns:
+            match_condition = " OR ".join(
+                f"target.{column.name} = source.{column.name}"
+                for column in match_columns
+            )
+            statements.append(f"ON {match_condition}")
 
         return statements
 
@@ -120,18 +118,19 @@ class MSSQLGenerator(BaseGenerator):
     def get_table_upsert_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
-        columns = [column for column in table.get_columns(order) if not column.identity]
+        columns = [column for column in table.get_columns(order)]
         statements: list[str] = self._get_merge_preamble(table, columns)
 
+        upsert_columns = [column for column in columns if not column.identity]
         statements.append("WHEN MATCHED THEN")
         update_list = ", ".join(
-            f"target.{column.name} = source.{column.name}" for column in columns
+            f"target.{column.name} = source.{column.name}" for column in upsert_columns
         )
         statements.append(f"UPDATE SET {update_list}")
 
         statements.append("WHEN NOT MATCHED BY TARGET THEN")
-        column_list = ", ".join(str(column.name) for column in columns)
-        insert_list = ", ".join(f"source.{column.name}" for column in columns)
+        column_list = ", ".join(str(column.name) for column in upsert_columns)
+        insert_list = ", ".join(f"source.{column.name}" for column in upsert_columns)
         statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
 
         statements.append(";")

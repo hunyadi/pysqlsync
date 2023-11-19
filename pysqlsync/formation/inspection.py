@@ -121,18 +121,19 @@ def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:
     """
 
     data_type = evaluate_member_type(typ, cls)
-    if is_type_optional(data_type):
+    plain_type = unwrap_annotated_type(data_type)
+    if is_type_optional(plain_type):
         # nullable type
-        required_type = reference_to_key(unwrap_optional_type(data_type), cls)
+        required_type = reference_to_key(unwrap_optional_type(plain_type), cls)
         return Optional[required_type]
-    elif is_entity_type(data_type):
+    elif is_entity_type(plain_type):
         # foreign key reference
-        return dataclass_primary_key_type(data_type)
-    elif is_type_union(data_type):
+        return dataclass_primary_key_type(plain_type)
+    elif is_type_union(plain_type):
         # discriminated key reference
         union_types = tuple(
             evaluate_member_type(t, cls)
-            for t in unwrap_union_types(data_type)
+            for t in unwrap_union_types(plain_type)
             if t is not None
         )
         if all(is_entity_type(t) for t in union_types):

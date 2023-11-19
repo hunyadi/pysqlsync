@@ -69,6 +69,19 @@ class MySQLGenerator(BaseGenerator):
         )
 
     @override
+    def get_table_insert_stmt(
+        self, table: Table, order: Optional[tuple[str, ...]] = None
+    ) -> str:
+        statements: list[str] = []
+        statements.append(f"INSERT INTO {table.name}")
+        columns = [column for column in table.get_columns(order) if not column.identity]
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join("%s" for column in columns)
+        statements.append(f"({column_list}) VALUES ({value_list})")
+        statements.append(";")
+        return "\n".join(statements)
+
+    @override
     def get_table_merge_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
@@ -90,10 +103,10 @@ class MySQLGenerator(BaseGenerator):
     ) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.get_columns(order) if not column.identity]
+        columns = [column for column in table.get_columns(order)]
         statements.append(_field_list([column.name for column in columns]))
-        value_columns = table.get_value_columns()
         statements.append("ON DUPLICATE KEY UPDATE")
+        value_columns = table.get_value_columns()
         if value_columns:
             defs = [_field_update(column.name) for column in value_columns]
             statements.append(",\n".join(defs))

@@ -213,7 +213,10 @@ class RandomGenerator:
         :returns: A callable object that takes a sequence index and returns a random value.
         """
 
-        properties = get_field_properties(reference_to_key(typ, cls))
+        field_properties = get_field_properties(typ)
+        referenced_type = reference_to_key(field_properties.field_type, cls)
+
+        properties = get_field_properties(referenced_type)
         plain_type = properties.plain_type
         field_type = properties.field_type
 

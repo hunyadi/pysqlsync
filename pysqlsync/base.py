@@ -154,7 +154,11 @@ class BaseGenerator(abc.ABC):
     def get_table_insert_stmt(
         self, table: Table, field_names: Optional[tuple[str, ...]] = None
     ) -> str:
-        "Returns a SQL statement to insert new records in a database table."
+        """
+        Returns a SQL statement to insert new records in a database table.
+
+        This statement omits values for identity columns.
+        """
 
         return self.get_table_merge_stmt(table, field_names)
 
@@ -162,7 +166,11 @@ class BaseGenerator(abc.ABC):
     def get_table_merge_stmt(
         self, table: Table, field_names: Optional[tuple[str, ...]] = None
     ) -> str:
-        "Returns a SQL statement to insert or ignore records in a database table."
+        """
+        Returns a SQL statement to insert or ignore records in a database table.
+
+        This statement omits values for identity columns.
+        """
 
         ...
 
@@ -170,7 +178,11 @@ class BaseGenerator(abc.ABC):
     def get_table_upsert_stmt(
         self, table: Table, field_names: Optional[tuple[str, ...]] = None
     ) -> str:
-        "Returns a SQL statement to insert or update records in a database table."
+        """
+        Returns a SQL statement to insert or update records in a database table.
+
+        This statement uses identity column values for lookup.
+        """
 
         ...
 
@@ -765,7 +777,7 @@ class BaseContext(abc.ABC):
 
         transformer = generator.get_value_transformer(column, field_type)
 
-        if table.is_relation(column.name):
+        if table.is_relation(column):
             relation = generator.state.get_referenced_table(table.name, column.name)
             if relation.is_lookup_table():
                 enum_dict: dict[str, int]

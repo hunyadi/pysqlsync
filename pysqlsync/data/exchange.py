@@ -1,4 +1,3 @@
-import abc
 from typing import Any, BinaryIO, Callable, Generic, Optional, Protocol, TypeVar
 
 from strong_typing.inspection import DataclassInstance, dataclass_fields

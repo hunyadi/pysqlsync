@@ -44,14 +44,14 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             namespaces={tables: "sample"}, foreign_constraints=False
         )
 
-    async def test_create_new(self) -> None:
+    async def test_create_schema(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
             self.assertFalse(conn.connection.generator.state.namespaces)
             await explorer.synchronize(module=tables)
             self.assertTrue(conn.connection.generator.state.namespaces)
 
-    async def test_update_existing(self) -> None:
+    async def test_update_schema(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
 
@@ -91,7 +91,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     explorer = self.engine.create_explorer(conn)
                     await explorer.synchronize(module=tables)
 
-    async def test_insert_data(self) -> None:
+    async def test_insert_update_delete_data(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
@@ -102,6 +102,9 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
             entity_types = get_entity_types([tables])
             for entity_type in entity_types:
+                if entity_type.__name__ == tables.UniqueTable.__name__:
+                    continue
+
                 entities = random_objects(entity_type, 100)
 
                 # randomize order of columns in tabular file

@@ -4,7 +4,7 @@ import unittest
 import tests.empty as empty
 import tests.tables as tables
 from pysqlsync.formation.mutation import Mutator, MutatorOptions
-from pysqlsync.formation.object_types import Column, StructMember
+from pysqlsync.formation.object_types import Column, StructMember, UniqueConstraint
 from pysqlsync.formation.py_to_sql import (
     ENUM_NAME_LENGTH,
     DataclassConverter,
@@ -38,6 +38,20 @@ class TestConverter(unittest.TestCase):
                 Column(LocalId("city"), SqlVariableCharacterType(), False),
                 Column(LocalId("state"), SqlVariableCharacterType(), True),
             ],
+        )
+
+    def test_identity(self) -> None:
+        table_def = dataclass_to_table(tables.UniqueTable)
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False, identity=True),
+                Column(LocalId("unique"), SqlVariableCharacterType(64), False),
+            ],
+        )
+        self.assertListEqual(
+            list(table_def.constraints.values()),
+            [UniqueConstraint(LocalId("uq_UniqueTable_unique"), LocalId("unique"))],
         )
 
     def test_foreign_key(self) -> None:

@@ -140,12 +140,8 @@ def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
-        data_type = (
-            unwrap_optional_type(field.type)
-            if is_type_optional(field.type)
-            else field.type
-        )
-        ref = evaluate_member_type(data_type, cls)
+        props = get_field_properties(field.type)
+        ref = evaluate_member_type(props.field_type, cls)
         yield DataclassField(field.name, ref)
 
 
@@ -157,9 +153,8 @@ class DataclassEnumField:
 
 def dataclass_enum_fields(cls: type[DataclassInstance]) -> Iterable[DataclassEnumField]:
     for field in dataclass_fields_as_required(cls):
-        field_type = unwrap_annotated_type(field.type)
-        if is_type_enum(field_type):
-            yield DataclassEnumField(field.name, field_type)
+        if is_type_enum(field.type):
+            yield DataclassEnumField(field.name, field.type)
 
 
 class NamespaceMapping:
@@ -508,6 +503,7 @@ class DataclassConverter:
             name=LocalId(field.name),
             data_type=data_type,
             nullable=props.nullable,
+            identity=props.is_identity,
             description=description,
         )
 
@@ -574,6 +570,15 @@ class DataclassConverter:
         "Extracts the foreign/primary key relationships from a data-class."
 
         constraints: list[Constraint] = []
+
+        for field in dataclass_fields(cls):
+            props = get_field_properties(field.type)
+            if props.is_unique:
+                constraints.append(
+                    UniqueConstraint(
+                        LocalId(f"uq_{cls.__name__}_{field.name}"), LocalId(field.name)
+                    )
+                )
 
         for field in dataclass_fields_as_required(cls):
             if is_entity_type(field.type):
