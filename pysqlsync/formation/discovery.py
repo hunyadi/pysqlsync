@@ -129,10 +129,16 @@ class AnsiExplorer(Explorer):
         return [QualifiedId(record[0], record[1]) for record in records]  # type: ignore[arg-type]
 
     def _where_table(self, table_id: SupportsQualifiedId, alias: str) -> str:
-        conditions: list[str] = []
-        conditions.append(f"{alias}.table_name = {quote(table_id.local_id)}")
-        if table_id.scope_id is not None:
-            conditions.append(f"{alias}.table_schema = {quote(table_id.scope_id)}")
+        table_schema = (
+            quote(table_id.scope_id)
+            if table_id.scope_id is not None
+            else self.conn.connection.generator.get_current_schema_stmt()
+        )
+        table_name = quote(table_id.local_id)
+        conditions = [
+            f"{alias}.table_schema = {table_schema}",
+            f"{alias}.table_name = {table_name}",
+        ]
         return " AND ".join(f"({c})" for c in conditions)
 
     async def has_table(self, table_id: SupportsQualifiedId) -> bool:

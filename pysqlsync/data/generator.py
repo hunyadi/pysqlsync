@@ -216,11 +216,11 @@ class RandomGenerator:
         field_properties = get_field_properties(typ)
         referenced_type = reference_to_key(field_properties.field_type, cls)
 
-        properties = get_field_properties(referenced_type)
-        plain_type = properties.plain_type
-        field_type = properties.field_type
+        value_properties = get_field_properties(referenced_type)
+        plain_type = value_properties.plain_type
+        field_type = value_properties.field_type
 
-        if properties.is_primary:
+        if field_properties.is_primary:
             if plain_type is int:
                 return lambda k: self.keys[k]
             elif plain_type is uuid.UUID:
@@ -228,7 +228,7 @@ class RandomGenerator:
 
             raise DataGeneratorError(f"unknown key type: {plain_type}")
 
-        if properties.nullable:
+        if value_properties.nullable:
             optional_generator = self.create(field_type, cls)
             return (
                 lambda k: optional_generator(k)

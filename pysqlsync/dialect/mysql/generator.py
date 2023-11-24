@@ -69,6 +69,10 @@ class MySQLGenerator(BaseGenerator):
         )
 
     @override
+    def get_current_schema_stmt(self) -> str:
+        return "DATABASE()"
+
+    @override
     def get_table_insert_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:

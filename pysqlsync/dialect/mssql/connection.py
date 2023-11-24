@@ -90,10 +90,6 @@ class MSSQLContext(BaseContext):
                 return self._resultset_unwrap_tuple(signature, records)
 
     @override
-    async def current_schema(self) -> Optional[str]:
-        return await self.query_one(str, "SELECT SCHEMA_NAME();")
-
-    @override
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
 

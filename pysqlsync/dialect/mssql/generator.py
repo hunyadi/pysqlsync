@@ -70,6 +70,10 @@ class MSSQLGenerator(BaseGenerator):
         )
 
     @override
+    def get_current_schema_stmt(self) -> str:
+        return "SCHEMA_NAME()"
+
+    @override
     def get_table_insert_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:

@@ -13,6 +13,7 @@ from pysqlsync.formation.object_types import (
     ConstraintReference,
     ForeignConstraint,
 )
+from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
 
 from .data_types import (
@@ -124,7 +125,7 @@ class MySQLExplorer(AnsiExplorer):
             "        ON kcu.constraint_catalog = ref.constraint_catalog\n"
             "            AND kcu.constraint_schema = ref.constraint_schema\n"
             "            AND kcu.constraint_name = ref.constraint_name\n"
-            f"WHERE {self._where_table(table_id, 'ref')} AND {self._where_table(table_id, 'kcu')}\n",
+            f"WHERE ref.table_name = {quote(table_id.local_id)} AND {self._where_table(table_id, 'kcu')}\n",
         )
 
         constraints: dict[str, ForeignConstraint] = {}

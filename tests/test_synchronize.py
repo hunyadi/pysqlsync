@@ -113,45 +113,58 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     field_names = [
                         field.name for field in dataclass_fields(entity_type)
                     ]
-                    random.shuffle(field_names)
-                    field_mapping = {name: f"value.{name}" for name in field_names}
 
                     # generate random data and write records
+                    random.shuffle(field_names)
+                    field_mapping = {name: f"value.{name}" for name in field_names}
                     with BytesIO() as stream:
                         writer = TextWriter(stream, entity_type, field_mapping)
                         writer.write_objects(entities)
                         data = stream.getvalue()
 
                     # read and parse data into records
+                    field_names.sort()
+                    field_mapping = {name: f"value.{name}" for name in field_names}
                     with BytesIO(data) as stream:
                         reader = TextReader(
                             stream, fields_to_types(entity_type, field_mapping)
                         )
-                        _, field_types = reader.columns, reader.field_types
+                        field_labels, field_types = reader.columns, reader.field_types
                         rows = reader.read_records()
 
-                    # insert data in database table
+                    # use field order as in data file
+                    field_mapping = {value: key for key, value in field_mapping.items()}
+                    field_labels = tuple(field_mapping[label] for label in field_labels)
+
+                    # truncate table
                     table = conn.get_table(entity_type)
+                    await conn.execute(f"DELETE FROM {table.name};")
+                    count = await conn.query_one(
+                        int, f"SELECT COUNT(*) FROM {table.name};"
+                    )
+                    self.assertEqual(count, 0)
+
+                    # insert data in database table
                     await conn.insert_rows(
                         table,
-                        field_names=tuple(field_names),
+                        field_names=field_labels,
                         field_types=field_types,
                         records=rows,
                     )
                     count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name}"
+                        int, f"SELECT COUNT(*) FROM {table.name};"
                     )
                     self.assertEqual(count, len(entities))
 
                     # update data in database table
                     await conn.upsert_rows(
                         table,
-                        field_names=tuple(field_names),
+                        field_names=field_labels,
                         field_types=field_types,
                         records=rows,
                     )
                     count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name}"
+                        int, f"SELECT COUNT(*) FROM {table.name};"
                     )
                     self.assertEqual(count, len(entities))
 
@@ -160,7 +173,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     keys = [getattr(entity, primary_name) for entity in entities]
                     await conn.delete_rows(table, primary_type, keys)
                     count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name}"
+                        int, f"SELECT COUNT(*) FROM {table.name};"
                     )
                     self.assertEqual(count, 0)
 

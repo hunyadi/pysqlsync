@@ -195,6 +195,9 @@ class BaseGenerator(abc.ABC):
     def get_qualified_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
         return self.converter.create_qualified_id(table.__module__, table.__name__)
 
+    def get_current_schema_stmt(self) -> str:
+        return "CURRENT_SCHEMA()"
+
     def get_dataclass_insert_stmt(self, table: type[DataclassInstance]) -> str:
         "Returns a SQL statement to insert or ignore records in a database table."
 
@@ -533,7 +536,8 @@ class BaseContext(abc.ABC):
         )
 
     async def current_schema(self) -> Optional[str]:
-        return await self.query_one(str, "SELECT CURRENT_SCHEMA();")
+        func = self.connection.generator.get_current_schema_stmt()
+        return await self.query_one(str, f"SELECT {func};")
 
     async def create_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"create schema: {namespace}")
