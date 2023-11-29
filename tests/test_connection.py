@@ -80,6 +80,11 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.UserTable])
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, 0)
+            await conn.insert_data(tables.UserTable, [])
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, 0)
             await conn.insert_data(tables.UserTable, data)
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, len(data))
@@ -90,6 +95,11 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
 
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.create_objects([tables.UserTable])
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, 0)
+            await conn.upsert_data(tables.UserTable, [])
+            value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
+            self.assertEqual(value, 0)
             await conn.upsert_data(tables.UserTable, data)
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, len(data))

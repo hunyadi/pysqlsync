@@ -7,11 +7,11 @@ from io import BytesIO
 from strong_typing.inspection import dataclass_fields
 
 import tests.tables as tables
-from pysqlsync.base import GeneratorOptions
+from pysqlsync.base import BaseContext, GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.inspection import get_entity_types
-from pysqlsync.formation.object_types import FormationError
+from pysqlsync.formation.object_types import FormationError, Table
 from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.key_types import DEFAULT
@@ -92,6 +92,10 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     explorer = self.engine.create_explorer(conn)
                     await explorer.synchronize(module=tables)
 
+    async def get_rows(self, conn: BaseContext, table: Table) -> int:
+        count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};")
+        return count
+
     async def test_insert_update_delete_rows(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
@@ -139,43 +143,45 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     # truncate table
                     table = conn.get_table(entity_type)
                     await conn.execute(f"DELETE FROM {table.name};")
-                    count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name};"
-                    )
-                    self.assertEqual(count, 0)
+                    self.assertEqual(await self.get_rows(conn, table), 0)
 
                     # insert data in database table
                     await conn.insert_rows(
                         table,
                         field_names=field_labels,
                         field_types=field_types,
+                        records=[],
+                    )
+                    self.assertEqual(await self.get_rows(conn, table), 0)
+                    await conn.insert_rows(
+                        table,
+                        field_names=field_labels,
+                        field_types=field_types,
                         records=rows,
                     )
-                    count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name};"
-                    )
-                    self.assertEqual(count, len(entities))
+                    self.assertEqual(await self.get_rows(conn, table), len(entities))
 
                     # update data in database table
                     await conn.upsert_rows(
                         table,
                         field_names=field_labels,
                         field_types=field_types,
+                        records=[],
+                    )
+                    self.assertEqual(await self.get_rows(conn, table), len(entities))
+                    await conn.upsert_rows(
+                        table,
+                        field_names=field_labels,
+                        field_types=field_types,
                         records=rows,
                     )
-                    count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name};"
-                    )
-                    self.assertEqual(count, len(entities))
+                    self.assertEqual(await self.get_rows(conn, table), len(entities))
 
                     # delete data from database table
                     primary_name, primary_type = get_primary_key_name_type(entity_type)
                     keys = [getattr(entity, primary_name) for entity in entities]
                     await conn.delete_rows(table, primary_type, keys)
-                    count = await conn.query_one(
-                        int, f"SELECT COUNT(*) FROM {table.name};"
-                    )
-                    self.assertEqual(count, 0)
+                    self.assertEqual(await self.get_rows(conn, table), 0)
 
     async def test_identity_dataclass(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:

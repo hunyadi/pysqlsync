@@ -115,7 +115,7 @@ class BaseGenerator(abc.ABC):
 
         if tables is not None:
             if not tables:
-                logging.warning("no tables to create")
+                LOGGER.warning("no tables to create")
 
             target = self.converter.dataclasses_to_catalog(tables)
             statement = self.get_mutate_stmt(target)
@@ -123,7 +123,7 @@ class BaseGenerator(abc.ABC):
             return statement
         elif modules is not None:
             if not modules:
-                logging.warning("no schemas to create")
+                LOGGER.warning("no schemas to create")
 
             target = self.converter.modules_to_catalog(modules)
             statement = self.get_mutate_stmt(target)
@@ -392,6 +392,9 @@ class BaseContext(abc.ABC):
 
         if isinstance(args, Sized):
             LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
+            if not len(args):
+                LOGGER.warning("no data to execute statement with")
+                return
         else:
             LOGGER.debug(f"execute SQL:\n{statement}")
         try:
@@ -575,6 +578,10 @@ class BaseContext(abc.ABC):
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts data in the database table corresponding to the dataclass type."
 
+        if isinstance(data, Sized) and not len(data):
+            LOGGER.warning("no data to insert")
+            return
+
         generator = self.connection.generator
         statement = generator.get_dataclass_insert_stmt(table)
         records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
@@ -582,6 +589,10 @@ class BaseContext(abc.ABC):
 
     async def upsert_data(self, table: type[D], data: Iterable[D]) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
+
+        if isinstance(data, Sized) and not len(data):
+            LOGGER.warning("no data to upsert")
+            return
 
         generator = self.connection.generator
         statement = generator.get_dataclass_upsert_stmt(table)
@@ -592,6 +603,10 @@ class BaseContext(abc.ABC):
         self, table: type[DataclassInstance], keys: Iterable[Any]
     ) -> None:
         "Inserts or updates data in the database table corresponding to the dataclass type."
+
+        if isinstance(keys, Sized) and not len(keys):
+            LOGGER.warning("no data to delete")
+            return
 
         generator = self.connection.generator
         statement = generator.get_dataclass_delete_stmt(table)
@@ -616,6 +631,9 @@ class BaseContext(abc.ABC):
 
         if isinstance(records, Sized):
             LOGGER.debug(f"insert {len(records)} rows into {table.name}")
+            if not len(records):
+                LOGGER.warning("no rows to insert")
+                return
         else:
             LOGGER.debug(f"insert into {table.name}")
 
@@ -669,6 +687,9 @@ class BaseContext(abc.ABC):
 
         if isinstance(records, Sized):
             LOGGER.debug(f"upsert {len(records)} rows into {table.name}")
+            if not len(records):
+                LOGGER.warning("no rows to upsert")
+                return
         else:
             LOGGER.debug(f"upsert into {table.name}")
 
@@ -862,6 +883,9 @@ class BaseContext(abc.ABC):
 
         if isinstance(key_values, Sized):
             LOGGER.debug(f"delete {len(key_values)} rows from {table.name}")
+            if not len(key_values):
+                LOGGER.warning("no rows to delete")
+                return
         else:
             LOGGER.debug(f"delete from {table.name}")
 
