@@ -37,12 +37,10 @@ from strong_typing.inspection import (
     is_generic_list,
     is_type_enum,
     is_type_literal,
-    is_type_optional,
     is_type_union,
     unwrap_annotated_type,
     unwrap_generic_list,
     unwrap_literal_types,
-    unwrap_optional_type,
     unwrap_union_types,
 )
 from strong_typing.topological import type_topological_sort
@@ -143,6 +141,19 @@ def dataclass_fields_as_required(
         props = get_field_properties(field.type)
         ref = evaluate_member_type(props.field_type, cls)
         yield DataclassField(field.name, ref)
+
+
+def _topological_sort(class_types: list[type]) -> list[type]:
+    """
+    Returns a list of types in topological order.
+
+    Types that don't depend on other types (i.e. fundamental types) are first. Types on which no other types depend are last.
+
+    :param types: A list of types (simple or composite).
+    :returns: A list of the same types but in topological order.
+    """
+
+    return [t for t in type_topological_sort(class_types) if t in class_types]
 
 
 @dataclasses.dataclass
@@ -688,18 +699,16 @@ class DataclassConverter:
         if self.options.struct_mode is StructMode.TYPE:
             struct_types = [obj for obj in referenced_types if is_struct_type(obj)]
             struct_types.sort(key=lambda s: s.__name__)
-            depend_types = type_topological_sort(struct_types)
-            for depend_type in depend_types:
-                if depend_type not in struct_types:
-                    continue
-
-                struct_defs = structs.setdefault(depend_type.__module__, [])
-                struct_defs.append(self.dataclass_to_struct(depend_type))
+            struct_types = _topological_sort(struct_types)
+            for struct_type in struct_types:
+                struct_defs = structs.setdefault(struct_type.__module__, [])
+                struct_defs.append(self.dataclass_to_struct(struct_type))
 
         # create tables
         tables: dict[str, list[Table]] = {}
         table_types = [obj for obj in referenced_types if is_entity_type(obj)]
-        table_types.sort(key=lambda obj: obj.__name__)
+        table_types.sort(key=lambda t: t.__name__)
+        table_types = _topological_sort(table_types)
         for table_type in table_types:
             table_defs = tables.setdefault(table_type.__module__, [])
             table_defs.append(self.dataclass_to_table(table_type))
