@@ -708,7 +708,6 @@ class DataclassConverter:
         tables: dict[str, list[Table]] = {}
         table_types = [obj for obj in referenced_types if is_entity_type(obj)]
         table_types.sort(key=lambda t: t.__name__)
-        table_types = _topological_sort(table_types)
         for table_type in table_types:
             table_defs = tables.setdefault(table_type.__module__, [])
             table_defs.append(self.dataclass_to_table(table_type))

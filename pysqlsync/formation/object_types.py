@@ -500,19 +500,46 @@ class Namespace(DatabaseObject):
         self.structs = ObjectDict(structs or [])
         self.tables = ObjectDict(tables or [])
 
-    def create_schema_stmt(self) -> str:
-        return f"CREATE SCHEMA {self.name};"
+    def create_schema_stmt(self) -> Optional[str]:
+        if self.name.local_id:
+            return f"CREATE SCHEMA {self.name};"
+        else:
+            return None
 
-    def drop_schema_stmt(self) -> str:
-        return f"DROP SCHEMA {self.name};"
+    def drop_schema_stmt(self) -> Optional[str]:
+        if self.name.local_id:
+            return f"DROP SCHEMA {self.name};"
+        else:
+            return None
 
     def create_stmt(self) -> str:
         items: list[str] = []
-        if self.name.local_id:
-            items.append(self.create_schema_stmt())
+        stmt = self.create_schema_stmt()
+        if stmt:
+            items.append(stmt)
+        items.append(self.create_objects_stmt())
+        return "\n".join(items)
+
+    def drop_stmt(self) -> str:
+        items: list[str] = []
+        items.append(self.drop_objects_stmt())
+        stmt = self.drop_schema_stmt()
+        if stmt:
+            items.append(stmt)
+        return "\n".join(items)
+
+    def create_objects_stmt(self) -> str:
+        items: list[str] = []
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
+        return "\n".join(items)
+
+    def drop_objects_stmt(self) -> str:
+        items: list[str] = []
+        items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
+        items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
+        items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
         return "\n".join(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
@@ -534,15 +561,6 @@ class Namespace(DatabaseObject):
             items.append(constraints)
 
         return "\n".join(items) if items else None
-
-    def drop_stmt(self) -> str:
-        items: list[str] = []
-        items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
-        items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
-        items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
-        if self.name.local_id:
-            items.append(self.drop_schema_stmt())
-        return "\n".join(items)
 
     def merge(self, op: "Namespace") -> None:
         "Merges the contents of two objects."
@@ -622,7 +640,14 @@ class Catalog(DatabaseObject):
         return self.get_table(reference.table)
 
     def create_stmt(self) -> str:
-        return "\n".join(n.create_stmt() for n in self.namespaces.values())
+        items: list[str] = []
+        for n in self.namespaces.values():
+            stmt = n.create_schema_stmt()
+            if stmt:
+                items.append(stmt)
+        for n in self.namespaces.values():
+            items.append(n.create_objects_stmt())
+        return "\n".join(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
         items: list[str] = []
@@ -635,7 +660,14 @@ class Catalog(DatabaseObject):
         return "\n".join(items) if items else None
 
     def drop_stmt(self) -> str:
-        return "\n".join(n.drop_stmt() for n in self.namespaces.values())
+        items: list[str] = []
+        for n in self.namespaces.values():
+            items.append(n.drop_objects_stmt())
+        for n in self.namespaces.values():
+            stmt = n.drop_schema_stmt()
+            if stmt:
+                items.append(stmt)
+        return "\n".join(items)
 
     def merge(self, op: "Catalog") -> None:
         "Merges the contents of two objects."

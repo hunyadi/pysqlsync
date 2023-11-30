@@ -546,13 +546,15 @@ class BaseContext(abc.ABC):
         LOGGER.debug(f"create schema: {namespace}")
         factory = self.connection.generator.factory
         stmt = factory.namespace_class(namespace).create_schema_stmt()
-        await self.execute(stmt)
+        if stmt:
+            await self.execute(stmt)
 
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug(f"drop schema: {namespace}")
         factory = self.connection.generator.factory
         stmt = factory.namespace_class(namespace).drop_schema_stmt()
-        await self.execute(stmt)
+        if stmt:
+            await self.execute(stmt)
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
         return self.connection.generator.state.get_table(

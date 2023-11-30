@@ -204,27 +204,58 @@ class Mutator:
 
     def mutate_catalog_stmt(self, source: Catalog, target: Catalog) -> Optional[str]:
         statements: list[str] = []
-        statements.extend(_create_diff(source.namespaces, target.namespaces))
-        for id in target.namespaces.keys():
-            if id not in source.namespaces.keys():
-                statement = target.namespaces[id].add_constraints_stmt()
-                if statement:
-                    statements.append(statement)
 
+        # create new namespaces
+        for id in target.namespaces.keys():
+            if id in source.namespaces.keys():
+                continue
+            stmt = target.namespaces[id].create_schema_stmt()
+            if stmt:
+                statements.append(stmt)
+
+        # create objects in each namespace added
+        for id in target.namespaces.keys():
+            if id in source.namespaces.keys():
+                continue
+            statements.append(target.namespaces[id].create_objects_stmt())
+
+        # add new constraints
+        for id in target.namespaces.keys():
+            if id in source.namespaces.keys():
+                continue
+            stmt = target.namespaces[id].add_constraints_stmt()
+            if stmt:
+                statements.append(stmt)
+
+        # mutate existing namespaces
         statements.extend(
             _mutate_diff(
                 self.mutate_namespace_stmt, source.namespaces, target.namespaces
             )
         )
 
+        # remove old constraints
         for id in source.namespaces.keys():
-            if id not in target.namespaces.keys():
-                statement = source.namespaces[id].drop_constraints_stmt()
-                if statement:
-                    statements.append(statement)
+            if id in target.namespaces.keys():
+                continue
+            stmt = source.namespaces[id].drop_constraints_stmt()
+            if stmt:
+                statements.append(stmt)
 
         if self.options.allow_drop_namespace:
-            statements.extend(_drop_diff(source.namespaces, target.namespaces))
+            # drop objects in each namespace removed
+            for id in source.namespaces.keys():
+                if id in target.namespaces.keys():
+                    continue
+                statements.append(source.namespaces[id].drop_objects_stmt())
+
+            # drop old namespaces
+            for id in source.namespaces.keys():
+                if id in target.namespaces.keys():
+                    continue
+                stmt = source.namespaces[id].drop_schema_stmt()
+                if stmt:
+                    statements.append(stmt)
 
         return "\n".join(statements) if statements else None
 

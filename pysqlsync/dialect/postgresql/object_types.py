@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 from pysqlsync.formation.object_types import Namespace, ObjectFactory, StructType, Table
 
@@ -60,11 +61,17 @@ class PostgreSQLStructType(StructType):
 
 
 class PostgreSQLNamespace(Namespace):
-    def create_schema_stmt(self) -> str:
-        return f"CREATE SCHEMA IF NOT EXISTS {self.name};"
+    def create_schema_stmt(self) -> Optional[str]:
+        if self.name.local_id:
+            return f"CREATE SCHEMA IF NOT EXISTS {self.name};"
+        else:
+            return None
 
-    def drop_schema_stmt(self) -> str:
-        return f"DROP SCHEMA IF EXISTS {self.name} CASCADE;"
+    def drop_schema_stmt(self) -> Optional[str]:
+        if self.name.local_id:
+            return f"DROP SCHEMA IF EXISTS {self.name} CASCADE;"
+        else:
+            return None
 
 
 class PostgreSQLObjectFactory(ObjectFactory):

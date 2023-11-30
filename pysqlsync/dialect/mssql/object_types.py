@@ -41,9 +41,12 @@ class MSSQLTable(Table):
 
 
 class MSSQLNamespace(Namespace):
-    def create_schema_stmt(self) -> str:
-        # Microsoft SQL Server requires a separate batch for creating a schema
-        return f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(self.name.id)} ) EXEC('CREATE SCHEMA {self.name}');"
+    def create_schema_stmt(self) -> Optional[str]:
+        if self.name.local_id:
+            # Microsoft SQL Server requires a separate batch for creating a schema
+            return f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(self.name.id)} ) EXEC('CREATE SCHEMA {self.name}');"
+        else:
+            return None
 
 
 class MSSQLObjectFactory(ObjectFactory):
