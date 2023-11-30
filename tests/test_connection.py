@@ -11,10 +11,17 @@ from pysqlsync.formation.py_to_sql import (
 )
 from pysqlsync.model.id_types import QualifiedId
 from tests import tables
-from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import (
+    MSSQLBase,
+    MySQLBase,
+    PostgreSQLBase,
+    TestEngineBase,
+    disable_integration_tests,
+)
 from tests.timed_test import TimedAsyncioTestCase
 
 
+@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestConnection(TestEngineBase, TimedAsyncioTestCase):
     @property
     def options(self) -> GeneratorOptions:

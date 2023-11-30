@@ -12,7 +12,13 @@ from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.properties import get_class_properties
 from tests.measure import Timer
 from tests.model.event import EventRecord
-from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import (
+    MSSQLBase,
+    MySQLBase,
+    PostgreSQLBase,
+    TestEngineBase,
+    disable_integration_tests,
+)
 
 
 def generate_input_file(data_file_path: str, record_count: int) -> None:
@@ -24,6 +30,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
         generator.generate_file(f, (dataclasses.astuple(item) for item in items))
 
 
+@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     RECORD_COUNT = 100000
 

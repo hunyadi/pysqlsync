@@ -1,4 +1,5 @@
 import abc
+import os
 
 from pysqlsync.base import BaseEngine, ConnectionParameters
 from pysqlsync.factory import get_dialect
@@ -66,3 +67,9 @@ class MySQLBase(TestEngineBase):
             password=None,
             database="levente_hunyadi",
         )
+
+
+def disable_integration_tests() -> bool:
+    "True if integration tests are not to be executed."
+
+    return os.getenv("TEST_SKIP_INTEGRATION", "0") == "1"

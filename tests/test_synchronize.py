@@ -16,7 +16,13 @@ from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.key_types import DEFAULT
 from pysqlsync.model.properties import get_field_properties
-from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import (
+    MSSQLBase,
+    MySQLBase,
+    PostgreSQLBase,
+    TestEngineBase,
+    disable_integration_tests,
+)
 
 
 def get_primary_key_name_type(entity_type: type) -> tuple[str, type]:
@@ -34,6 +40,7 @@ class TestOptions:
     struct_mode: StructMode
 
 
+@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:

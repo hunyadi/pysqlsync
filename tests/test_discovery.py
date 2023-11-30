@@ -5,9 +5,16 @@ from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import NamespaceMapping, dataclass_to_table
 from pysqlsync.model.id_types import LocalId
-from tests.params import MSSQLBase, MySQLBase, PostgreSQLBase, TestEngineBase
+from tests.params import (
+    MSSQLBase,
+    MySQLBase,
+    PostgreSQLBase,
+    TestEngineBase,
+    disable_integration_tests,
+)
 
 
+@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     @property
     def options(self) -> GeneratorOptions:

@@ -411,7 +411,10 @@ class TestGenerator(unittest.TestCase):
             'USING (VALUES (?, ?, ?)) AS source("id", "boolean", "nullable_boolean")\n'
             'ON target."id" = source."id"\n'
             "WHEN MATCHED THEN\n"
-            'UPDATE SET target."id" = source."id", target."boolean" = source."boolean", target."nullable_boolean" = source."nullable_boolean"\n'
+            "UPDATE SET "
+            'target."id" = source."id", '
+            'target."boolean" = source."boolean", '
+            'target."nullable_boolean" = source."nullable_boolean"\n'
             "WHEN NOT MATCHED BY TARGET THEN\n"
             'INSERT ("id", "boolean", "nullable_boolean") VALUES (source."id", source."boolean", source."nullable_boolean")\n'
             ";",

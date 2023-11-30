@@ -1,6 +1,7 @@
 import enum
 import http
 import ipaddress
+import sys
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Optional
@@ -22,19 +23,36 @@ class HTTPVersion(enum.Enum):
     http20 = "2.0"
 
 
-@extend_enum(http.HTTPMethod)
-class HTTPMethod(enum.Enum):
-    """HTTP methods used in the Canvas API."""
+if sys.version_info >= (3, 11):
 
-    SEARCH = "SEARCH"
-    PROPFIND = "PROPFIND"
-    LOCK = "LOCK"
-    REPORT = "REPORT"
-    PURGE = "PURGE"
-    MKCOL = "MKCOL"
-    PROPPATCH = "PROPPATCH"
-    CHECKOUT = "CHECKOUT"
-    UNLOCK = "UNLOCK"
+    @extend_enum(http.HTTPMethod)
+    class HTTPMethod(enum.Enum):
+        """HTTP methods used in the Canvas API."""
+
+        SEARCH = "SEARCH"
+        PROPFIND = "PROPFIND"
+        LOCK = "LOCK"
+        REPORT = "REPORT"
+        PURGE = "PURGE"
+        MKCOL = "MKCOL"
+        PROPPATCH = "PROPPATCH"
+        CHECKOUT = "CHECKOUT"
+        UNLOCK = "UNLOCK"
+
+else:
+
+    class HTTPMethod(enum.Enum):
+        "HTTP methods and descriptions"
+
+        CONNECT = "CONNECT"
+        DELETE = "DELETE"
+        GET = "GET"
+        HEAD = "HEAD"
+        OPTIONS = "OPTIONS"
+        PATCH = "PATCH"
+        POST = "POST"
+        PUT = "PUT"
+        TRACE = "TRACE"
 
 
 HTTPStatus: type[enum.Enum] = enum.Enum(  # type: ignore
