@@ -19,6 +19,7 @@ from pysqlsync.formation.py_to_sql import (
 from pysqlsync.formation.sql_to_py import SqlConverterOptions, table_to_dataclass
 from pysqlsync.model.data_types import (
     SqlDoubleType,
+    SqlFixedCharacterType,
     SqlIntegerType,
     SqlUserDefinedType,
     SqlUuidType,
@@ -133,6 +134,31 @@ class TestConverter(unittest.TestCase):
                 Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
                 Column(
                     LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                ),
+            ],
+        )
+
+    def test_literal_type(self) -> None:
+        options = DataclassConverterOptions(namespaces=NamespaceMapping({tables: None}))
+        table_def = dataclass_to_table(tables.LiteralTable, options=options)
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(
+                    LocalId("single"),
+                    SqlFixedCharacterType(limit=5),
+                    False,
+                ),
+                Column(
+                    LocalId("multiple"),
+                    SqlFixedCharacterType(limit=4),
+                    False,
+                ),
+                Column(
+                    LocalId("union"),
+                    SqlVariableCharacterType(limit=255),
+                    False,
                 ),
             ],
         )

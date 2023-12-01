@@ -281,7 +281,7 @@ class RandomGenerator:
         elif is_type_literal(plain_type):
             literal_values = unwrap_literal_values(plain_type)
             if len(literal_values) > 1:
-                return lambda k: random.choice(literal_values)[k]
+                return lambda _: random.choice(literal_values)
             else:
                 literal_value = literal_values[0]
                 return lambda _: literal_value

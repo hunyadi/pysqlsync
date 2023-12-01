@@ -60,6 +60,8 @@ def is_constraint(item: Any) -> bool:
 def tsv_type(plain_type: TypeLike) -> type:
     "Python type that represents the TSV storage type for this data."
 
+    plain_type = unwrap_annotated_type(plain_type)
+
     if is_type_enum(plain_type):
         return str
     elif is_type_literal(plain_type):

@@ -37,6 +37,7 @@ class MySQLConnection(BaseConnection):
             db=self.params.database,
             sql_mode=f"'{sql_mode}'",
             init_command='SET @@session.time_zone = "+00:00";',
+            autocommit=True,
         )
         return MySQLContext(self)
 

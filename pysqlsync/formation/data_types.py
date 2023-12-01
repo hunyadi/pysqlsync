@@ -72,6 +72,8 @@ class SqlDiscovery:
             return SqlTimeType(None, False)
         elif type_name == "time with time zone":
             return SqlTimeType(None, True)
+        elif type_name in ["char", "character"]:
+            return SqlFixedCharacterType()
         elif type_name in ["varchar", "character varying", "text"]:
             return SqlVariableCharacterType()
         elif type_name == "binary":

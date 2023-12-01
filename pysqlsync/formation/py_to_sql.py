@@ -41,6 +41,7 @@ from strong_typing.inspection import (
     unwrap_annotated_type,
     unwrap_generic_list,
     unwrap_literal_types,
+    unwrap_literal_values,
     unwrap_union_types,
 )
 from strong_typing.topological import type_topological_sort
@@ -54,6 +55,7 @@ from ..model.data_types import (
     SqlDecimalType,
     SqlDoubleType,
     SqlEnumType,
+    SqlFixedCharacterType,
     SqlFloatType,
     SqlIntegerType,
     SqlIntervalType,
@@ -114,16 +116,6 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
             f"inconsistent enumeration value types for type {enum_type.__name__}: {value_types}"
         )
     return value_types.pop()
-
-
-def is_unique(items: Iterable[T]) -> bool:
-    "Uniqueness check of unhashable iterables."
-
-    unique: list[T] = []
-    for item in items:
-        if item not in unique:
-            unique.append(item)
-    return len(unique) == 1
 
 
 def is_relationship(field_type: TypeLike) -> bool:
@@ -432,12 +424,16 @@ class DataclassConverter:
             return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_type_literal(typ):
             literal_types = unwrap_literal_types(typ)
-            sql_literal_types = [
-                self.member_to_sql_data_type(t, cls) for t in literal_types
-            ]
-            if not is_unique(sql_literal_types):
-                raise TypeError(f"inconsistent literal data types: {literal_types}")
-            return sql_literal_types[0]
+            if not all(t is str for t in literal_types):
+                sql_literal_types = [
+                    self.member_to_sql_data_type(t, cls) for t in literal_types
+                ]
+            else:
+                literal_values = unwrap_literal_values(typ)
+                sql_literal_types = [
+                    SqlFixedCharacterType(limit=len(v)) for v in literal_values
+                ]
+            return compatible_type(sql_literal_types)
         if is_generic_list(typ):
             item_type = unwrap_generic_list(typ)
             if is_simple_type(item_type):

@@ -10,6 +10,7 @@ from typing import Annotated, Any, Optional, Union
 from uuid import UUID
 
 from strong_typing.auxiliary import (
+    Length,
     MaxLength,
     Precision,
     TimePrecision,
@@ -28,6 +29,7 @@ from ..model.data_types import (
     SqlDateType,
     SqlDecimalType,
     SqlDoubleType,
+    SqlFixedCharacterType,
     SqlFloatType,
     SqlIntegerType,
     SqlJsonType,
@@ -80,6 +82,10 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
         if sql_type.precision is not None:
             return Annotated[datetime.time, TimePrecision(sql_type.precision)]
         return datetime.time
+    elif isinstance(sql_type, SqlFixedCharacterType):
+        if sql_type.limit is not None:
+            return Annotated[str, Length(sql_type.limit)]
+        return str
     elif isinstance(sql_type, SqlVariableCharacterType):
         if sql_type.limit is not None:
             return Annotated[str, MaxLength(sql_type.limit)]

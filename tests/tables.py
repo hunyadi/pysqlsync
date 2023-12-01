@@ -108,9 +108,11 @@ class IPAddressTable:
 
 
 @dataclass
-class PromotionTable:
+class LiteralTable:
     id: PrimaryKey[int]
-    string_value = Union[Literal["unknown"], str]
+    single: Literal["value"]
+    multiple: Literal["one", "of", "many"]
+    union: Union[Literal["unknown"], Annotated[str, MaxLength(255)]]
 
 
 @dataclass
