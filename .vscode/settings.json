@@ -5,16 +5,16 @@
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder}"
     },
-    "python.analysis.typeCheckingMode": "off",
     "editor.formatOnSave": true,
-    "files.insertFinalNewline": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
     },
+    "files.insertFinalNewline": true,
     "isort.args": [
         "--profile",
         "black"
     ],
+    "python.analysis.typeCheckingMode": "off",
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     }

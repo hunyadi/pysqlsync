@@ -19,7 +19,7 @@ class SupportsLocalId(Protocol):
 
     @abc.abstractproperty
     def local_id(self) -> str:
-        "The component of an identifier to be used in a local context, e.g. columns of a table."
+        "Unquoted component of an identifier to be used in a local context, e.g. columns of a table."
         ...
 
     @abc.abstractproperty
@@ -34,16 +34,17 @@ class SupportsQualifiedId(Protocol):
 
     @abc.abstractproperty
     def scope_id(self) -> Optional[str]:
+        "Unquoted scope identifier."
         ...
 
     @abc.abstractproperty
     def local_id(self) -> str:
-        "The component of an identifier to be used in a local context, e.g. columns of a table."
+        "Unquoted component of an identifier to be used in a local context, e.g. columns of a table."
         ...
 
     @abc.abstractproperty
     def compact_id(self) -> str:
-        "An unquoted identifier."
+        "An unquoted composite identifier."
         ...
 
     @abc.abstractproperty
@@ -67,6 +68,8 @@ class LocalId:
 
     @property
     def local_id(self) -> str:
+        "Unquoted identifier."
+
         return self.id
 
     @property

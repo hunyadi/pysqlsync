@@ -1,11 +1,21 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Optional, overload
+from typing import Iterable, Optional, overload
 
-from ..model.data_types import SqlDataType, constant
+from strong_typing.topological import topological_sort
+
+from ..model.data_types import SqlDataType, SqlUserDefinedType, constant
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
+
+
+def join(statements: Iterable[Optional[str]]) -> str:
+    return "\n".join(s for s in statements if s is not None)
+
+
+def join_or_none(statements: Iterable[Optional[str]]) -> Optional[str]:
+    return join(statements) or None
 
 
 class MappingError(RuntimeError):
@@ -108,6 +118,13 @@ class StructType(DatabaseObject, QualifiedObject):
         super().__init__(name)
         self.members = ObjectDict(members)
         self.description = description
+
+    def get_referenced_types(self) -> set[SupportsQualifiedId]:
+        return set(
+            m.data_type.ref
+            for m in self.members.values()
+            if isinstance(m.data_type, SqlUserDefinedType)
+        )
 
     def create_stmt(self) -> str:
         members = ",\n".join(str(m) for m in self.members.values())
@@ -369,6 +386,8 @@ class Table(DatabaseObject, QualifiedObject):
         ]
 
     def is_lookup_column(self, column: Column) -> bool:
+        "True if the column may be used to look up a record by its value."
+
         return self.is_primary_column(column.name) or self.is_unique_column(column)
 
     def get_lookup_columns(self) -> list[Column]:
@@ -407,7 +426,7 @@ class Table(DatabaseObject, QualifiedObject):
 
         return False
 
-    def get_reference(self, column_id: LocalId) -> ConstraintReference:
+    def get_constraint(self, column_id: LocalId) -> ConstraintReference:
         "Returns a reference that a column points to."
 
         for constraint in self.constraints.values():
@@ -418,6 +437,22 @@ class Table(DatabaseObject, QualifiedObject):
             return constraint.reference
 
         raise KeyError(f"foreign constraint not found for column: {column_id}")
+
+    def get_referenced_types(self) -> set[SupportsQualifiedId]:
+        return set(
+            c.data_type.ref
+            for c in self.columns.values()
+            if isinstance(c.data_type, SqlUserDefinedType)
+        )
+
+    def get_referenced_tables(self) -> set[SupportsQualifiedId]:
+        items: set[SupportsQualifiedId] = set()
+        for c in self.constraints.values():
+            if isinstance(c, ForeignConstraint):
+                items.add(c.reference.table)
+            elif isinstance(c, DiscriminatedConstraint):
+                items.update(r.table for r in c.references)
+        return items
 
     def create_stmt(self) -> str:
         defs: list[str] = []
@@ -500,6 +535,15 @@ class Namespace(DatabaseObject):
         self.structs = ObjectDict(structs or [])
         self.tables = ObjectDict(tables or [])
 
+    def get_referenced_namespaces(self) -> set[LocalId]:
+        items: set[SupportsQualifiedId] = set()
+        for s in self.structs.values():
+            items.update(s.get_referenced_types())
+        for t in self.tables.values():
+            items.update(t.get_referenced_types())
+            items.update(t.get_referenced_tables())
+        return set(LocalId(i.scope_id) for i in items if i.scope_id is not None)
+
     def create_schema_stmt(self) -> Optional[str]:
         if self.name.local_id:
             return f"CREATE SCHEMA {self.name};"
@@ -513,54 +557,34 @@ class Namespace(DatabaseObject):
             return None
 
     def create_stmt(self) -> str:
-        items: list[str] = []
-        stmt = self.create_schema_stmt()
-        if stmt:
-            items.append(stmt)
-        items.append(self.create_objects_stmt())
-        return "\n".join(items)
+        return join([self.create_schema_stmt(), self.create_objects_stmt()])
 
     def drop_stmt(self) -> str:
-        items: list[str] = []
-        items.append(self.drop_objects_stmt())
-        stmt = self.drop_schema_stmt()
-        if stmt:
-            items.append(stmt)
-        return "\n".join(items)
+        return join([self.drop_objects_stmt(), self.drop_schema_stmt()])
 
     def create_objects_stmt(self) -> str:
         items: list[str] = []
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
-        return "\n".join(items)
+        return join(items)
 
     def drop_objects_stmt(self) -> str:
         items: list[str] = []
         items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
         items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
         items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
-        return "\n".join(items)
+        return join(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
-        items: list[str] = []
-        for table in self.tables.values():
-            constraints = table.add_constraints_stmt()
-            if constraints is None:
-                continue
-            items.append(constraints)
-
-        return "\n".join(items) if items else None
+        return join_or_none(
+            table.add_constraints_stmt() for table in self.tables.values()
+        )
 
     def drop_constraints_stmt(self) -> Optional[str]:
-        items: list[str] = []
-        for table in self.tables.values():
-            constraints = table.drop_constraints_stmt()
-            if constraints is None:
-                continue
-            items.append(constraints)
-
-        return "\n".join(items) if items else None
+        return join_or_none(
+            table.drop_constraints_stmt() for table in self.tables.values()
+        )
 
     def merge(self, op: "Namespace") -> None:
         "Merges the contents of two objects."
@@ -636,38 +660,41 @@ class Catalog(DatabaseObject):
         """
 
         table = self.get_table(table_id)
-        reference = table.get_reference(column_id)
+        reference = table.get_constraint(column_id)
         return self.get_table(reference.table)
 
     def create_stmt(self) -> str:
-        items: list[str] = []
-        for n in self.namespaces.values():
-            stmt = n.create_schema_stmt()
-            if stmt:
-                items.append(stmt)
-        for n in self.namespaces.values():
-            items.append(n.create_objects_stmt())
-        return "\n".join(items)
+        self.sort()
+        items: list[Optional[str]] = []
+        items.extend(n.create_schema_stmt() for n in self.namespaces.values())
+        items.extend(n.create_objects_stmt() for n in self.namespaces.values())
+        return join(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
-        items: list[str] = []
-        for namespace in self.namespaces.values():
-            constraints = namespace.add_constraints_stmt()
-            if constraints is None:
-                continue
-            items.append(constraints)
-
-        return "\n".join(items) if items else None
+        return join_or_none(n.add_constraints_stmt() for n in self.namespaces.values())
 
     def drop_stmt(self) -> str:
-        items: list[str] = []
-        for n in self.namespaces.values():
-            items.append(n.drop_objects_stmt())
-        for n in self.namespaces.values():
-            stmt = n.drop_schema_stmt()
-            if stmt:
-                items.append(stmt)
-        return "\n".join(items)
+        self.sort()
+        items: list[Optional[str]] = []
+        items.extend(n.drop_objects_stmt() for n in reversed(self.namespaces.values()))
+        items.extend(n.drop_schema_stmt() for n in reversed(self.namespaces.values()))
+        return join(items)
+
+    def sort(self) -> None:
+        """
+        Sort namespaces in topological order of reference.
+
+        Namespaces that have no external references come first. The next group contains namespaces that reference
+        items only in the first group of namespaces, etc.
+        """
+
+        graph = {
+            ns.name: ns.get_referenced_namespaces() for ns in self.namespaces.values()
+        }
+        for ref_ns in graph.values():
+            ref_ns.intersection_update(graph.keys())
+        order = [name.local_id for name in topological_sort(graph)]
+        self.namespaces.reorder(order)
 
     def merge(self, op: "Catalog") -> None:
         "Merges the contents of two objects."
@@ -679,12 +706,7 @@ class Catalog(DatabaseObject):
                 self.namespaces.add(copy.deepcopy(op_ns))
 
     def __str__(self) -> str:
-        statements: list[str] = []
-        statements.append(self.create_stmt())
-        constraints = self.add_constraints_stmt()
-        if constraints is not None:
-            statements.append(constraints)
-        return "\n".join(statements)
+        return join([self.create_stmt(), self.add_constraints_stmt()])
 
 
 class ObjectFactory:

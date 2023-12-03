@@ -64,3 +64,19 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
 
     def items(self) -> ItemsView[str, ObjectItem]:
         return self._items.items()
+
+    def difference(self, op: "ObjectDict[ObjectItem]") -> Iterable["ObjectItem"]:
+        for key, item in self.items():
+            if key not in op:
+                yield item
+
+    def intersection(
+        self, op: "ObjectDict[ObjectItem]"
+    ) -> Iterable[tuple["ObjectItem", "ObjectItem"]]:
+        for key, item in self.items():
+            op_item = op.get(key)
+            if op_item is not None:
+                yield (item, op_item)
+
+    def reorder(self, order: list[str]) -> None:
+        self._items = {key: self._items[key] for key in order}

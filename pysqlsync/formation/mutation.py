@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Mapping, Optional, TypeVar
+from typing import Optional
 
 from ..model.data_types import constant
 from ..model.id_types import SupportsName
@@ -7,13 +7,13 @@ from .object_types import (
     Catalog,
     Column,
     ColumnFormationError,
-    DatabaseObject,
     EnumType,
     FormationError,
     Namespace,
     StructType,
     Table,
     TableFormationError,
+    join_or_none,
 )
 
 
@@ -73,12 +73,19 @@ class Mutator:
         self.check_identity(source, target)
 
         statements: list[str] = []
-        for source_member in source.members.values():
-            if source_member not in target.members.values():
-                statements.append(f"DROP ATTRIBUTE {source_member.name}")
-        for target_member in target.members.values():
-            if target_member not in target.members.values():
-                statements.append(f"ADD ATTRIBUTE {target_member}")
+        statements.extend(
+            f"DROP ATTRIBUTE {member.name}"
+            for member in source.members.difference(target.members)
+        )
+        for source_member, target_member in source.members.intersection(target.members):
+            if source_member != target_member:
+                statements.append(
+                    f"ALTER ATTRIBUTE {source_member.name} SET DATA TYPE {target_member.data_type}"
+                )
+        statements.extend(
+            f"ADD ATTRIBUTE {member}"
+            for member in target.members.difference(source.members)
+        )
         if statements:
             return f"ALTER TYPE {source.name}\n" + ",\n".join(statements) + ";\n"
         else:
@@ -117,49 +124,56 @@ class Mutator:
         self.check_identity(source, target)
 
         statements: list[str] = []
-        source_column: Optional[Column]
         try:
-            for target_column in target.columns.values():
-                source_column = source.columns.get(target_column.name.id)
-                if source_column is None:
-                    statements.append(target_column.create_stmt())
-                else:
-                    statement = self.mutate_column_stmt(source_column, target_column)
-                    if statement:
-                        statements.append(statement)
+            statements.extend(
+                column.create_stmt()
+                for column in target.columns.difference(source.columns)
+            )
         except ColumnFormationError as e:
             raise TableFormationError(
-                "failed to create or update columns in table", target.name
+                "failed to create columns in table", target.name
             ) from e
 
         try:
-            for source_column in source.columns.values():
-                if source_column.name.id not in target.columns:
-                    statements.append(source_column.drop_stmt())
+            common_columns = source.columns.intersection(target.columns)
+            for source_column, target_column in common_columns:
+                statement = self.mutate_column_stmt(source_column, target_column)
+                if statement:
+                    statements.append(statement)
+        except ColumnFormationError as e:
+            raise TableFormationError(
+                "failed to update columns in table", target.name
+            ) from e
+
+        try:
+            statements.extend(
+                column.drop_stmt()
+                for column in source.columns.difference(target.columns)
+            )
         except ColumnFormationError as e:
             raise TableFormationError(
                 "failed to drop columns in table", target.name
             ) from e
 
-        for name, source_constraint in source.constraints.items():
-            if name in target.constraints:
-                continue
+        statements.extend(
+            f"DROP CONSTRAINT {constraint.name}"
+            for constraint in source.constraints.difference(target.constraints)
+            if constraint.is_alter_table()
+        )
 
-            if source_constraint.is_alter_table():
-                statements.append(f"DROP CONSTRAINT {source_constraint.name}")
+        common_constraints = source.constraints.intersection(target.constraints)
+        for source_constraint, target_constraint in common_constraints:
+            if source_constraint != target_constraint:
+                raise TableFormationError(
+                    f"failed to mutate constraint `{source_constraint.name}`",
+                    target.name,
+                )
 
-        for name, target_constraint in target.constraints.items():
-            if name in source.constraints:
-                source_constraint = source.constraints[name]
-
-                if source_constraint != target_constraint:
-                    raise TableFormationError(
-                        f"failed to mutate constraint `{name}`", target.name
-                    )
-                continue
-
-            if target_constraint.is_alter_table():
-                statements.append(f"ADD CONSTRAINT {target_constraint.spec}")
+        statements.extend(
+            f"ADD CONSTRAINT {constraint.spec}"
+            for constraint in target.constraints.difference(source.constraints)
+            if constraint.is_alter_table()
+        )
 
         if statements:
             return source.alter_table_stmt(statements)
@@ -171,117 +185,85 @@ class Mutator:
     ) -> Optional[str]:
         self.check_identity(source, target)
 
-        statements: list[str] = []
+        statements: list[Optional[str]] = []
 
-        statements.extend(_create_diff(source.enums, target.enums))
-        statements.extend(_create_diff(source.structs, target.structs))
-        statements.extend(_create_diff(source.tables, target.tables))
+        # create new objects
+        enum_create = target.enums.difference(source.enums)
+        statements.extend(enum.create_stmt() for enum in enum_create)
 
-        for id in target.tables.keys():
-            if id not in source.tables.keys():
-                statement = target.tables[id].add_constraints_stmt()
-                if statement:
-                    statements.append(statement)
+        struct_create = target.structs.difference(source.structs)
+        statements.extend(struct.create_stmt() for struct in struct_create)
 
+        table_create = target.tables.difference(source.tables)
+        statements.extend(table.create_stmt() for table in table_create)
+        statements.extend(table.add_constraints_stmt() for table in table_create)
+
+        # mutate existing object
+        enum_mutate = source.enums.intersection(target.enums)
         statements.extend(
-            _mutate_diff(self.mutate_enum_stmt, source.enums, target.enums)
-        )
-        statements.extend(
-            _mutate_diff(self.mutate_struct_stmt, source.structs, target.structs)
-        )
-        statements.extend(
-            _mutate_diff(self.mutate_table_stmt, source.tables, target.tables)
+            self.mutate_enum_stmt(source_enum, target_enum)
+            for source_enum, target_enum in enum_mutate
         )
 
+        struct_mutate = source.structs.intersection(target.structs)
+        statements.extend(
+            self.mutate_struct_stmt(source_struct, target_struct)
+            for source_struct, target_struct in struct_mutate
+        )
+
+        table_mutate = source.tables.intersection(target.tables)
+        statements.extend(
+            self.mutate_table_stmt(source_table, target_table)
+            for source_table, target_table in table_mutate
+        )
+
+        # drop old objects
         if self.options.allow_drop_table:
-            statements.extend(_drop_diff(source.tables, target.tables))
-        if self.options.allow_drop_struct:
-            statements.extend(_drop_diff(source.structs, target.structs))
-        if self.options.allow_drop_enum:
-            statements.extend(_drop_diff(source.enums, target.enums))
+            table_drop = source.tables.difference(target.tables)
+            statements.extend(table.drop_stmt() for table in table_drop)
 
-        return "\n".join(statements) if statements else None
+        if self.options.allow_drop_struct:
+            struct_drop = source.structs.difference(target.structs)
+            statements.extend(struct.drop_stmt() for struct in struct_drop)
+
+        if self.options.allow_drop_enum:
+            enum_drop = source.enums.difference(target.enums)
+            statements.extend(enum.drop_stmt() for enum in enum_drop)
+
+        return join_or_none(statements)
 
     def mutate_catalog_stmt(self, source: Catalog, target: Catalog) -> Optional[str]:
-        statements: list[str] = []
+        statements: list[Optional[str]] = []
+
+        source.sort()
+        target.sort()
+
+        ns_create = list(target.namespaces.difference(source.namespaces))
+        ns_drop = list(source.namespaces.difference(target.namespaces))
+        ns_mutate = list(source.namespaces.intersection(target.namespaces))
 
         # create new namespaces
-        for id in target.namespaces.keys():
-            if id in source.namespaces.keys():
-                continue
-            stmt = target.namespaces[id].create_schema_stmt()
-            if stmt:
-                statements.append(stmt)
+        statements.extend(namespace.create_schema_stmt() for namespace in ns_create)
 
         # create objects in each namespace added
-        for id in target.namespaces.keys():
-            if id in source.namespaces.keys():
-                continue
-            statements.append(target.namespaces[id].create_objects_stmt())
+        statements.extend(namespace.create_objects_stmt() for namespace in ns_create)
 
         # add new constraints
-        for id in target.namespaces.keys():
-            if id in source.namespaces.keys():
-                continue
-            stmt = target.namespaces[id].add_constraints_stmt()
-            if stmt:
-                statements.append(stmt)
+        statements.extend(namespace.add_constraints_stmt() for namespace in ns_create)
 
         # mutate existing namespaces
         statements.extend(
-            _mutate_diff(
-                self.mutate_namespace_stmt, source.namespaces, target.namespaces
-            )
+            self.mutate_namespace_stmt(source_ns, target_ns)
+            for source_ns, target_ns in ns_mutate
         )
 
         # remove old constraints
-        for id in source.namespaces.keys():
-            if id in target.namespaces.keys():
-                continue
-            stmt = source.namespaces[id].drop_constraints_stmt()
-            if stmt:
-                statements.append(stmt)
-
+        statements.extend(namespace.drop_constraints_stmt() for namespace in ns_drop)
         if self.options.allow_drop_namespace:
             # drop objects in each namespace removed
-            for id in source.namespaces.keys():
-                if id in target.namespaces.keys():
-                    continue
-                statements.append(source.namespaces[id].drop_objects_stmt())
+            statements.extend(namespace.drop_objects_stmt() for namespace in ns_drop)
 
             # drop old namespaces
-            for id in source.namespaces.keys():
-                if id in target.namespaces.keys():
-                    continue
-                stmt = source.namespaces[id].drop_schema_stmt()
-                if stmt:
-                    statements.append(stmt)
+            statements.extend(namespace.drop_schema_stmt() for namespace in ns_drop)
 
-        return "\n".join(statements) if statements else None
-
-
-Obj = TypeVar("Obj", bound=DatabaseObject)
-
-
-def _create_diff(source: Mapping[str, Obj], target: Mapping[str, Obj]) -> list[str]:
-    return [target[id].create_stmt() for id in target.keys() if id not in source.keys()]
-
-
-def _drop_diff(source: Mapping[str, Obj], target: Mapping[str, Obj]) -> list[str]:
-    return [source[id].drop_stmt() for id in source.keys() if id not in target.keys()]
-
-
-def _mutate_diff(
-    mutate_fn: Callable[[Obj, Obj], Optional[str]],
-    source: Mapping[str, Obj],
-    target: Mapping[str, Obj],
-) -> list[str]:
-    statements: list[str] = []
-
-    for id in source.keys():
-        if id in target.keys():
-            statement = mutate_fn(source[id], target[id])
-            if statement:
-                statements.append(statement)
-
-    return statements
+        return join_or_none(statements)

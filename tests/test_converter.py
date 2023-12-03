@@ -232,8 +232,8 @@ class TestConverter(unittest.TestCase):
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
             'ALTER TABLE "public"."UserTable"\n'
-            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'ADD COLUMN "social_url" text NOT NULL,\n'
+            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'DROP COLUMN "homepage_url";\n'
             'DROP TABLE "public"."Employee";\n'
             'DROP TYPE "public"."Coordinates";',
@@ -250,8 +250,8 @@ class TestConverter(unittest.TestCase):
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
             'ALTER TABLE "public"."UserTable"\n'
-            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'ADD COLUMN "social_url" text NOT NULL,\n'
+            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'DROP COLUMN "homepage_url";',
         )
 
