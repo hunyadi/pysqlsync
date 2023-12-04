@@ -298,45 +298,48 @@ def max_or_none(left: Optional[int], right: Optional[int]) -> Optional[int]:
 
 
 def _compatible_type(left: SqlDataType, right: SqlDataType) -> SqlDataType:
+    """
+    Returns a common type that can represent instances of both source types without data loss.
+
+    The implementation makes use of `type(...)` to ensure the most specific class is instantiated when
+    database-specific data types are created with inheritance.
+    """
+
     if left == right:
         return left
 
     # integer types
     if isinstance(left, SqlIntegerType) and isinstance(right, SqlIntegerType):
-        return SqlIntegerType(width=max(left.width, right.width))
+        return type(left)(width=max(left.width, right.width))
 
     # floating-point types
     if isinstance(left, SqlRealType):
         if isinstance(right, SqlRealType):
-            return SqlRealType()
+            return type(left)()
         elif isinstance(right, SqlDoubleType):
-            return SqlDoubleType()
+            return type(right)()
     elif isinstance(left, SqlDoubleType):
         if isinstance(right, (SqlRealType, SqlDoubleType)):
-            return SqlDoubleType()
+            return type(left)()
 
     # character types
     if isinstance(left, SqlFixedCharacterType):
         if isinstance(right, SqlFixedCharacterType):
-            return SqlFixedCharacterType(limit=max_or_none(left.limit, right.limit))
+            return type(left)(limit=max_or_none(left.limit, right.limit))
         elif isinstance(right, SqlVariableCharacterType):
-            return SqlVariableCharacterType(limit=max_or_none(left.limit, right.limit))
+            return type(right)(limit=max_or_none(left.limit, right.limit))
     elif isinstance(left, SqlVariableCharacterType):
         if isinstance(right, (SqlFixedCharacterType, SqlVariableCharacterType)):
-            return SqlVariableCharacterType(limit=max_or_none(left.limit, right.limit))
+            return type(left)(limit=max_or_none(left.limit, right.limit))
 
     # binary types
     if isinstance(left, SqlFixedBinaryType):
         if isinstance(right, SqlFixedBinaryType):
-            return SqlFixedBinaryType(storage=max_or_none(left.storage, right.storage))
+            return type(left)(storage=max_or_none(left.storage, right.storage))
         elif isinstance(right, SqlVariableBinaryType):
-            return SqlVariableBinaryType(
-                storage=max_or_none(left.storage, right.storage)
-            )
+            return type(right)(storage=max_or_none(left.storage, right.storage))
     elif isinstance(left, SqlVariableBinaryType):
         if isinstance(right, (SqlFixedBinaryType, SqlVariableBinaryType)):
-            return SqlVariableBinaryType(
-                storage=max_or_none(left.storage, right.storage)
-            )
+            return type(left)(storage=max_or_none(left.storage, right.storage))
 
     raise CompatibilityError()

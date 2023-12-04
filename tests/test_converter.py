@@ -160,6 +160,11 @@ class TestConverter(unittest.TestCase):
                     SqlVariableCharacterType(limit=255),
                     False,
                 ),
+                Column(
+                    LocalId("unbounded"),
+                    SqlVariableCharacterType(),
+                    False,
+                ),
             ],
         )
 

@@ -245,6 +245,42 @@ class TestGenerator(unittest.TestCase):
                     ");",
                 )
 
+    def test_create_literal_table(self) -> None:
+        self.maxDiff = None
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.LiteralTable, dialect="postgresql"),
+            'CREATE TABLE "LiteralTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"single" char(5) NOT NULL,\n'
+            '"multiple" char(4) NOT NULL,\n'
+            '"union" varchar(255) NOT NULL,\n'
+            '"unbounded" text NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.LiteralTable, dialect="mssql"),
+            'CREATE TABLE "LiteralTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"single" char(5) NOT NULL,\n'
+            '"multiple" char(4) NOT NULL,\n'
+            '"union" varchar(255) NOT NULL,\n'
+            '"unbounded" varchar(max) NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.LiteralTable, dialect="mysql"),
+            'CREATE TABLE "LiteralTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"single" char(5) NOT NULL,\n'
+            '"multiple" char(4) NOT NULL,\n'
+            '"union" varchar(255) NOT NULL,\n'
+            '"unbounded" mediumtext NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");",
+        )
+
     def test_create_primary_key_table(self) -> None:
         self.maxDiff = None
         self.assertMultiLineEqual(

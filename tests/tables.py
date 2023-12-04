@@ -113,6 +113,7 @@ class LiteralTable:
     single: Literal["value"]
     multiple: Literal["one", "of", "many"]
     union: Union[Literal["unknown"], Annotated[str, MaxLength(255)]]
+    unbounded: Union[Literal["unkown"], str]
 
 
 @dataclass
