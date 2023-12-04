@@ -1,3 +1,12 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+This module defines base classes to create a connection, generate SQL, discover database objects, and synchronize
+schema and data.
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 import abc
 import dataclasses
 import json

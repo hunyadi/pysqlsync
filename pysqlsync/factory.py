@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+This module helps discover and register database dialects.
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 import importlib
 import importlib.resources
 import logging
@@ -91,7 +99,7 @@ class UnavailableEngine(BaseEngine):
 
     def _raise_error(self) -> typing.NoReturn:
         raise RuntimeError(
-            f"failed to import dependency: `{self._module}`; you may need to run `pip install pysqlsync[{self._name}]`"
+            f"missing dependency: `{self._module}`; you may need to run `pip install pysqlsync[{self._name}]`"
         )
 
 
@@ -103,27 +111,37 @@ def discover_dialects() -> None:
         if resource.name.startswith((".", "__")) or not resource.is_dir():
             continue
 
+        # run a preliminary check importing only the module `dependency`;
+        # if the check fails, it indicates that required dependencies have not been installed (e.g. database driver)
         try:
             module = importlib.import_module(
-                f".dialect.{resource.name}.engine", package=__package__
+                f".dialect.{resource.name}.dependency", package=__package__
             )
-            classes = [
-                cls
-                for cls in get_module_classes(module)
-                if re.match(r"^\w+Engine$", cls.__name__)
-            ]
-            engine_type = typing.cast(type[BaseEngine], classes.pop())
-            engine_factory = engine_type()
-            LOGGER.info(
-                f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
-            )
-
-            register_dialect(engine_factory.name, engine_factory)
-
         except ModuleNotFoundError as e:
+            LOGGER.debug(
+                f"skipping dialect `{resource.name}`: missing dependency: `{e.name}`; "
+                f"you may need to run `pip install pysqlsync[{resource.name}]`"
+            )
             register_dialect(
                 resource.name, UnavailableEngine(resource.name, e.name or "")
             )
+            continue
+
+        # import the module `engine`, which acts as an entry point to connector, generator and explorer functionality
+        module = importlib.import_module(
+            f".dialect.{resource.name}.engine", package=__package__
+        )
+        classes = [
+            cls
+            for cls in get_module_classes(module)
+            if re.match(r"^\w+Engine$", cls.__name__)
+        ]
+        engine_type = typing.cast(type[BaseEngine], classes.pop())
+        engine_factory = engine_type()
+        LOGGER.info(
+            f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
+        )
+        register_dialect(engine_factory.name, engine_factory)
 
 
 discover_dialects()
