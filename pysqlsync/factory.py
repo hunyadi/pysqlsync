@@ -7,7 +7,13 @@ from urllib.parse import urlparse
 
 from strong_typing.inspection import get_module_classes
 
-from .base import BaseEngine, ConnectionParameters
+from .base import (
+    BaseConnection,
+    BaseEngine,
+    BaseGenerator,
+    ConnectionParameters,
+    Explorer,
+)
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -62,6 +68,33 @@ def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
     )
 
 
+class UnavailableEngine(BaseEngine):
+    _name: str
+    _module: str
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __init__(self, name: str, module: str) -> None:
+        self._name = name
+        self._module = module
+
+    def get_generator_type(self) -> type[BaseGenerator]:
+        self._raise_error()
+
+    def get_connection_type(self) -> type[BaseConnection]:
+        self._raise_error()
+
+    def get_explorer_type(self) -> type[Explorer]:
+        self._raise_error()
+
+    def _raise_error(self) -> typing.NoReturn:
+        raise RuntimeError(
+            f"failed to import dependency: `{self._module}`; you may need to run `pip install pysqlsync[{self._name}]`"
+        )
+
+
 def discover_dialects() -> None:
     "Discovers database engine dialects bundled with this package."
 
@@ -87,8 +120,10 @@ def discover_dialects() -> None:
 
             register_dialect(engine_factory.name, engine_factory)
 
-        except ImportError:
-            pass
+        except ModuleNotFoundError as e:
+            register_dialect(
+                resource.name, UnavailableEngine(resource.name, e.name or "")
+            )
 
 
 discover_dialects()

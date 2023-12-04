@@ -308,11 +308,11 @@ class QueryException(RuntimeError):
 class ConnectionParameters:
     "Database connection parameters that would typically be encapsulated in a connection string."
 
-    host: Optional[str]
-    port: Optional[int]
-    username: Optional[str]
-    password: Optional[str]
-    database: Optional[str]
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    database: Optional[str] = None
 
     def __str__(self) -> str:
         host = self.host or "localhost"
@@ -1054,11 +1054,14 @@ class BaseEngine(abc.ABC):
         connection_type = self.get_connection_type()
         return connection_type(self.create_generator(generator_options), params)
 
-    def create_generator(self, options: GeneratorOptions) -> BaseGenerator:
+    def create_generator(
+        self, options: Optional[GeneratorOptions] = None
+    ) -> BaseGenerator:
         "Instantiates a generator that can emit SQL statements."
 
+        generator_options = options if options is not None else GeneratorOptions()
         generator_type = self.get_generator_type()
-        return generator_type(options)
+        return generator_type(generator_options)
 
     def create_explorer(self, conn: BaseContext) -> Explorer:
         "Instantiates an explorer that can discover objects in a database."
