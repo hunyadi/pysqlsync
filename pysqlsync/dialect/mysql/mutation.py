@@ -2,7 +2,7 @@ import typing
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import Column, Table
+from pysqlsync.formation.object_types import Column, StatementList, Table, join_or_none
 from pysqlsync.model.data_types import quote
 
 from .object_types import MySQLColumn, MySQLTable
@@ -15,10 +15,8 @@ class MySQLMutator(Mutator):
         source = typing.cast(MySQLTable, source_table)
         target = typing.cast(MySQLTable, target_table)
 
-        statements: list[str] = []
-        stmt = super().mutate_table_stmt(source, target)
-        if stmt is not None:
-            statements.append(stmt)
+        statements: StatementList = StatementList()
+        statements.append(super().mutate_table_stmt(source, target))
 
         source_desc = source.short_description
         target_desc = target.short_description
@@ -36,7 +34,7 @@ class MySQLMutator(Mutator):
                     f"ALTER TABLE {target.name} COMMENT = {quote(target_desc)};"
                 )
 
-        return "\n".join(statements) if statements else None
+        return join_or_none(statements)
 
     def mutate_column_stmt(
         self, source_column: Column, target_column: Column

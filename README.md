@@ -13,51 +13,53 @@
 
 First, define the table structure with a standard Python data-class (including dependent data types):
 
+<!-- Example 1 -->
 ```python
-from datetime import datetime
-from uuid import UUID
-from pysqlsync.model.key_types import PrimaryKey
-from strong_typing.auxiliary import Annotated, MaxLength
-
 class WorkflowState(enum.Enum):
     active = "active"
     inactive = "inactive"
     deleted = "deleted"
-    
-@dataclass(slots=True)
+
+
+@dataclasses.dataclass
 class UserTable:
     id: PrimaryKey[int]
-    created_at: datetime
     updated_at: datetime
-    deleted_at: datetime
     workflow_state: WorkflowState
-    uuid: UUID
+    uuid: uuid.UUID
     name: str
     short_name: Annotated[str, MaxLength(255)]
-    homepage_url: str | None
+    homepage_url: str | None = None
 ```
 
 The data-class can be defined statically in code, or generated dynamically from input (with `dataclasses.make_dataclass`). Fields can be required or nullable (represented in Python as `None`). All basic data types are supported, including integers (of various widths), floating-point numbers, strings (of fixed or variable length), timestamps (`datetime.datetime` in Python), UUIDs (`uuid.UUID` in Python), enumerations (represented in Python as `enum.Enum`), etc. `list[...]` is supported as a collection type, and composite types (data-classes without a primary key) are also permitted.
 
 Next, instantiate a database engine, open a connection, create the database structure (with a `CREATE TABLE` statement), and populate the database with initial data (with SQL `INSERT` or `COPY`):
 
+<!-- Example 2 -->
 ```python
-from pysqlsync.factory import get_dialect
-from pysqlsync.base import ConnectionParameters, GeneratorOptions
-
 engine = get_dialect("postgresql")
 parameters = ConnectionParameters(
     host="localhost",
     port=5432,
-    username="postgres",
+    username="levente.hunyadi",
     password=None,
-    database="public",
+    database="levente.hunyadi",
 )
 options = GeneratorOptions(
-    enum_mode=EnumMode.RELATION, namespaces={ ... }
+    enum_mode=EnumMode.RELATION, namespaces={tables: "example"}
 )
 
-data = [ UserTable(...), ... ]
+data = [
+    UserTable(
+        id=1,
+        updated_at=datetime.now(),
+        workflow_state=WorkflowState.active,
+        uuid=uuid.uuid4(),
+        name="Laura Twenty-Four",
+        short_name="Laura",
+    )
+]
 async with engine.create_connection(parameters, options) as conn:
     await conn.create_objects([UserTable])
     await conn.insert_data(UserTable, data)
@@ -65,31 +67,48 @@ async with engine.create_connection(parameters, options) as conn:
 
 Let's assume the database structure changes. With the help of an `Explorer` instance, discover the objects in the database, and create/drop objects to match the state as captured in the specified Python module:
 
+<!-- Example 3 -->
 ```python
 async with engine.create_connection(parameters, options) as conn:
-    explorer = engine.create_explorer(conn)
-    await explorer.synchronize(module=canvas)
+    await engine.create_explorer(conn).synchronize(module=tables)
 ```
 
 Finally, keep the target database content synchronized with data from the source (with the equivalent of SQL `MERGE`):
 
+<!-- Example 4 -->
 ```python
-data = [ UserTable(...), ... ]
+data = [
+    UserTable(
+        id=2,
+        updated_at=datetime.now(),
+        workflow_state=WorkflowState.active,
+        uuid=uuid.uuid4(),
+        name="Zeta Twelve",
+        short_name="Zeta",
+    )
+]
 async with engine.create_connection(parameters, options) as conn:
+    await engine.create_explorer(conn).synchronize(module=tables)
     await conn.upsert_data(UserTable, data)
 ```
 
 In order to boost efficiency, you can insert (or update) data directly from a list of tuples:
 
+<!-- Example 5 -->
 ```python
-field_names = ["id", "uuid", "name", "updated_at", ...]
-field_types = [int, UUID, str, datetime, ...]
+field_names = ["id", "uuid", "name", "short_name", "workflow_state", "updated_at"]
+field_types = [int, uuid.UUID, str, str, str, datetime]
+rows = [
+    (1, uuid.uuid4(), "Laura Twenty-Four", "Laura", "active", datetime.now()),
+    (2, uuid.uuid4(), "Zeta Twelve", "Zeta", "inactive", datetime.now()),
+]
 async with engine.create_connection(parameters, options) as conn:
+    await engine.create_explorer(conn).synchronize(module=tables)
     table = conn.get_table(UserTable)
     await conn.upsert_rows(
         table,
-        field_names=field_names,
-        field_types=field_types,
+        field_names=tuple(field_names),
+        field_types=tuple(field_types),
         records=rows,
     )
 ```
@@ -156,3 +175,9 @@ Formation is the process of generating a series of SQL statements from a collect
 The collection of database objects represents a current structure, which may morph into a target structure. Some of the objects may be vendor-specific, e.g. MySQL has its own `MySQLColumn` type and PostgreSQL has its own `PostgreSQLTable` type.
 
 All objects are identified either with a local ID (e.g. namespaces and columns) or a qualified ID (e.g. tables). When the database engine lacks namespace support, qualified IDs map to a prefix, e.g. `canvas.accounts` (table `accounts` in namespace `canvas`) becomes `canvas__accounts` (a table with no namespace).
+
+## Dialects
+
+pysqlsync comes with several database dialects shipped with the library. However, it is possible to create and register new dialects that behave the same way as built-in dialects. In terms of capabilities, there are no differences between built-in and user-defined dialects.
+
+If you are about to write integration for a new database dialect, it is recommended that you take one of the existing dialects (e.g. PostgreSQL, Microsoft SQL Server or MySQL), and use it as a template. For more information, explore the folder `pysqlsync/dialect`.

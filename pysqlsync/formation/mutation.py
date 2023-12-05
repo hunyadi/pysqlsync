@@ -10,6 +10,7 @@ from .object_types import (
     EnumType,
     FormationError,
     Namespace,
+    StatementList,
     StructType,
     Table,
     TableFormationError,
@@ -185,7 +186,7 @@ class Mutator:
     ) -> Optional[str]:
         self.check_identity(source, target)
 
-        statements: list[Optional[str]] = []
+        statements: StatementList = StatementList()
 
         # create new objects
         enum_create = target.enums.difference(source.enums)
@@ -233,7 +234,7 @@ class Mutator:
         return join_or_none(statements)
 
     def mutate_catalog_stmt(self, source: Catalog, target: Catalog) -> Optional[str]:
-        statements: list[Optional[str]] = []
+        statements: StatementList = StatementList()
 
         source.sort()
         target.sort()

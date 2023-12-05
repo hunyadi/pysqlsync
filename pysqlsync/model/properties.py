@@ -10,6 +10,7 @@ from typing import Annotated, Any, Union
 from strong_typing.inspection import (
     DataclassInstance,
     TypeLike,
+    dataclass_fields,
     get_annotation,
     is_dataclass_type,
     is_type_enum,
@@ -46,9 +47,20 @@ def is_unique_type(field_type: TypeLike) -> bool:
 def get_primary_key_name(class_type: type[DataclassInstance]) -> str:
     "Fetches the primary key of the table."
 
-    for field in dataclasses.fields(class_type):
+    for field in dataclass_fields(class_type):
         if is_primary_key_type(field.type):
             return field.name
+
+    raise TypeError(f"table type has no primary key: {class_type.__name__}")
+
+
+def get_primary_key_name_type(class_type: type[DataclassInstance]) -> tuple[str, type]:
+    "Returns the primary key of the table and its plain representation type."
+
+    for field in dataclass_fields(class_type):
+        props = get_field_properties(field.type)
+        if props.is_primary:
+            return field.name, props.tsv_type
 
     raise TypeError(f"table type has no primary key: {class_type.__name__}")
 

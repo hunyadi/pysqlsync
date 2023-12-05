@@ -1,4 +1,4 @@
-# Dialects for pysqlsync
+# Dialects
 
 pysqlsync comes with several database dialects shipped with the library. However, it is possible to create and register new dialects that behave the same way as built-in dialects. In terms of capabilities, there are no differences between built-in and user-defined dialects.
 

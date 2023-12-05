@@ -10,6 +10,19 @@ from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
 
+class StatementList(list[str]):
+    def append(self, __object: str | None) -> None:
+        if __object is None:
+            return
+        if isinstance(__object, str) and not __object.strip():
+            raise ValueError("empty statement")
+        return super().append(__object)
+
+    def extend(self, __iterable: Iterable[str | None]) -> None:
+        for item in __iterable:
+            self.append(item)
+
+
 def join(statements: Iterable[Optional[str]]) -> str:
     return "\n".join(s for s in statements if s is not None)
 
@@ -562,19 +575,19 @@ class Namespace(DatabaseObject):
     def drop_stmt(self) -> str:
         return join([self.drop_objects_stmt(), self.drop_schema_stmt()])
 
-    def create_objects_stmt(self) -> str:
+    def create_objects_stmt(self) -> Optional[str]:
         items: list[str] = []
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
-        return join(items)
+        return join_or_none(items)
 
-    def drop_objects_stmt(self) -> str:
+    def drop_objects_stmt(self) -> Optional[str]:
         items: list[str] = []
         items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
         items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
         items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
-        return join(items)
+        return join_or_none(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
         return join_or_none(

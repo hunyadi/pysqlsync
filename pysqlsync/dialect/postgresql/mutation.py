@@ -1,17 +1,15 @@
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import Table
+from pysqlsync.formation.object_types import StatementList, Table, join_or_none
 
 from .object_types import sql_quoted_string
 
 
 class PostgreSQLMutator(Mutator):
     def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
-        statements: list[str] = []
-        statement = super().mutate_table_stmt(source, target)
-        if statement is not None:
-            statements.append(statement)
+        statements: StatementList = StatementList()
+        statements.append(super().mutate_table_stmt(source, target))
 
         for target_column in target.columns.values():
             source_column = source.columns.get(target_column.name.id)
@@ -41,4 +39,4 @@ class PostgreSQLMutator(Mutator):
                     f"COMMENT ON TABLE {target.name} IS {sql_quoted_string(target.description)};"
                 )
 
-        return "\n".join(statements)
+        return join_or_none(statements)

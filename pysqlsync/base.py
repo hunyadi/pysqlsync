@@ -378,6 +378,8 @@ class BaseContext(abc.ABC):
 
         if not statement:
             raise ValueError("empty statement")
+        if not statement.strip():
+            raise ValueError("blank statement")
 
         LOGGER.debug(f"execute SQL:\n{statement}")
         try:
@@ -565,10 +567,11 @@ class BaseContext(abc.ABC):
         if stmt:
             await self.execute(stmt)
 
+    def get_table_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
+        return self.connection.generator.get_qualified_id(table)
+
     def get_table(self, table: type[DataclassInstance]) -> Table:
-        return self.connection.generator.state.get_table(
-            self.connection.generator.get_qualified_id(table)
-        )
+        return self.connection.generator.state.get_table(self.get_table_id(table))
 
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         "Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions."
@@ -888,7 +891,8 @@ class BaseContext(abc.ABC):
         Deletes rows from a database table.
 
         :param table: The table to remove records from.
-        :param key_type: The data type of the key values.
+        :param key_type: The data type of the key values such that the following is true:
+            `all(isinstance(v, key_type) for v in key_values)`
         :param key_values: The key values to look up in the table.
         """
 
@@ -1004,6 +1008,8 @@ class Explorer(abc.ABC):
             raise TypeError("disallowed: both parameters `module` and `modules`")
 
         if modules is not None:
+            if not isinstance(modules, list):
+                raise TypeError("expected: list of modules for parameter `modules`")
             entity_modules = modules
         elif module is not None:
             entity_modules = [module]

@@ -15,7 +15,7 @@ from pysqlsync.formation.object_types import FormationError, Table
 from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.key_types import DEFAULT
-from pysqlsync.model.properties import get_field_properties
+from pysqlsync.model.properties import get_primary_key_name_type
 from tests.params import (
     MSSQLBase,
     MySQLBase,
@@ -23,14 +23,6 @@ from tests.params import (
     TestEngineBase,
     disable_integration_tests,
 )
-
-
-def get_primary_key_name_type(entity_type: type) -> tuple[str, type]:
-    for field in dataclass_fields(entity_type):
-        props = get_field_properties(field.type)
-        if props.is_primary:
-            return field.name, props.tsv_type
-    raise TypeError(f"not an entity type: {entity_type}")
 
 
 @dataclass

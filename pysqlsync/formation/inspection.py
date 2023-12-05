@@ -90,7 +90,12 @@ def dataclass_primary_key_name(typ: type[DataclassInstance]) -> str:
 
 
 def dataclass_primary_key_type(typ: type[DataclassInstance]) -> TypeLike:
-    "Extracts the primary key data type from a dataclass."
+    """
+    Extracts the primary key data type from a dataclass.
+
+    This function returns the type of the primary key field without constraint annotations such as identity,
+    primary key, or unique. This may be a parameterized or annotated type, e.g. `Annotated[str, MaxLength(255)]`.
+    """
 
     for field in dataclass_fields(typ):
         props = get_field_properties(field.type)
