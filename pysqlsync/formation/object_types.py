@@ -11,14 +11,14 @@ from .object_dict import ObjectDict
 
 
 class StatementList(list[str]):
-    def append(self, __object: str | None) -> None:
+    def append(self, __object: Optional[str]) -> None:
         if __object is None:
             return
         if isinstance(__object, str) and not __object.strip():
             raise ValueError("empty statement")
         return super().append(__object)
 
-    def extend(self, __iterable: Iterable[str | None]) -> None:
+    def extend(self, __iterable: Iterable[Optional[str]]) -> None:
         for item in __iterable:
             self.append(item)
 

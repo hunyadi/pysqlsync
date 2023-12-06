@@ -770,7 +770,7 @@ class BaseContext(abc.ABC):
         for index, field_type, field_name in zip(
             range(len(field_types)), field_types, field_names
         ):
-            if field_type is types.NoneType or not field_name:
+            if field_type is type(None) or not field_name:
                 continue
 
             indices.append(index)
