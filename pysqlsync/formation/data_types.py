@@ -108,7 +108,7 @@ class SqlDiscovery:
             else:
                 return SqlTimestampType(int(m.group(1)), False)
 
-        m = re.fullmatch(r"^char[(](\d+)[)]$", type_def, re.IGNORECASE)
+        m = re.fullmatch(r"^char(?:acter)?[(](\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlFixedCharacterType(int(m.group(1)))
 

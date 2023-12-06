@@ -648,6 +648,9 @@ class Catalog(DatabaseObject):
     ) -> None:
         self.namespaces = ObjectDict(namespaces)
 
+    def __bool__(self) -> bool:
+        return len(self.namespaces) > 0
+
     def get_table(self, table_id: SupportsQualifiedId) -> Table:
         """
         Looks up a table by its qualified name.

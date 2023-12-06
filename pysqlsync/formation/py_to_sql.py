@@ -284,9 +284,7 @@ class DataclassConverter:
             return SqlDoubleType()
         if typ is int8:
             if self.options.extra_numeric_types:
-                return SqlUserDefinedType(
-                    GlobalId("int1")
-                )  # PostgreSQL extension required
+                return SqlUserDefinedType(GlobalId("int1"))
             else:
                 return SqlIntegerType(2)
         if typ is int16:
@@ -297,30 +295,22 @@ class DataclassConverter:
             return SqlIntegerType(8)
         if typ is uint8:
             if self.options.extra_numeric_types:
-                return SqlUserDefinedType(
-                    GlobalId("uint1")
-                )  # PostgreSQL extension required
+                return SqlUserDefinedType(GlobalId("uint1"))
             else:
                 return SqlIntegerType(2)
         if typ is uint16:
             if self.options.extra_numeric_types:
-                return SqlUserDefinedType(
-                    GlobalId("uint2")
-                )  # PostgreSQL extension required
+                return SqlUserDefinedType(GlobalId("uint2"))
             else:
                 return SqlIntegerType(2)
         if typ is uint32:
             if self.options.extra_numeric_types:
-                return SqlUserDefinedType(
-                    GlobalId("uint4")
-                )  # PostgreSQL extension required
+                return SqlUserDefinedType(GlobalId("uint4"))
             else:
                 return SqlIntegerType(4)
         if typ is uint64:
             if self.options.extra_numeric_types:
-                return SqlUserDefinedType(
-                    GlobalId("uint8")
-                )  # PostgreSQL extension required
+                return SqlUserDefinedType(GlobalId("uint8"))
             else:
                 return SqlIntegerType(8)
         if typ is float32:

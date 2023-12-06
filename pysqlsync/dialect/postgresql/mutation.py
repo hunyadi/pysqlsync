@@ -1,7 +1,12 @@
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import StatementList, Table, join_or_none
+from pysqlsync.formation.object_types import (
+    StatementList,
+    StructType,
+    Table,
+    join_or_none,
+)
 
 from .object_types import sql_quoted_string
 
@@ -37,6 +42,23 @@ class PostgreSQLMutator(Mutator):
             if source.description != target.description:
                 statements.append(
                     f"COMMENT ON TABLE {target.name} IS {sql_quoted_string(target.description)};"
+                )
+
+        return join_or_none(statements)
+
+    def mutate_struct_stmt(
+        self, source: StructType, target: StructType
+    ) -> Optional[str]:
+        statements: StatementList = StatementList()
+        statements.append(super().mutate_struct_stmt(source, target))
+
+        if target.description is None:
+            if source.description is not None:
+                statements.append(f"COMMENT ON TYPE {target.name} IS NULL;")
+        else:
+            if source.description != target.description:
+                statements.append(
+                    f"COMMENT ON TYPE {target.name} IS {sql_quoted_string(target.description)};"
                 )
 
         return join_or_none(statements)

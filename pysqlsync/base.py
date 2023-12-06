@@ -41,6 +41,48 @@ _JSON_ENCODER = json.JSONEncoder(
 )
 
 
+class ClassRef:
+    module_name: str
+    entity_name: str
+
+    @overload
+    def __init__(self, entity_type: type[DataclassInstance]) -> None:
+        ...
+
+    @overload
+    def __init__(self, *, module: types.ModuleType, entity_name: str) -> None:
+        ...
+
+    @overload
+    def __init__(self, *, module_name: str, entity_name: str) -> None:
+        ...
+
+    def __init__(
+        self,
+        entity_type: Optional[type[DataclassInstance]] = None,
+        *,
+        module: Optional[types.ModuleType] = None,
+        module_name: Optional[str] = None,
+        entity_name: Optional[str] = None,
+    ) -> None:
+        if module_name is None:
+            if module is not None:
+                module_name = module.__name__
+            elif entity_type is not None:
+                module_name = entity_type.__module__
+            else:
+                raise ValueError("expected: module name or type")
+
+        if entity_name is None:
+            if entity_type is not None:
+                entity_name = entity_type.__name__
+            else:
+                raise ValueError("expected: entity class name or type")
+
+        self.module_name = module_name
+        self.entity_name = entity_name
+
+
 @dataclass
 class GeneratorOptions:
     """
@@ -201,8 +243,8 @@ class BaseGenerator(abc.ABC):
 
         ...
 
-    def get_qualified_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
-        return self.converter.create_qualified_id(table.__module__, table.__name__)
+    def get_qualified_id(self, ref: ClassRef) -> SupportsQualifiedId:
+        return self.converter.create_qualified_id(ref.module_name, ref.entity_name)
 
     def get_current_schema_stmt(self) -> str:
         return "CURRENT_SCHEMA()"
@@ -210,19 +252,19 @@ class BaseGenerator(abc.ABC):
     def get_dataclass_insert_stmt(self, table: type[DataclassInstance]) -> str:
         "Returns a SQL statement to insert or ignore records in a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(table))
+        table_object = self.state.get_table(self.get_qualified_id(ClassRef(table)))
         return self.get_table_insert_stmt(table_object)
 
     def get_dataclass_upsert_stmt(self, table: type[DataclassInstance]) -> str:
         "Returns a SQL statement to insert or update records in a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(table))
+        table_object = self.state.get_table(self.get_qualified_id(ClassRef(table)))
         return self.get_table_upsert_stmt(table_object)
 
     def get_dataclass_delete_stmt(self, table: type[DataclassInstance]) -> str:
         "Returns a SQL statement to delete records from a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(table))
+        table_object = self.state.get_table(self.get_qualified_id(ClassRef(table)))
         return self.get_table_delete_stmt(table_object)
 
     def get_dataclass_as_record(
@@ -230,7 +272,9 @@ class BaseGenerator(abc.ABC):
     ) -> tuple:
         "Converts a data-class object into a record to insert into a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(entity_type))
+        table_object = self.state.get_table(
+            self.get_qualified_id(ClassRef(entity_type))
+        )
         extractors = self._get_dataclass_extractors(
             table_object, entity_type, skip_identity=skip_identity
         )
@@ -245,7 +289,9 @@ class BaseGenerator(abc.ABC):
     ) -> Iterable[tuple]:
         "Converts a list of data-class objects into a list of records to insert into a database table."
 
-        table_object = self.state.get_table(self.get_qualified_id(entity_type))
+        table_object = self.state.get_table(
+            self.get_qualified_id(ClassRef(entity_type))
+        )
         extractors = self._get_dataclass_extractors(
             table_object, entity_type, skip_identity=skip_identity
         )
@@ -567,11 +613,13 @@ class BaseContext(abc.ABC):
         if stmt:
             await self.execute(stmt)
 
-    def get_table_id(self, table: type[DataclassInstance]) -> SupportsQualifiedId:
-        return self.connection.generator.get_qualified_id(table)
+    def get_table_id(self, ref: ClassRef) -> SupportsQualifiedId:
+        return self.connection.generator.get_qualified_id(ref)
 
     def get_table(self, table: type[DataclassInstance]) -> Table:
-        return self.connection.generator.state.get_table(self.get_table_id(table))
+        return self.connection.generator.state.get_table(
+            self.get_table_id(ClassRef(table))
+        )
 
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         "Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions."
@@ -931,6 +979,26 @@ class BaseContext(abc.ABC):
         await self.execute_all(statement, records)
 
 
+def _module_or_list(
+    module: Optional[types.ModuleType], modules: Optional[list[types.ModuleType]]
+) -> list[types.ModuleType]:
+    if module is None and modules is None:
+        raise TypeError("required: one of parameters `module` and `modules`")
+    if module is not None and modules is not None:
+        raise TypeError("disallowed: both parameters `module` and `modules`")
+
+    if modules is not None:
+        if not isinstance(modules, list):
+            raise TypeError("expected: list of modules for parameter `modules`")
+        entity_modules = modules
+    elif module is not None:
+        entity_modules = [module]
+    else:
+        raise NotImplementedError("match condition not exhaustive")
+
+    return entity_modules
+
+
 class DiscoveryError(RuntimeError):
     pass
 
@@ -966,25 +1034,55 @@ class Explorer(abc.ABC):
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         ...
 
-    async def get_catalog_meta(self, *, namespace: str) -> Catalog:
-        "Discovers database objects in a namespace."
+    @overload
+    async def discover(self, *, module: types.ModuleType) -> None:
+        ...
 
-        ns_name = self.conn.connection.generator.converter.options.namespaces.get(
-            namespace
-        )
-        if ns_name is None:
-            raise DiscoveryError(
-                "discovery expects a (pseudo) namespace but options map to blank name"
-            )
+    @overload
+    async def discover(self, *, modules: list[types.ModuleType]) -> None:
+        ...
 
-        ns = await self.get_namespace(LocalId(ns_name))
-        return Catalog(namespaces=[ns])
+    async def discover(
+        self,
+        *,
+        module: Optional[types.ModuleType] = None,
+        modules: Optional[list[types.ModuleType]] = None,
+    ) -> None:
+        """
+        Assumes a database model based on the state of the database.
 
-    async def acquire(self, *, namespace: str) -> None:
-        "Merges database objects in a namespace into the current model."
+        Discovers database objects (e.g. tables, structs, user-defined types, constraints) and builds a model
+        representing those objects. The database model is specific to the selected dialect.
+
+        The list of Python modules passed as a parameter is used in mapping modules to database schemas. These modules
+        don't need to contain Python class definitions.
+
+        :param module: The Python module identifying the database schema to discover.
+        :param modules: The list of Python modules identifying database schemas to discover.
+        """
+
+        entity_modules = _module_or_list(module, modules)
 
         generator = self.conn.connection.generator
-        generator.state.merge(await self.get_catalog_meta(namespace=namespace))
+        generator.reset()
+
+        namespaces: list[Namespace] = []
+        for entity_module in entity_modules:
+            ns_name = generator.converter.options.namespaces.get(entity_module.__name__)
+            if ns_name is None:
+                raise DiscoveryError(
+                    "discovery expects a (pseudo) namespace but options map to blank name"
+                )
+            ns = await self.get_namespace(LocalId(ns_name))
+            namespaces.append(ns)
+
+        generator.state = Catalog(namespaces=namespaces)
+
+        LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")
+        for ns in generator.state.namespaces.values():
+            LOGGER.debug(f"found {len(ns.enums)} enum(s) in namespace {ns.name}")
+            LOGGER.debug(f"found {len(ns.structs)} struct(s) in namespace {ns.name}")
+            LOGGER.debug(f"found {len(ns.tables)} table(s) in namespace {ns.name}")
 
     @overload
     async def synchronize(self, *, module: types.ModuleType) -> None:
@@ -1000,21 +1098,22 @@ class Explorer(abc.ABC):
         module: Optional[types.ModuleType] = None,
         modules: Optional[list[types.ModuleType]] = None,
     ) -> None:
-        "Synchronizes a current source state with a desired target state."
+        """
+        Synchronizes a current source state with a desired target state.
 
-        if module is None and modules is None:
-            raise TypeError("required: one of parameters `module` and `modules`")
-        if module is not None and modules is not None:
-            raise TypeError("disallowed: both parameters `module` and `modules`")
+        First, constructs a database source model from the Python modules and the classes defined within.
 
-        if modules is not None:
-            if not isinstance(modules, list):
-                raise TypeError("expected: list of modules for parameter `modules`")
-            entity_modules = modules
-        elif module is not None:
-            entity_modules = [module]
-        else:
-            raise NotImplementedError()
+        Next, discovers database objects (e.g. tables, structs, user-defined types, constraints) and builds a target
+        model representing those objects. The database model is specific to the selected dialect.
+
+        Finally, compares the source and the target models, and mutates the database state from the source state to
+        the desired target state. Mutation involves executing SQL statements.
+
+        :param module: The Python module identifying the database schema to discover.
+        :param modules: The list of Python modules identifying database schemas to discover.
+        """
+
+        entity_modules = _module_or_list(module, modules)
 
         generator = self.conn.connection.generator
 
@@ -1024,14 +1123,7 @@ class Explorer(abc.ABC):
         target_state = generator.state
 
         # acquire current database schema
-        generator.reset()
-        for m in entity_modules:
-            await self.acquire(namespace=m.__name__)
-        LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")
-        for ns in generator.state.namespaces.values():
-            LOGGER.debug(f"found {len(ns.enums)} enums in namespace {ns.name}")
-            LOGGER.debug(f"found {len(ns.structs)} structs in namespace {ns.name}")
-            LOGGER.debug(f"found {len(ns.tables)} tables in namespace {ns.name}")
+        await self.discover(modules=entity_modules)
 
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)

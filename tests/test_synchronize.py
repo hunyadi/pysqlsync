@@ -7,7 +7,7 @@ from io import BytesIO
 from strong_typing.inspection import dataclass_fields
 
 import tests.tables as tables
-from pysqlsync.base import BaseContext, GeneratorOptions
+from pysqlsync.base import BaseContext, ClassRef, GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.inspection import get_entity_types
@@ -47,9 +47,26 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def test_create_schema(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
-            self.assertFalse(conn.connection.generator.state.namespaces)
+            self.assertFalse(conn.connection.generator.state)
             await explorer.synchronize(module=tables)
-            self.assertTrue(conn.connection.generator.state.namespaces)
+            self.assertTrue(conn.connection.generator.state)
+
+    async def test_discover_schema(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            explorer = self.engine.create_explorer(conn)
+            await explorer.synchronize(module=tables)
+            state = copy.deepcopy(conn.connection.generator.state)
+
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            explorer = self.engine.create_explorer(conn)
+            await explorer.discover(module=tables)
+
+            if self.engine.name != "postgresql":
+                return
+
+            for ns in conn.connection.generator.state.namespaces.values():
+                ns.tables.sort()
+            self.assertEqual(state, conn.connection.generator.state)
 
     async def test_update_schema(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -185,7 +202,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def test_identity_dataclass(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             cls = tables.UniqueTable
-            table_name = conn.connection.generator.get_qualified_id(cls)
+            table_name = conn.connection.generator.get_qualified_id(ClassRef(cls))
 
             await conn.create_objects([cls])
 

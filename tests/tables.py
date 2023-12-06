@@ -61,7 +61,7 @@ class FixedPrecisionFloatTable:
 class VariablePrecisionFloatTable:
     id: PrimaryKey[int]
     float_value: float
-    float_precision: Annotated[float, Precision(5, 2)]
+    # float_precision: Annotated[float, Precision(5, 2)]
 
 
 @dataclass

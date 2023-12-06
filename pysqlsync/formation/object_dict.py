@@ -78,5 +78,8 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
             if op_item is not None:
                 yield (item, op_item)
 
+    def sort(self) -> None:
+        self._items = dict(sorted(self._items.items()))
+
     def reorder(self, order: list[str]) -> None:
         self._items = {key: self._items[key] for key in order}

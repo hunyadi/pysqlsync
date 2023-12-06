@@ -17,8 +17,8 @@ from pysqlsync.formation.object_types import (
     Table,
     UniqueConstraint,
 )
-from pysqlsync.model.data_types import SqlArrayType, quote
-from pysqlsync.model.id_types import LocalId, QualifiedId, SupportsQualifiedId
+from pysqlsync.model.data_types import SqlArrayType, SqlUserDefinedType, quote
+from pysqlsync.model.id_types import GlobalId, LocalId, QualifiedId, SupportsQualifiedId
 
 from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
@@ -79,7 +79,12 @@ class PostgreSQLExplorer(Explorer):
     def __init__(self, conn: BaseContext) -> None:
         super().__init__(conn)
         self.discovery = SqlDiscovery(
-            SqlDiscoveryOptions(substitutions={"jsonb": PostgreSQLJsonType()})
+            SqlDiscoveryOptions(
+                substitutions={
+                    "jsonb": PostgreSQLJsonType(),
+                    "inet": SqlUserDefinedType(GlobalId("inet")),
+                }
+            )
         )
         self.factory = PostgreSQLObjectFactory()
 
@@ -142,14 +147,20 @@ class PostgreSQLExplorer(Explorer):
         return len(rows) > 0 and rows[0] > 0
 
     async def get_struct(self, struct_id: SupportsQualifiedId) -> StructType:
+        conditions: list[str] = []
+        conditions.append(f"typ.typname = {quote(struct_id.local_id)}")
+        if struct_id.scope_id is not None:
+            conditions.append(f"nsp.nspname = {quote(struct_id.scope_id)}")
+        condition = " AND ".join(f"({c})" for c in conditions)
+
         struct_record = await self.conn.query_one(
             PostgreSQLStructMeta,
             "SELECT\n"
             "    dsc.description AS description\n"
-            "FROM pg_catalog.pg_class AS cls\n"
-            "    INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
-            "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = cls.oid AND dsc.objsubid = 0\n"
-            f"WHERE {self._where_struct(struct_id)}",
+            "FROM pg_catalog.pg_type AS typ\n"
+            "    INNER JOIN pg_catalog.pg_namespace AS nsp ON typ.typnamespace = nsp.oid\n"
+            "    LEFT JOIN pg_catalog.pg_description AS dsc ON dsc.objoid = typ.oid AND dsc.objsubid = 0\n"
+            f"WHERE {condition}",
         )
 
         member_records = await self.conn.query_all(
