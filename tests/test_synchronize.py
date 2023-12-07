@@ -6,7 +6,6 @@ from io import BytesIO
 
 from strong_typing.inspection import dataclass_fields
 
-import tests.tables as tables
 from pysqlsync.base import BaseContext, ClassRef, GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
 from pysqlsync.data.generator import random_objects
@@ -16,6 +15,8 @@ from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.model.key_types import DEFAULT
 from pysqlsync.model.properties import get_primary_key_name_type
+from tests import tables
+from tests.model import event, school
 from tests.params import (
     MSSQLBase,
     MySQLBase,
@@ -48,7 +49,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             explorer = self.engine.create_explorer(conn)
             self.assertFalse(conn.connection.generator.state)
-            await explorer.synchronize(module=tables)
+            await explorer.synchronize(modules=[tables, event, school])
             self.assertTrue(conn.connection.generator.state)
 
     async def test_discover_schema(self) -> None:

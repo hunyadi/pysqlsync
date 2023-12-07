@@ -1,8 +1,6 @@
 import copy
 import unittest
 
-import tests.empty as empty
-import tests.tables as tables
 from pysqlsync.formation.mutation import Mutator, MutatorOptions
 from pysqlsync.formation.object_types import Column, StructMember, UniqueConstraint
 from pysqlsync.formation.py_to_sql import (
@@ -27,6 +25,7 @@ from pysqlsync.model.data_types import (
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.python_types import dataclass_to_code
+from tests import empty, tables
 
 
 class TestConverter(unittest.TestCase):

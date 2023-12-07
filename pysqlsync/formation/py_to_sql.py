@@ -172,7 +172,14 @@ class NamespaceMapping:
     def __init__(
         self, dictionary: Optional[dict[types.ModuleType, Optional[str]]] = None
     ) -> None:
-        self.dictionary = dictionary if dictionary is not None else {}
+        if dictionary is not None:
+            if len(set(dictionary.values())) != len(dictionary):
+                raise ValueError(
+                    "expected: a one-to-one mapping between Python modules and database schema names"
+                )
+            self.dictionary = dictionary
+        else:
+            self.dictionary = {}
 
     def get(self, name: str) -> Optional[str]:
         module = sys.modules[name]

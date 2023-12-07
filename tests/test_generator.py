@@ -4,9 +4,9 @@ from datetime import date, datetime, time, timezone
 
 from strong_typing.inspection import DataclassInstance
 
-import tests.tables as tables
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.factory import get_dialect
+from tests import tables
 
 
 def get_generator(dialect: str) -> BaseGenerator:

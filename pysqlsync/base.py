@@ -15,7 +15,7 @@ import types
 import typing
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, overload
+from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -616,10 +616,25 @@ class BaseContext(abc.ABC):
     def get_table_id(self, ref: ClassRef) -> SupportsQualifiedId:
         return self.connection.generator.get_qualified_id(ref)
 
-    def get_table(self, table: type[DataclassInstance]) -> Table:
-        return self.connection.generator.state.get_table(
-            self.get_table_id(ClassRef(table))
-        )
+    @overload
+    def get_table(self, __ref: ClassRef) -> Table:
+        ...
+
+    @overload
+    def get_table(self, __table: type[DataclassInstance]) -> Table:
+        ...
+
+    def get_table(
+        self, __table_or_ref: Union[ClassRef, type[DataclassInstance]]
+    ) -> Table:
+        if isinstance(__table_or_ref, ClassRef):
+            table_id = self.get_table_id(__table_or_ref)
+        elif is_dataclass_type(__table_or_ref):
+            table_id = self.get_table_id(ClassRef(__table_or_ref))
+        else:
+            raise TypeError(f"expected: {ClassRef.__name__} or data-class type")
+
+        return self.connection.generator.state.get_table(table_id)
 
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         "Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions."
@@ -1066,7 +1081,6 @@ class Explorer(abc.ABC):
         generator = self.conn.connection.generator
         generator.reset()
 
-        namespaces: list[Namespace] = []
         for entity_module in entity_modules:
             ns_name = generator.converter.options.namespaces.get(entity_module.__name__)
             if ns_name is None:
@@ -1074,9 +1088,7 @@ class Explorer(abc.ABC):
                     "discovery expects a (pseudo) namespace but options map to blank name"
                 )
             ns = await self.get_namespace(LocalId(ns_name))
-            namespaces.append(ns)
-
-        generator.state = Catalog(namespaces=namespaces)
+            generator.state.merge(Catalog([ns]))
 
         LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")
         for ns in generator.state.namespaces.values():

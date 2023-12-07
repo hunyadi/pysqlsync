@@ -1,10 +1,10 @@
 import unittest
 
-import tests.tables as tables
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import NamespaceMapping, dataclass_to_table
 from pysqlsync.model.id_types import LocalId
+from tests import tables
 from tests.params import (
     MSSQLBase,
     MySQLBase,

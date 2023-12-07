@@ -644,9 +644,9 @@ class Catalog(DatabaseObject):
 
     def __init__(
         self,
-        namespaces: list[Namespace],
+        namespaces: Optional[list[Namespace]] = None,
     ) -> None:
-        self.namespaces = ObjectDict(namespaces)
+        self.namespaces = ObjectDict(namespaces or [])
 
     def __bool__(self) -> bool:
         return len(self.namespaces) > 0
