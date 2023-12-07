@@ -49,6 +49,18 @@ class NumericTable:
 
 
 @dataclass
+class DefaultNumericTable:
+    id: PrimaryKey[int]
+
+    integer_8: int8 = 127
+    integer_16: int16 = 32767
+    integer_32: int32 = 2147483647
+    integer_64: int64 = 0
+
+    integer: int = 23
+
+
+@dataclass
 class FixedPrecisionFloatTable:
     id: PrimaryKey[int]
     float_32: float32

@@ -42,19 +42,38 @@ _JSON_ENCODER = json.JSONEncoder(
 
 
 class ClassRef:
+    "Represents a reference to a Python class in a Python module."
+
     module_name: str
     entity_name: str
 
     @overload
     def __init__(self, entity_type: type[DataclassInstance]) -> None:
+        """
+        Creates a reference from a Python data-class type.
+
+        :param entity_type: A Python data-class type.
+        """
         ...
 
     @overload
     def __init__(self, *, module: types.ModuleType, entity_name: str) -> None:
+        """
+        Creates a reference from a Python class name in a Python module.
+
+        :param module: A Python module instance.
+        :param entity_name: Class name without module qualifier.
+        """
         ...
 
     @overload
     def __init__(self, *, module_name: str, entity_name: str) -> None:
+        """
+        Creates a reference from a Python fully-qualified module name and Python class name pair.
+
+        :param module_name: Fully-qualified module name.
+        :param entity_name: Class name without module qualifier.
+        """
         ...
 
     def __init__(

@@ -1,16 +1,22 @@
 from typing import Optional
 
-from pysqlsync.formation.object_types import Column, Namespace, ObjectFactory, Table
+from pysqlsync.formation.object_types import (
+    Column,
+    Namespace,
+    ObjectFactory,
+    Table,
+    join_or_none,
+)
 from pysqlsync.model.data_types import quote
+from pysqlsync.model.id_types import LocalId
 
 
 class MSSQLColumn(Column):
     @property
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable else ""
-        default = f" DEFAULT {self.default}" if self.default is not None else ""
         identity = " IDENTITY" if self.identity else ""
-        return f"{self.data_type}{nullable}{default}{identity}"
+        return f"{self.data_type}{nullable}{identity}"
 
 
 class MSSQLTable(Table):
@@ -20,24 +26,48 @@ class MSSQLTable(Table):
         )
 
     def add_constraints_stmt(self) -> Optional[str]:
+        statements: list[str] = []
+
+        constraints: list[str] = []
+        for column in self.columns.values():
+            if column.default is None:
+                continue
+            name = LocalId(f"df_{column.name.local_id}")
+            constraints.append(
+                f"ADD CONSTRAINT {name} DEFAULT {column.default} FOR {column.name}"
+            )
+        if constraints:
+            statements.append(self.alter_table_stmt(constraints))
+
         if self.table_constraints:
-            return (
+            statements.append(
                 f"ALTER TABLE {self.name} ADD\n"
                 + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints)
                 + "\n;"
             )
-        else:
-            return None
+
+        return join_or_none(statements)
 
     def drop_constraints_stmt(self) -> Optional[str]:
+        statements: list[str] = []
+
+        constraints: list[str] = []
+        for column in self.columns.values():
+            if column.default is None:
+                continue
+            name = LocalId(f"df_{column.name.local_id}")
+            constraints.append(f"DROP CONSTRAINT {name}")
+        if constraints:
+            statements.append(self.alter_table_stmt(constraints))
+
         if self.table_constraints:
-            return (
+            statements.append(
                 f"ALTER TABLE {self.name} DROP\n"
                 + ",\n".join(f"CONSTRAINT {c.name}" for c in self.table_constraints)
                 + "\n;"
             )
-        else:
-            return None
+
+        return join_or_none(statements)
 
 
 class MSSQLNamespace(Namespace):

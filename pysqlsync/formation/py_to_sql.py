@@ -132,7 +132,7 @@ def dataclass_fields_as_required(
     for field in dataclass_fields(cls):
         props = get_field_properties(field.type)
         ref = evaluate_member_type(props.field_type, cls)
-        yield DataclassField(field.name, ref)
+        yield DataclassField(field.name, ref, field.default)
 
 
 def _topological_sort(class_types: list[type]) -> list[type]:
@@ -499,6 +499,11 @@ class DataclassConverter:
 
         props = get_field_properties(field.type)
         data_type = self.member_to_sql_data_type(props.field_type, cls)
+        default_value = (
+            constant(field.default)
+            if field.default is not dataclasses.MISSING and field.default is not None
+            else None
+        )
         description = (
             doc.params[field.name].description if field.name in doc.params else None
         )
@@ -507,6 +512,7 @@ class DataclassConverter:
             name=LocalId(field.name),
             data_type=data_type,
             nullable=props.nullable,
+            default=default_value,
             identity=props.is_identity,
             description=description,
         )

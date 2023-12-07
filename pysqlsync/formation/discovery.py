@@ -26,6 +26,7 @@ class AnsiColumnMeta:
     column_name: str
     data_type: str
     nullable: bool
+    column_default: str
     character_maximum_length: Optional[int]
     numeric_precision: Optional[int]
     numeric_scale: Optional[int]
@@ -200,6 +201,7 @@ class AnsiExplorer(Explorer):
             "    column_name AS column_name,\n"
             "    data_type AS data_type,\n"
             "    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable,\n"
+            "    column_default AS column_default,\n"
             "    character_maximum_length AS character_maximum_length,\n"
             "    numeric_precision AS numeric_precision,\n"
             "    numeric_scale AS numeric_scale,\n"
@@ -222,6 +224,7 @@ class AnsiExplorer(Explorer):
                         datetime_precision=col.datetime_precision,
                     ),
                     bool(col.nullable),
+                    default=col.column_default,
                 )
             )
         return columns

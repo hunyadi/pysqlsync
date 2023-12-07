@@ -72,6 +72,7 @@ class MySQLExplorer(AnsiExplorer):
             "    column_name AS column_name,\n"
             "    data_type AS data_type,\n"
             "    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable,\n"
+            "    column_default AS column_default,\n"
             "    character_maximum_length AS character_maximum_length,\n"
             "    numeric_precision AS numeric_precision,\n"
             "    numeric_scale AS numeric_scale,\n"
@@ -98,6 +99,7 @@ class MySQLExplorer(AnsiExplorer):
                         datetime_precision=col.datetime_precision,
                     ),
                     bool(col.nullable),
+                    default=col.column_default,
                     identity="auto_increment" in col.extra,
                     description=col.column_comment or None,
                 )

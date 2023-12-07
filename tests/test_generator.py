@@ -69,6 +69,40 @@ class TestGenerator(unittest.TestCase):
                     ");",
                 )
 
+    def test_create_default_numeric_table(self) -> None:
+        self.maxDiff = None
+        for dialect in ["postgresql", "mysql"]:
+            with self.subTest(dialect=dialect):
+                self.assertMultiLineEqual(
+                    get_create_stmt(tables.DefaultNumericTable, dialect=dialect),
+                    'CREATE TABLE "DefaultNumericTable" (\n'
+                    '"id" bigint NOT NULL,\n'
+                    '"integer_8" smallint NOT NULL DEFAULT 127,\n'
+                    '"integer_16" smallint NOT NULL DEFAULT 32767,\n'
+                    '"integer_32" integer NOT NULL DEFAULT 2147483647,\n'
+                    '"integer_64" bigint NOT NULL DEFAULT 0,\n'
+                    '"integer" bigint NOT NULL DEFAULT 23,\n'
+                    'PRIMARY KEY ("id")\n'
+                    ");",
+                )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DefaultNumericTable, dialect="mssql"),
+            'CREATE TABLE "DefaultNumericTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"integer_8" smallint NOT NULL,\n'
+            '"integer_16" smallint NOT NULL,\n'
+            '"integer_32" integer NOT NULL,\n'
+            '"integer_64" bigint NOT NULL,\n'
+            '"integer" bigint NOT NULL,\n'
+            'PRIMARY KEY ("id")\n'
+            ");\n"
+            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_8" DEFAULT 127 FOR "integer_8";\n'
+            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_16" DEFAULT 32767 FOR "integer_16";\n'
+            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_32" DEFAULT 2147483647 FOR "integer_32";\n'
+            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_64" DEFAULT 0 FOR "integer_64";\n'
+            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer" DEFAULT 23 FOR "integer";',
+        )
+
     def test_create_fixed_precision_float_table(self) -> None:
         self.maxDiff = None
         for dialect in ["postgresql", "mssql", "mysql"]:
