@@ -115,6 +115,7 @@ class IPAddressTable:
     id: PrimaryKey[int]
     ipv4: ipaddress.IPv4Address
     ipv6: ipaddress.IPv6Address
+    ipv4_or_ipv6: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
     optional_ipv4: Optional[ipaddress.IPv4Address]
     optional_ipv6: Optional[ipaddress.IPv6Address]
 

@@ -260,6 +260,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"ipv4" inet NOT NULL,\n'
             '"ipv6" inet NOT NULL,\n'
+            '"ipv4_or_ipv6" inet NOT NULL,\n'
             '"optional_ipv4" inet,\n'
             '"optional_ipv6" inet,\n'
             'PRIMARY KEY ("id")\n'
@@ -273,6 +274,7 @@ class TestGenerator(unittest.TestCase):
                     '"id" bigint NOT NULL,\n'
                     '"ipv4" binary(4) NOT NULL,\n'
                     '"ipv6" binary(16) NOT NULL,\n'
+                    '"ipv4_or_ipv6" binary(16) NOT NULL,\n'
                     '"optional_ipv4" binary(4),\n'
                     '"optional_ipv6" binary(16),\n'
                     'PRIMARY KEY ("id")\n'
@@ -566,6 +568,7 @@ class TestGenerator(unittest.TestCase):
                     1,
                     ipaddress.IPv4Address("192.168.0.1"),
                     ipaddress.IPv6Address("2001:db8::"),
+                    ipaddress.IPv6Address("2001:db8::"),
                     None,
                     None,
                 ),
@@ -573,6 +576,7 @@ class TestGenerator(unittest.TestCase):
             (
                 1,
                 ipaddress.IPv4Address("192.168.0.1"),
+                ipaddress.IPv6Address("2001:db8::"),
                 ipaddress.IPv6Address("2001:db8::"),
                 None,
                 None,

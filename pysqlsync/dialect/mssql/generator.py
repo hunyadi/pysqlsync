@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
+from pysqlsync.formation.inspection import is_ip_address_type
 from pysqlsync.formation.object_types import Column, FormationError, Table
 from pysqlsync.formation.py_to_sql import (
     ArrayMode,
@@ -150,7 +151,7 @@ class MSSQLGenerator(BaseGenerator):
     ) -> Callable[[Any], Any]:
         if field_type is uuid.UUID:
             return lambda obj: getattr(obj, field_name).bytes
-        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+        elif is_ip_address_type(field_type):
             return lambda obj: getattr(obj, field_name).packed
 
         return super().get_field_extractor(column, field_name, field_type)
@@ -161,7 +162,7 @@ class MSSQLGenerator(BaseGenerator):
     ) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
-        elif field_type is ipaddress.IPv4Address or field_type is ipaddress.IPv6Address:
+        elif is_ip_address_type(field_type):
             return lambda field: field.packed
 
         return super().get_value_transformer(column, field_type)

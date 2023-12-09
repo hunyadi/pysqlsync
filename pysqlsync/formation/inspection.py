@@ -1,10 +1,10 @@
 import datetime
 import decimal
 import inspect
-import ipaddress
 import sys
 import types
 import uuid
+from ipaddress import IPv4Address, IPv6Address
 from typing import Any, Optional
 
 from strong_typing.core import JsonType
@@ -43,8 +43,8 @@ def is_simple_type(typ: Any) -> bool:
         or typ is datetime.timedelta
         or typ is uuid.UUID
         or typ is JsonType
-        or typ is ipaddress.IPv4Address  # PostgreSQL only
-        or typ is ipaddress.IPv6Address  # PostgreSQL only
+        or typ is IPv4Address  # PostgreSQL only
+        or typ is IPv6Address  # PostgreSQL only
     ):
         return True
     if is_type_enum(typ):
@@ -71,6 +71,24 @@ def is_struct_type(typ: Any) -> TypeGuard[type[DataclassInstance]]:
         return False
 
     return not dataclass_has_primary_key(typ)
+
+
+def is_ip_address_type(field_type: type) -> bool:
+    "Check if type is an IPv4 or IPv6 address type."
+
+    if field_type is IPv4Address or field_type is IPv6Address:
+        return True
+
+    # check if type is IPv4Address | IPv6Address
+    if is_type_union(field_type):
+        field_type = unwrap_annotated_type(field_type)
+        member_types = unwrap_union_types(field_type)
+        if len(member_types) != 2:
+            return False
+        if IPv4Address in member_types and IPv6Address in member_types:
+            return True
+
+    return False
 
 
 def dataclass_has_primary_key(typ: type[DataclassInstance]) -> bool:

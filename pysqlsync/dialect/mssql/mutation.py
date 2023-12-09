@@ -6,7 +6,6 @@ from pysqlsync.formation.object_types import (
     ColumnFormationError,
     StatementList,
     Table,
-    TableFormationError,
     join_or_none,
 )
 from pysqlsync.model.id_types import LocalId
