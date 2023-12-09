@@ -25,7 +25,7 @@ class MSSQLMutator(Mutator):
         else:
             return None
 
-    def mutate_table_stmt(self, source: Table, target: Table) -> str | None:
+    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
         statements = StatementList()
 
         constraints: list[str] = []

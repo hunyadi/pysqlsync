@@ -29,7 +29,7 @@ class UserTable:
     uuid: uuid.UUID
     name: str
     short_name: Annotated[str, MaxLength(255)]
-    homepage_url: str | None = None
+    homepage_url: Optional[str] = None
 ```
 
 The data-class can be defined statically in code, or generated dynamically from input (with `dataclasses.make_dataclass`). Fields can be required or nullable (represented in Python as `None`). All basic data types are supported, including integers (of various widths), floating-point numbers, strings (of fixed or variable length), timestamps (`datetime.datetime` in Python), UUIDs (`uuid.UUID` in Python), enumerations (represented in Python as `enum.Enum`), etc. `list[...]` is supported as a collection type, and composite types (data-classes without a primary key) are also permitted.
