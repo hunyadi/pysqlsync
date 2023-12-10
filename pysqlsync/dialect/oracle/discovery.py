@@ -24,6 +24,7 @@ from pysqlsync.model.id_types import (
 from .data_types import (
     OracleIntegerType,
     OracleTimestampType,
+    OracleTimeType,
     OracleVariableBinaryType,
     OracleVariableCharacterType,
 )
@@ -64,9 +65,11 @@ class OracleExplorer(Explorer):
                 substitutions={
                     "BLOB": OracleVariableBinaryType(),
                     "CLOB": OracleVariableCharacterType(),
+                    "INTERVAL DAY": OracleTimeType(),
                     "NUMBER": OracleIntegerType(),
                     "RAW": OracleVariableBinaryType(),
                     "TIMESTAMP": OracleTimestampType(),
+                    "VARCHAR2": OracleVariableCharacterType(),
                 }
             )
         )
@@ -142,13 +145,15 @@ class OracleExplorer(Explorer):
                 numeric_precision=col.data_precision,
                 numeric_scale=col.data_scale,
             )
+            nullable = bool(col.is_nullable)
+            identity = bool(col.is_identity)
             columns.append(
                 self.factory.column_class(
                     LocalId(col.column_name),
                     data_type,
-                    bool(col.is_nullable),
-                    identity=bool(col.is_identity),
-                    default=col.data_default,
+                    nullable,
+                    identity=identity,
+                    default=col.data_default if not identity else None,
                     description=col.comments,
                 )
             )

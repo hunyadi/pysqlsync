@@ -261,7 +261,8 @@ class RandomGenerator:
             return lambda _: random_time()
         elif plain_type is str:
             min_length_tag = get_annotation(field_type, MinLength)
-            min_length = min_length_tag.value if min_length_tag is not None else 0
+            # use a minimum length of at least 1; Oracle treats empty string as equivalent to NULL
+            min_length = min_length_tag.value if min_length_tag is not None else 1
             max_length_tag = get_annotation(field_type, MaxLength)
             max_length = max_length_tag.value if max_length_tag is not None else 255
             return lambda _: random_alphanumeric_str(min_length, max_length)

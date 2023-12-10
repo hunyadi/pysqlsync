@@ -7,6 +7,7 @@ from strong_typing.auxiliary import int8, int16, int32, int64
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
+from pysqlsync.dialect.oracle.mutation import OracleMutator
 from pysqlsync.formation.inspection import is_ip_address_type
 from pysqlsync.formation.object_types import Column, FormationError
 from pysqlsync.formation.py_to_sql import (
@@ -22,6 +23,7 @@ from pysqlsync.util.typing import override
 from .data_types import (
     OracleIntegerType,
     OracleTimestampType,
+    OracleTimeType,
     OracleVariableBinaryType,
     OracleVariableCharacterType,
 )
@@ -34,16 +36,24 @@ class OracleGenerator(BaseGenerator):
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, OracleObjectFactory())
+        super().__init__(options, OracleObjectFactory(), OracleMutator())
 
-        if options.enum_mode is EnumMode.TYPE:
+        if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
             raise FormationError(
                 f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
+            )
+        if options.struct_mode is StructMode.TYPE:
+            raise FormationError(
+                f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
+            )
+        if options.array_mode is ArrayMode.ARRAY:
+            raise FormationError(
+                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
             )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=options.enum_mode or EnumMode.INLINE,
+                enum_mode=options.enum_mode or EnumMode.RELATION,
                 struct_mode=options.struct_mode or StructMode.JSON,
                 array_mode=options.array_mode or ArrayMode.JSON,
                 qualified_names=False,
@@ -51,6 +61,7 @@ class OracleGenerator(BaseGenerator):
                 foreign_constraints=options.foreign_constraints,
                 substitutions={
                     bytes: OracleVariableBinaryType(),
+                    datetime.time: OracleTimeType(),
                     datetime.datetime: OracleTimestampType(),
                     int: OracleIntegerType(),
                     int8: OracleIntegerType(),
@@ -80,6 +91,13 @@ class OracleGenerator(BaseGenerator):
             return lambda obj: getattr(obj, field_name).bytes
         elif is_ip_address_type(field_type):
             return lambda obj: getattr(obj, field_name).packed
+        elif field_type is datetime.time:
+            return (
+                lambda obj: datetime.datetime.combine(
+                    datetime.date.min, getattr(obj, field_name)
+                )
+                - datetime.datetime.min
+            )
 
         return super().get_field_extractor(column, field_name, field_type)
 
@@ -91,5 +109,10 @@ class OracleGenerator(BaseGenerator):
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):
             return lambda field: field.packed
+        elif field_type is datetime.time:
+            return (
+                lambda field: datetime.datetime.combine(datetime.date.min, field)
+                - datetime.datetime.min
+            )
 
         return super().get_value_transformer(column, field_type)

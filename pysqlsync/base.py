@@ -516,6 +516,8 @@ class BaseContext(abc.ABC):
         LOGGER.debug(f"execute SQL:\n{statement}")
         try:
             await self._execute(statement)
+        except QueryException:
+            raise
         except Exception as e:
             raise QueryException(statement) from e
 

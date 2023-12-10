@@ -110,7 +110,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     await explorer.synchronize(module=tables)
 
     async def get_rows(self, conn: BaseContext, table: Table) -> int:
-        count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name};")
+        count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
         return count
 
     async def test_insert_update_delete_rows(self) -> None:
@@ -159,7 +159,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
                     # truncate table
                     table = conn.get_table(entity_type)
-                    await conn.execute(f"DELETE FROM {table.name};")
+                    await conn.execute(f"DELETE FROM {table.name}")
                     self.assertEqual(await self.get_rows(conn, table), 0)
 
                     # insert data in database table
@@ -240,6 +240,11 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(count, 5)
 
             await conn.drop_objects()
+
+
+# @unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
+# class TestOracleSynchronize(OracleBase, TestSynchronize):
+#     pass
 
 
 @unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")

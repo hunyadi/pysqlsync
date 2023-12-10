@@ -1,6 +1,7 @@
 from pysqlsync.model.data_types import (
     SqlIntegerType,
     SqlTimestampType,
+    SqlTimeType,
     SqlVariableBinaryType,
     SqlVariableCharacterType,
 )
@@ -25,6 +26,11 @@ class OracleTimestampType(SqlTimestampType):
         else:
             time_zone = ""
         return f"timestamp{precision}{time_zone}"
+
+
+class OracleTimeType(SqlTimeType):
+    def __str__(self) -> str:
+        return "interval day to second"
 
 
 class OracleVariableCharacterType(SqlVariableCharacterType):

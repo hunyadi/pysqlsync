@@ -6,7 +6,7 @@ from typing import Any, Iterable, Optional, TypeVar
 import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.base import BaseConnection, BaseContext, QueryException
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.resultset import resultset_unwrap_tuple
@@ -36,6 +36,7 @@ class OracleConnection(BaseConnection):
             password=self.params.password,
             dsn=f"{host}:{port}/{database}",
         )
+        conn.autocommit = True
 
         self.native = conn
         return OracleContext(self)
@@ -63,7 +64,10 @@ class OracleContext(BaseContext):
             else:
                 statement = statement.rstrip("\r\n\t\v ;")
                 for s in re.split(r";$", statement, flags=re.MULTILINE):
-                    cur.execute(s)
+                    try:
+                        cur.execute(s)
+                    except Exception as e:
+                        raise QueryException(s) from e
 
     @override
     @thread_dispatch
@@ -101,7 +105,7 @@ class OracleContext(BaseContext):
             str,
             f"SELECT table_name FROM all_tables WHERE {condition}",
         )
-        statement = ", ".join(
+        statement = "\n".join(
             f"DROP TABLE {LocalId(table)} CASCADE CONSTRAINTS PURGE;"
             for table in tables
         )
