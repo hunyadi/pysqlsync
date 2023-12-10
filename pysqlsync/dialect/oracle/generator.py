@@ -8,7 +8,7 @@ from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.inspection import is_ip_address_type
-from pysqlsync.formation.object_types import Column, FormationError, Table
+from pysqlsync.formation.object_types import Column, FormationError
 from pysqlsync.formation.py_to_sql import (
     ArrayMode,
     DataclassConverter,
@@ -69,84 +69,8 @@ class OracleGenerator(BaseGenerator):
         )
 
     @override
-    def get_table_insert_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
-        statements: list[str] = []
-        statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.get_columns(order) if not column.identity]
-        column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f":{index}" for index, _ in enumerate(columns, start=1))
-        statements.append(f"({column_list}) VALUES ({value_list})")
-        statements.append(";")
-        return "\n".join(statements)
-
-    def _get_merge_preamble(self, table: Table, columns: list[Column]) -> list[str]:
-        statements: list[str] = []
-
-        statements.append(f"MERGE INTO {table.name} target")
-        column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f":{index}" for index, _ in enumerate(columns, start=1))
-        statements.append(f"USING (VALUES ({value_list})) source({column_list})")
-
-        match_columns = [column for column in columns if table.is_lookup_column(column)]
-        if match_columns:
-            match_condition = " OR ".join(
-                f"target.{column.name} = source.{column.name}"
-                for column in match_columns
-            )
-
-            statements.append(f"ON ({match_condition})")
-
-        return statements
-
-    @override
-    def get_table_merge_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
-        columns = [column for column in table.get_columns(order) if not column.identity]
-        statements = self._get_merge_preamble(table, columns)
-
-        statements.append("WHEN NOT MATCHED THEN")
-        column_list = ", ".join(str(column.name) for column in columns)
-        insert_list = ", ".join(f"source.{column.name}" for column in columns)
-        statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
-
-        statements.append(";")
-        return "\n".join(statements)
-
-    @override
-    def get_table_upsert_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
-        columns = [column for column in table.get_columns(order)]
-        statements: list[str] = self._get_merge_preamble(table, columns)
-
-        insert_columns = [column for column in columns if not column.identity]
-        update_columns = [
-            column for column in insert_columns if not table.is_lookup_column(column)
-        ]
-        if update_columns:
-            statements.append("WHEN MATCHED THEN")
-            update_list = ", ".join(
-                f"target.{column.name} = source.{column.name}"
-                for column in update_columns
-            )
-            statements.append(f"UPDATE SET {update_list}")
-        if insert_columns:
-            statements.append("WHEN NOT MATCHED THEN")
-            column_list = ", ".join(str(column.name) for column in insert_columns)
-            insert_list = ", ".join(
-                f"source.{column.name}" for column in insert_columns
-            )
-            statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
-
-        statements.append(";")
-        return "\n".join(statements)
-
-    @override
-    def get_table_delete_stmt(self, table: Table) -> str:
-        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = :1"
+    def placeholder(self, index: int) -> str:
+        return f":{index}"
 
     @override
     def get_field_extractor(

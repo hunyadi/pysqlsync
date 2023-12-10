@@ -1,6 +1,6 @@
 import unittest
 
-from pysqlsync.base import ClassRef, GeneratorOptions
+from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import NamespaceMapping, dataclass_to_table
 from pysqlsync.model.id_types import LocalId
@@ -12,11 +12,11 @@ from tests.params import (
     OracleBase,
     PostgreSQLBase,
     TestEngineBase,
-    disable_integration_tests,
+    has_env_var,
 )
 
 
-@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
+@unittest.skipUnless(has_env_var("INTEGRATION"), "database tests are disabled")
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters) as conn:
@@ -104,18 +104,22 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.drop_objects()
 
 
-# class TestOracleDiscovery(OracleBase, TestDiscovery):
-#     pass
+@unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
+class TestOracleDiscovery(OracleBase, TestDiscovery):
+    pass
 
 
+@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):
     pass
 
 
+@unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")
 class TestMSSQLDiscovery(MSSQLBase, TestDiscovery):
     pass
 
 
+@unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLDiscovery(MySQLBase, TestDiscovery):
     pass
 

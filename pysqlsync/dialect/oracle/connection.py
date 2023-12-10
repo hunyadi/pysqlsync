@@ -7,6 +7,9 @@ import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.model.data_types import escape_like
+from pysqlsync.model.id_types import LocalId
+from pysqlsync.resultset import resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
 
@@ -82,8 +85,25 @@ class OracleContext(BaseContext):
             if is_dataclass_type(signature):
                 return records
             else:
-                return self._resultset_unwrap_tuple(signature, records)
+                return resultset_unwrap_tuple(signature, records)
 
     @override
     async def current_schema(self) -> Optional[str]:
         return None
+
+    @override
+    async def drop_schema(self, namespace: LocalId) -> None:
+        LOGGER.debug(f"drop schema: {namespace}")
+        condition = (
+            f"table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~'"
+        )
+        tables = await self.query_all(
+            str,
+            f"SELECT table_name FROM all_tables WHERE {condition}",
+        )
+        statement = ", ".join(
+            f"DROP TABLE {LocalId(table)} CASCADE CONSTRAINTS PURGE;"
+            for table in tables
+        )
+        if statement:
+            await self.execute(statement)

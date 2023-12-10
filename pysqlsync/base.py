@@ -12,8 +12,6 @@ import dataclasses
 import json
 import logging
 import types
-import typing
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union, overload
 
@@ -221,8 +219,17 @@ class BaseGenerator(abc.ABC):
 
         return self.mutator.mutate_catalog_stmt(self.state, target)
 
+    @abc.abstractmethod
+    def placeholder(self, index: int) -> str:
+        """
+        Returns a placeholder for a positional argument in a prepared statement.
+
+        :param index: An index starting at 1 for the first position.
+        """
+        ...
+
     def get_table_insert_stmt(
-        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+        self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
         """
         Returns a SQL statement to insert new records in a database table.
@@ -230,11 +237,41 @@ class BaseGenerator(abc.ABC):
         This statement omits values for identity columns.
         """
 
-        return self.get_table_merge_stmt(table, field_names)
+        statements: list[str] = []
+        statements.append(f"INSERT INTO {table.name}")
+        columns = [column for column in table.get_columns(order) if not column.identity]
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join(
+            self.placeholder(index) for index, _ in enumerate(columns, start=1)
+        )
+        statements.append(f"({column_list}) VALUES ({value_list})")
+        statements.append(";")
+        return "\n".join(statements)
 
-    @abc.abstractmethod
+    def _get_merge_preamble(self, table: Table, columns: list[Column]) -> list[str]:
+        "Builds the match condition of a SQL MERGE statement."
+
+        statements: list[str] = []
+
+        statements.append(f"MERGE INTO {table.name} target")
+        column_list = ", ".join(str(column.name) for column in columns)
+        value_list = ", ".join(
+            self.placeholder(index) for index, _ in enumerate(columns, start=1)
+        )
+        statements.append(f"USING (VALUES ({value_list})) source({column_list})")
+
+        match_columns = [column for column in columns if table.is_lookup_column(column)]
+        if match_columns:
+            match_condition = " OR ".join(
+                f"target.{column.name} = source.{column.name}"
+                for column in match_columns
+            )
+            statements.append(f"ON ({match_condition})")
+
+        return statements
+
     def get_table_merge_stmt(
-        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+        self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
         """
         Returns a SQL statement to insert or ignore records in a database table.
@@ -242,11 +279,19 @@ class BaseGenerator(abc.ABC):
         This statement omits values for identity columns.
         """
 
-        ...
+        columns = [column for column in table.get_columns(order) if not column.identity]
+        statements = self._get_merge_preamble(table, columns)
 
-    @abc.abstractmethod
+        statements.append("WHEN NOT MATCHED THEN")
+        column_list = ", ".join(str(column.name) for column in columns)
+        insert_list = ", ".join(f"source.{column.name}" for column in columns)
+        statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
+
+        statements.append(";")
+        return "\n".join(statements)
+
     def get_table_upsert_stmt(
-        self, table: Table, field_names: Optional[tuple[str, ...]] = None
+        self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
         """
         Returns a SQL statement to insert or update records in a database table.
@@ -254,13 +299,35 @@ class BaseGenerator(abc.ABC):
         This statement uses identity column values for lookup.
         """
 
-        ...
+        columns = [column for column in table.get_columns(order)]
+        statements: list[str] = self._get_merge_preamble(table, columns)
 
-    @abc.abstractmethod
+        insert_columns = [column for column in columns if not column.identity]
+        update_columns = [
+            column for column in insert_columns if not table.is_lookup_column(column)
+        ]
+        if update_columns:
+            statements.append("WHEN MATCHED THEN")
+            update_list = ", ".join(
+                f"target.{column.name} = source.{column.name}"
+                for column in update_columns
+            )
+            statements.append(f"UPDATE SET {update_list}")
+        if insert_columns:
+            statements.append("WHEN NOT MATCHED THEN")
+            column_list = ", ".join(str(column.name) for column in insert_columns)
+            insert_list = ", ".join(
+                f"source.{column.name}" for column in insert_columns
+            )
+            statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
+
+        statements.append(";")
+        return "\n".join(statements)
+
     def get_table_delete_stmt(self, table: Table) -> str:
         "Returns a SQL statement to delete rows from a database table."
 
-        ...
+        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = {self.placeholder(1)}"
 
     def get_qualified_id(self, ref: ClassRef) -> SupportsQualifiedId:
         return self.converter.create_qualified_id(ref.module_name, ref.entity_name)
@@ -505,114 +572,6 @@ class BaseContext(abc.ABC):
         "Runs a query to produce a result-set of one or more columns, and multiple rows."
 
         ...
-
-    def _resultset_unwrap_dict(
-        self, signature: type[D], records: Iterable[dict[str, Any]]
-    ) -> list[D]:
-        """
-        Converts a result-set into a list of data-class instances.
-
-        :param signature: A data-class type.
-        :param records: The result-set whose rows to convert.
-        """
-
-        if not is_dataclass_type(signature):
-            raise TypeError(
-                f"expected: data-class type as result-set signature; got: {signature}"
-            )
-
-        return [
-            signature(**{name: value for name, value in record.items()})  # type: ignore
-            for record in records
-        ]
-
-    def _resultset_unwrap_object(
-        self, signature: type[D], records: Iterable[Any]
-    ) -> list[D]:
-        """
-        Converts a result-set into a list of data-class instances.
-
-        :param signature: A data-class type.
-        :param records: The result-set whose rows to convert.
-        """
-
-        if not is_dataclass_type(signature):
-            raise TypeError(
-                f"expected: data-class type as result-set signature; got: {signature}"
-            )
-
-        names = [name for name in signature.__dataclass_fields__.keys()]
-        return [
-            signature(**{name: record.__getattribute__(name) for name in names}) for record in records  # type: ignore
-        ]
-
-    def _resultset_unwrap_tuple(
-        self, signature: type[T], records: Iterable[Sequence[Any]]
-    ) -> list[T]:
-        """
-        Converts a result-set into a list of tuples, or a list of simple types (as appropriate).
-
-        :param signature: A tuple type, or a simple type (e.g. `bool` or `str`).
-        :param records: The result-set whose rows to convert.
-        """
-
-        if signature in [bool, int, float, str]:
-            scalar_results: list[T] = []
-
-            # check result shape
-            it = iter(records)
-            try:
-                item = next(it)
-            except StopIteration:
-                return []
-            if len(item) != 1:
-                raise ValueError(
-                    f"invalid number of columns, expected: 1; got: {len(item)}"
-                )
-            scalar_results.append(item[0])
-            while True:
-                try:
-                    item = next(it)
-                except StopIteration:
-                    return scalar_results
-                scalar_results.append(item[0])
-
-        origin_type = typing.get_origin(signature)
-        if origin_type is tuple:
-            origin_args = typing.get_args(signature)
-            results: list[T] = []
-
-            # check result shape
-            it = iter(records)
-            try:
-                item = next(it)
-            except StopIteration:
-                return []
-            if len(item) != len(origin_args):
-                raise ValueError(
-                    f"invalid number of columns, expected: {len(origin_args)}; got: {len(item)}"
-                )
-
-            if isinstance(item, tuple):
-                results.append(item)  # type: ignore
-                while True:
-                    try:
-                        item = next(it)
-                    except StopIteration:
-                        return results
-                    results.append(item)  # type: ignore
-            else:
-                results.append(tuple(item))  # type: ignore
-                while True:
-                    try:
-                        item = next(it)
-                    except StopIteration:
-                        return results
-                    results.append(tuple(item))  # type: ignore
-
-        raise TypeError(
-            f"expected: tuple or simple type as result-set signature; got: {signature}"
-        )
 
     async def current_schema(self) -> Optional[str]:
         func = self.connection.generator.get_current_schema_stmt()

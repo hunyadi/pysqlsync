@@ -6,6 +6,7 @@ from strong_typing.inspection import is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.formation.object_types import Table
+from pysqlsync.resultset import resultset_unwrap_tuple
 from pysqlsync.util.typing import override
 
 T = TypeVar("T")
@@ -60,7 +61,7 @@ class TrinoContext(BaseContext):
         cur = await self.native_connection.cursor()
         await cur.execute(statement)
         records = await cur.fetchall()
-        return self._resultset_unwrap_tuple(signature, records)
+        return resultset_unwrap_tuple(signature, records)
 
     @override
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:

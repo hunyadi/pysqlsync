@@ -13,12 +13,12 @@ from tests.params import (
     OracleBase,
     PostgreSQLBase,
     TestEngineBase,
-    disable_integration_tests,
+    has_env_var,
 )
 from tests.timed_test import TimedAsyncioTestCase
 
 
-@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
+@unittest.skipUnless(has_env_var("INTEGRATION"), "database tests are disabled")
 class TestConnection(TestEngineBase, TimedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters) as conn:
@@ -172,10 +172,12 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.execute(state_table.drop_stmt())
 
 
-# class TestOracleConnection(OracleBase, TestConnection):
-#     pass
+@unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
+class TestOracleConnection(OracleBase, TestConnection):
+    pass
 
 
+@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLConnection(PostgreSQLBase, TestConnection):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
@@ -183,10 +185,12 @@ class TestPostgreSQLConnection(PostgreSQLBase, TestConnection):
             await conn.execute('DROP TYPE IF EXISTS "WorkflowState";')
 
 
+@unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")
 class TestMSSQLConnection(MSSQLBase, TestConnection):
     pass
 
 
+@unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLConnection(MySQLBase, TestConnection):
     pass
 

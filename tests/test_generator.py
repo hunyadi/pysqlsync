@@ -431,19 +431,22 @@ class TestGenerator(unittest.TestCase):
             ";",
         )
 
-        generator = get_generator(dialect="mssql")
-        generator.create(tables=[tables.DataTable])
-        self.assertMultiLineEqual(
-            generator.get_dataclass_upsert_stmt(tables.DataTable),
-            'MERGE INTO "DataTable" AS target\n'
-            'USING (VALUES (?, ?)) AS source("id", "data")\n'
-            'ON target."id" = source."id"\n'
-            "WHEN MATCHED THEN\n"
-            'UPDATE SET target."data" = source."data"\n'
-            "WHEN NOT MATCHED BY TARGET THEN\n"
-            'INSERT ("id", "data") VALUES (source."id", source."data")\n'
-            ";",
-        )
+        for dialect in ["mssql", "oracle"]:
+            with self.subTest(dialect=dialect):
+                generator = get_generator(dialect=dialect)
+                generator.create(tables=[tables.DataTable])
+                value_list = f"({generator.placeholder(1)}, {generator.placeholder(2)})"
+                self.assertMultiLineEqual(
+                    generator.get_dataclass_upsert_stmt(tables.DataTable),
+                    'MERGE INTO "DataTable" target\n'
+                    f'USING (VALUES {value_list}) source("id", "data")\n'
+                    'ON (target."id" = source."id")\n'
+                    "WHEN MATCHED THEN\n"
+                    'UPDATE SET target."data" = source."data"\n'
+                    "WHEN NOT MATCHED THEN\n"
+                    'INSERT ("id", "data") VALUES (source."id", source."data")\n'
+                    ";",
+                )
 
         generator = get_generator(dialect="mysql")
         generator.create(tables=[tables.DataTable])
@@ -470,21 +473,24 @@ class TestGenerator(unittest.TestCase):
             ";",
         )
 
-        generator = get_generator(dialect="mssql")
-        generator.create(tables=[tables.BooleanTable])
-        self.assertMultiLineEqual(
-            generator.get_dataclass_upsert_stmt(tables.BooleanTable),
-            'MERGE INTO "BooleanTable" AS target\n'
-            'USING (VALUES (?, ?, ?)) AS source("id", "boolean", "nullable_boolean")\n'
-            'ON target."id" = source."id"\n'
-            "WHEN MATCHED THEN\n"
-            "UPDATE SET "
-            'target."boolean" = source."boolean", '
-            'target."nullable_boolean" = source."nullable_boolean"\n'
-            "WHEN NOT MATCHED BY TARGET THEN\n"
-            'INSERT ("id", "boolean", "nullable_boolean") VALUES (source."id", source."boolean", source."nullable_boolean")\n'
-            ";",
-        )
+        for dialect in ["mssql", "oracle"]:
+            with self.subTest(dialect=dialect):
+                generator = get_generator(dialect=dialect)
+                generator.create(tables=[tables.BooleanTable])
+                value_list = f"({generator.placeholder(1)}, {generator.placeholder(2)}, {generator.placeholder(3)})"
+                self.assertMultiLineEqual(
+                    generator.get_dataclass_upsert_stmt(tables.BooleanTable),
+                    'MERGE INTO "BooleanTable" target\n'
+                    f'USING (VALUES {value_list}) source("id", "boolean", "nullable_boolean")\n'
+                    'ON (target."id" = source."id")\n'
+                    "WHEN MATCHED THEN\n"
+                    "UPDATE SET "
+                    'target."boolean" = source."boolean", '
+                    'target."nullable_boolean" = source."nullable_boolean"\n'
+                    "WHEN NOT MATCHED THEN\n"
+                    'INSERT ("id", "boolean", "nullable_boolean") VALUES (source."id", source."boolean", source."nullable_boolean")\n'
+                    ";",
+                )
 
         generator = get_generator(dialect="mysql")
         generator.create(tables=[tables.BooleanTable])

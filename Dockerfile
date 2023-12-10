@@ -5,4 +5,4 @@ COPY dist/*.whl dist/
 RUN PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install `ls -1 dist/pysqlsync-*.whl`[mssql,mysql,postgresql,tsv]
 COPY tests/ tests/
 RUN python3 -m compileall -q .
-RUN TEST_SKIP_INTEGRATION=1 python3 -m unittest discover
+RUN TEST_INTEGRATION=0 python3 -m unittest discover

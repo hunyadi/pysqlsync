@@ -1,5 +1,4 @@
 from pysqlsync.model.data_types import (
-    SqlFixedBinaryType,
     SqlIntegerType,
     SqlTimestampType,
     SqlVariableBinaryType,

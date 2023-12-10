@@ -17,7 +17,7 @@ from tests.params import (
     MySQLBase,
     PostgreSQLBase,
     TestEngineBase,
-    disable_integration_tests,
+    has_env_var,
 )
 
 
@@ -30,7 +30,7 @@ def generate_input_file(data_file_path: str, record_count: int) -> None:
         generator.generate_file(f, (dataclasses.astuple(item) for item in items))
 
 
-@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
+@unittest.skipUnless(has_env_var("INTEGRATION"), "database tests are disabled")
 class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     RECORD_COUNT = 100000
 
@@ -77,14 +77,17 @@ class TestPerformance(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.drop_objects()
 
 
+@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLConnection(PostgreSQLBase, TestPerformance):
     pass
 
 
+@unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")
 class TestMSSQLConnection(MSSQLBase, TestPerformance):
     pass
 
 
+@unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLConnection(MySQLBase, TestPerformance):
     pass
 

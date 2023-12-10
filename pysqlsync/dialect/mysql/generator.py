@@ -74,6 +74,10 @@ class MySQLGenerator(BaseGenerator):
         return "DATABASE()"
 
     @override
+    def placeholder(self, index: int) -> str:
+        return r"%s"
+
+    @override
     def get_table_insert_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
@@ -119,10 +123,6 @@ class MySQLGenerator(BaseGenerator):
             statements.append(_field_update(table.primary_key))
         statements.append(";")
         return "\n".join(statements)
-
-    @override
-    def get_table_delete_stmt(self, table: Table) -> str:
-        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = %s"
 
     @override
     def get_field_extractor(

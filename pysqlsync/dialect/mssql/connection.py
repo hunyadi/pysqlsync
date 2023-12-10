@@ -9,6 +9,7 @@ from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, QualifiedId
+from pysqlsync.resultset import resultset_unwrap_object, resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
 
@@ -85,9 +86,9 @@ class MSSQLContext(BaseContext):
             records = cur.execute(statement).fetchall()
 
             if is_dataclass_type(signature):
-                return self._resultset_unwrap_object(signature, records)  # type: ignore
+                return resultset_unwrap_object(signature, records)  # type: ignore
             else:
-                return self._resultset_unwrap_tuple(signature, records)
+                return resultset_unwrap_tuple(signature, records)
 
     @override
     async def drop_schema(self, namespace: LocalId) -> None:

@@ -22,7 +22,7 @@ from tests.params import (
     MySQLBase,
     PostgreSQLBase,
     TestEngineBase,
-    disable_integration_tests,
+    has_env_var,
 )
 
 
@@ -33,7 +33,7 @@ class TestOptions:
     struct_mode: StructMode
 
 
-@unittest.skipIf(disable_integration_tests(), "database tests are disabled")
+@unittest.skipUnless(has_env_var("INTEGRATION"), "database tests are disabled")
 class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
@@ -242,14 +242,17 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.drop_objects()
 
 
+@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
     pass
 
 
+@unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")
 class TestMSSQLSynchronize(MSSQLBase, TestSynchronize):
     pass
 
 
+@unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLSynchronize(MySQLBase, TestSynchronize):
     pass
 

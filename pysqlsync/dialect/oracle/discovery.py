@@ -116,7 +116,8 @@ class OracleExplorer(Explorer):
             "    t.char_length,\n"
             "    t.identity_column = 'YES' AS is_identity,\n"
             "    tc.comments\n"
-            "FROM all_tab_columns t JOIN all_col_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name AND t.column_name = tc.column_name\n"
+            "FROM all_tab_columns t\n"
+            "    JOIN all_col_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name AND t.column_name = tc.column_name\n"
             f"WHERE {condition}\n"
             "ORDER BY column_id",
         )

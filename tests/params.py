@@ -87,7 +87,11 @@ class MySQLBase(TestEngineBase):
         )
 
 
-def disable_integration_tests() -> bool:
-    "True if integration tests are not to be executed."
+def has_env_var(name: str) -> bool:
+    """
+    True if tests are to be executed. To be used with `@unittest.skipUnless`.
 
-    return os.getenv("TEST_SKIP_INTEGRATION", "0") == "1"
+    :param name: Environment variable to check.
+    """
+
+    return os.getenv(f"TEST_{name}", "0") == "1"

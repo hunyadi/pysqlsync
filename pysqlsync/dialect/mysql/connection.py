@@ -8,6 +8,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
 from pysqlsync.util.typing import override
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -72,12 +73,12 @@ class MySQLContext(BaseContext):
             cur = await self.native_connection.cursor(aiomysql.cursors.DictCursor)
             await cur.execute(statement)
             records = await cur.fetchall()
-            return self._resultset_unwrap_dict(signature, records)  # type: ignore
+            return resultset_unwrap_dict(signature, records)  # type: ignore
         else:
             cur = await self.native_connection.cursor()
             await cur.execute(statement)
             records = await cur.fetchall()
-            return self._resultset_unwrap_tuple(signature, records)
+            return resultset_unwrap_tuple(signature, records)
 
     @override
     async def current_schema(self) -> Optional[str]:

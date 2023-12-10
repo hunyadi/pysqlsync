@@ -52,6 +52,10 @@ class PostgreSQLGenerator(BaseGenerator):
         )
 
     @override
+    def placeholder(self, index: int) -> str:
+        return f"${index}"
+
+    @override
     def get_table_insert_stmt(
         self, table: Table, order: Optional[tuple[str, ...]] = None
     ) -> str:
@@ -59,7 +63,9 @@ class PostgreSQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
+        value_list = ", ".join(
+            self.placeholder(index) for index, _ in enumerate(columns, start=1)
+        )
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append(";")
         return "\n".join(statements)
@@ -72,7 +78,9 @@ class PostgreSQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
+        value_list = ", ".join(
+            self.placeholder(index) for index, _ in enumerate(columns, start=1)
+        )
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append("ON CONFLICT DO NOTHING")
         statements.append(";")
@@ -86,7 +94,9 @@ class PostgreSQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order)]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join(f"${index}" for index, _ in enumerate(columns, start=1))
+        value_list = ", ".join(
+            self.placeholder(index) for index, _ in enumerate(columns, start=1)
+        )
         statements.append(f"({column_list}) VALUES ({value_list})")
         value_columns = table.get_value_columns()
         if value_columns:
@@ -99,7 +109,3 @@ class PostgreSQLGenerator(BaseGenerator):
             statements.append(f"ON CONFLICT ({table.primary_key}) DO NOTHING")
         statements.append(";")
         return "\n".join(statements)
-
-    @override
-    def get_table_delete_stmt(self, table: Table) -> str:
-        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = $1"

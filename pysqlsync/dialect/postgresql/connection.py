@@ -9,6 +9,7 @@ from strong_typing.inspection import DataclassInstance, is_dataclass_type
 from pysqlsync.base import BaseConnection, BaseContext, ClassRef
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.properties import is_identity_type
+from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
 from pysqlsync.util.typing import override
 
 D = TypeVar("D", bound=DataclassInstance)
@@ -66,9 +67,9 @@ class PostgreSQLContext(BaseContext):
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
         records: list[asyncpg.Record] = await self.native_connection.fetch(statement)
         if is_dataclass_type(signature):
-            return self._resultset_unwrap_dict(signature, records)  # type: ignore
+            return resultset_unwrap_dict(signature, records)  # type: ignore
         else:
-            return self._resultset_unwrap_tuple(signature, records)  # type: ignore
+            return resultset_unwrap_tuple(signature, records)  # type: ignore
 
     @override
     async def insert_data(self, table: type[D], data: Iterable[D]) -> None:
