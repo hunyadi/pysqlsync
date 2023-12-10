@@ -1,3 +1,4 @@
+import datetime
 import ipaddress
 import uuid
 from typing import Any, Callable, Optional
@@ -19,8 +20,8 @@ from pysqlsync.formation.py_to_sql import (
 from pysqlsync.util.typing import override
 
 from .data_types import (
-    OracleFixedBinaryType,
     OracleIntegerType,
+    OracleTimestampType,
     OracleVariableBinaryType,
     OracleVariableCharacterType,
 )
@@ -45,20 +46,22 @@ class OracleGenerator(BaseGenerator):
                 enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=options.struct_mode or StructMode.JSON,
                 array_mode=options.array_mode or ArrayMode.JSON,
+                qualified_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
                 substitutions={
                     bytes: OracleVariableBinaryType(),
+                    datetime.datetime: OracleTimestampType(),
                     int: OracleIntegerType(),
                     int8: OracleIntegerType(),
                     int16: OracleIntegerType(),
                     int32: OracleIntegerType(),
                     int64: OracleIntegerType(),
                     str: OracleVariableCharacterType(),
-                    uuid.UUID: OracleFixedBinaryType(16),
+                    uuid.UUID: OracleVariableBinaryType(16),
                     JsonType: OracleVariableCharacterType(),
-                    ipaddress.IPv4Address: OracleFixedBinaryType(4),
-                    ipaddress.IPv6Address: OracleFixedBinaryType(16),
+                    ipaddress.IPv4Address: OracleVariableBinaryType(4),
+                    ipaddress.IPv6Address: OracleVariableBinaryType(16),
                 },
                 skip_annotations=options.skip_annotations,
                 factory=self.factory,

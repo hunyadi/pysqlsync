@@ -146,19 +146,6 @@ UniqueTable(id=23, unique="unique")
 
 
 @dataclass
-class UserTable:
-    id: PrimaryKey[int]
-    created_at: datetime
-    updated_at: datetime
-    deleted_at: datetime
-    uuid: UUID
-    name: str
-    short_name: str
-    sortable_name: str
-    homepage_url: Optional[str]
-
-
-@dataclass
 class Coordinates:
     """
     Coordinates in the geographic coordinate system.

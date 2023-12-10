@@ -26,6 +26,7 @@ from pysqlsync.model.data_types import (
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.python_types import dataclass_to_code
 from tests import empty, tables
+from tests.model import user
 
 
 class TestConverter(unittest.TestCase):
@@ -226,19 +227,10 @@ class TestConverter(unittest.TestCase):
         target_ns.enums["WorkflowState"].values.append("unknown")
         target_ns.structs.remove("Coordinates")
         target_ns.tables.remove("Employee")
-        target_ns.tables["UserTable"].columns.remove("homepage_url")
-        target_ns.tables["UserTable"].columns["short_name"].nullable = True
-        target_ns.tables["UserTable"].columns.add(
-            Column(LocalId("social_url"), SqlVariableCharacterType(), False)
-        )
         self.assertEqual(
             Mutator().mutate_catalog_stmt(source, target),
             'ALTER TYPE "public"."WorkflowState"\n'
             "ADD VALUE 'unknown';\n"
-            'ALTER TABLE "public"."UserTable"\n'
-            'ADD COLUMN "social_url" text NOT NULL,\n'
-            'ALTER COLUMN "short_name" DROP NOT NULL,\n'
-            'DROP COLUMN "homepage_url";\n'
             'DROP TABLE "public"."Employee";\n'
             'DROP TYPE "public"."Coordinates";',
         )
@@ -251,8 +243,26 @@ class TestConverter(unittest.TestCase):
                     allow_drop_namespace=False,
                 )
             ).mutate_catalog_stmt(source, target),
-            'ALTER TYPE "public"."WorkflowState"\n'
-            "ADD VALUE 'unknown';\n"
+            'ALTER TYPE "public"."WorkflowState"\n' "ADD VALUE 'unknown';",
+        )
+
+        source = module_to_catalog(
+            user,
+            options=DataclassConverterOptions(
+                enum_mode=EnumMode.TYPE,
+                struct_mode=StructMode.TYPE,
+                namespaces=NamespaceMapping({user: "public"}),
+            ),
+        )
+        target = copy.deepcopy(source)
+        target_ns = target.namespaces["public"]
+        target_ns.tables["UserTable"].columns.remove("homepage_url")
+        target_ns.tables["UserTable"].columns["short_name"].nullable = True
+        target_ns.tables["UserTable"].columns.add(
+            Column(LocalId("social_url"), SqlVariableCharacterType(), False)
+        )
+        self.assertEqual(
+            Mutator().mutate_catalog_stmt(source, target),
             'ALTER TABLE "public"."UserTable"\n'
             'ADD COLUMN "social_url" text NOT NULL,\n'
             'ALTER COLUMN "short_name" DROP NOT NULL,\n'

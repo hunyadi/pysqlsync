@@ -7,6 +7,14 @@ class OracleTable(Table):
             f"ALTER TABLE {self.name} {statement};" for statement in statements
         )
 
+    def drop_if_exists_stmt(self) -> str:
+        return (
+            "BEGIN\n"
+            f"    EXECUTE IMMEDIATE 'DROP TABLE {self.name}';\n"
+            "EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;\n"
+            "END;"
+        )
+
 
 class OracleObjectFactory(ObjectFactory):
     @property

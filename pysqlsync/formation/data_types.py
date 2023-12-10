@@ -42,47 +42,48 @@ class SqlDiscovery:
         type_name: str,
         type_schema: Optional[str] = None,
     ) -> Optional[SqlDataType]:
-        if type_name in ["bool", "boolean"]:
+        name = type_name.lower()
+        if name in ["bool", "boolean"]:
             return SqlBooleanType()
-        elif type_name in ["tinyint", "tinyint(1)", "int1"]:
+        elif name in ["tinyint", "tinyint(1)", "int1"]:
             return SqlIntegerType(1)
-        elif type_name in ["smallint", "int2"]:
+        elif name in ["smallint", "int2"]:
             return SqlIntegerType(2)
-        elif type_name in ["integer", "int", "int4"]:
+        elif name in ["integer", "int", "int4"]:
             return SqlIntegerType(4)
-        elif type_name in ["bigint", "int8"]:
+        elif name in ["bigint", "int8"]:
             return SqlIntegerType(8)
-        elif type_name in ["numeric", "decimal"]:
+        elif name in ["decimal", "number", "numeric"]:
             return SqlDecimalType()
-        elif type_name in ["real", "float4"]:
+        elif name in ["real", "float4"]:
             return SqlRealType()
-        elif type_name in ["double", "double precision", "float8"]:
+        elif name in ["double", "double precision", "float8"]:
             return SqlDoubleType()
-        elif type_name == "float":
+        elif name == "float":
             return SqlFloatType()
-        elif type_name in ["timestamp", "timestamp without time zone"]:
+        elif name in ["timestamp", "timestamp without time zone"]:
             return SqlTimestampType(None, False)
-        elif type_name == "timestamp with time zone":
+        elif name == "timestamp with time zone":
             return SqlTimestampType(None, True)
-        elif type_name == "datetime":
+        elif name == "datetime":
             return SqlTimestampType()
-        elif type_name == "date":
+        elif name == "date":
             return SqlDateType()
-        elif type_name in ["time", "time without time zone"]:
+        elif name in ["time", "time without time zone"]:
             return SqlTimeType(None, False)
-        elif type_name == "time with time zone":
+        elif name == "time with time zone":
             return SqlTimeType(None, True)
-        elif type_name in ["char", "character"]:
+        elif name in ["char", "character"]:
             return SqlFixedCharacterType()
-        elif type_name in ["varchar", "character varying", "text"]:
+        elif name in ["varchar", "character varying", "text"]:
             return SqlVariableCharacterType()
-        elif type_name == "binary":
+        elif name == "binary":
             return SqlFixedBinaryType()
-        elif type_name in ["varbinary", "binary varying", "bytea"]:
+        elif name in ["varbinary", "binary varying", "bytea"]:
             return SqlVariableBinaryType()
-        elif type_name in ["json", "jsonb"]:  # PostgreSQL-specific
+        elif name in ["json", "jsonb"]:  # PostgreSQL-specific
             return SqlJsonType()
-        elif type_name == "uuid":  # PostgreSQL-specific
+        elif name == "uuid":  # PostgreSQL-specific
             return SqlUuidType()
 
         if type_schema is not None:
@@ -92,7 +93,7 @@ class SqlDiscovery:
 
     def sql_data_type_from_def(self, type_def: str) -> Optional[SqlDataType]:
         m = re.fullmatch(
-            r"^(?:decimal|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE
+            r"^(?:decimal|number|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE
         )
         if m is not None:
             return SqlDecimalType(int(m.group(1)), int(m.group(2)))

@@ -6,6 +6,7 @@ from pysqlsync.base import GeneratorOptions
 from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.id_types import QualifiedId
 from tests import tables
+from tests.model import user
 from tests.params import (
     MSSQLBase,
     MySQLBase,
@@ -19,12 +20,16 @@ from tests.timed_test import TimedAsyncioTestCase
 
 @unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestConnection(TestEngineBase, TimedAsyncioTestCase):
-    @property
-    def options(self) -> GeneratorOptions:
-        return GeneratorOptions(namespaces={tables: None})
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters) as conn:
+            await conn.drop_table_if_exists(QualifiedId(None, "DataTable"))
+            await conn.drop_table_if_exists(QualifiedId(None, "EnumTable"))
+            await conn.drop_table_if_exists(QualifiedId(None, "UserTable"))
+            await conn.drop_table_if_exists(QualifiedId(None, "WorkflowState"))
 
     async def test_connection(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        options = GeneratorOptions(namespaces={tables: None})
+        async with self.engine.create_connection(self.parameters, options) as conn:
             if self.engine.name == "oracle":
                 await conn.execute(
                     'CREATE TABLE "DataTable" ("id" number PRIMARY KEY, "data" clob);'
@@ -36,7 +41,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.execute('DROP TABLE "DataTable";')
 
     async def test_upsert(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        options = GeneratorOptions(namespaces={tables: None})
+        async with self.engine.create_connection(self.parameters, options) as conn:
             await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
             statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
@@ -52,7 +58,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.drop_objects()
 
     async def test_bulk_upsert(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        options = GeneratorOptions(namespaces={tables: None})
+        async with self.engine.create_connection(self.parameters, options) as conn:
             await conn.create_objects([tables.DataTable])
             generator = conn.connection.generator
             statement = generator.get_dataclass_upsert_stmt(tables.DataTable)
@@ -67,9 +74,9 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
                 await conn.execute_all(statement, records)
             await conn.drop_objects()
 
-    def get_user_data(self) -> list[tables.UserTable]:
+    def get_user_data(self) -> list[user.UserTable]:
         return [
-            tables.UserTable(
+            user.UserTable(
                 id=k,
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
@@ -86,14 +93,15 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
     async def test_dataclass_insert(self) -> None:
         data = self.get_user_data()
 
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([tables.UserTable])
+        options = GeneratorOptions(namespaces={user: None})
+        async with self.engine.create_connection(self.parameters, options) as conn:
+            await conn.create_objects([user.UserTable])
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, 0)
-            await conn.insert_data(tables.UserTable, [])
+            await conn.insert_data(user.UserTable, [])
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, 0)
-            await conn.insert_data(tables.UserTable, data)
+            await conn.insert_data(user.UserTable, data)
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, len(data))
             await conn.drop_objects()
@@ -101,14 +109,15 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
     async def test_dataclass_upsert(self) -> None:
         data = self.get_user_data()
 
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.create_objects([tables.UserTable])
+        options = GeneratorOptions(namespaces={user: None})
+        async with self.engine.create_connection(self.parameters, options) as conn:
+            await conn.create_objects([user.UserTable])
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, 0)
-            await conn.upsert_data(tables.UserTable, [])
+            await conn.upsert_data(user.UserTable, [])
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, 0)
-            await conn.upsert_data(tables.UserTable, data)
+            await conn.upsert_data(user.UserTable, data)
             value = await conn.query_one(int, 'SELECT COUNT(*) FROM "UserTable"')
             self.assertEqual(value, len(data))
             await conn.drop_objects()
@@ -163,49 +172,23 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.execute(state_table.drop_stmt())
 
 
-class TestOracleConnection(OracleBase, TestConnection):
-    def drop_table_stmt(self, table: QualifiedId) -> str:
-        return (
-            "BEGIN\n"
-            f"    EXECUTE IMMEDIATE 'DROP TABLE {table}';\n"
-            "EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;\n"
-            "END;"
-        )
-
-    async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute(self.drop_table_stmt(QualifiedId(None, "DataTable")))
-            await conn.execute(self.drop_table_stmt(QualifiedId(None, "EnumTable")))
-            await conn.execute(self.drop_table_stmt(QualifiedId(None, "UserTable")))
-            await conn.execute(self.drop_table_stmt(QualifiedId(None, "WorkflowState")))
+# class TestOracleConnection(OracleBase, TestConnection):
+#     pass
 
 
 class TestPostgreSQLConnection(PostgreSQLBase, TestConnection):
     async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute('DROP TABLE IF EXISTS "DataTable";')
-            await conn.execute('DROP TABLE IF EXISTS "EnumTable";')
-            await conn.execute('DROP TABLE IF EXISTS "UserTable";')
-            await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
+        await super().asyncSetUp()
+        async with self.engine.create_connection(self.parameters) as conn:
             await conn.execute('DROP TYPE IF EXISTS "WorkflowState";')
 
 
 class TestMSSQLConnection(MSSQLBase, TestConnection):
-    async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute('DROP TABLE IF EXISTS "DataTable";')
-            await conn.execute('DROP TABLE IF EXISTS "EnumTable";')
-            await conn.execute('DROP TABLE IF EXISTS "UserTable";')
-            await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
+    pass
 
 
 class TestMySQLConnection(MySQLBase, TestConnection):
-    async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute('DROP TABLE IF EXISTS "DataTable";')
-            await conn.execute('DROP TABLE IF EXISTS "EnumTable";')
-            await conn.execute('DROP TABLE IF EXISTS "UserTable";')
-            await conn.execute('DROP TABLE IF EXISTS "WorkflowState";')
+    pass
 
 
 del TestConnection

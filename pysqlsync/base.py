@@ -655,6 +655,16 @@ class BaseContext(abc.ABC):
 
         return self.connection.generator.state.get_table(table_id)
 
+    async def drop_table_if_exists(self, table: SupportsQualifiedId) -> None:
+        LOGGER.debug(f"drop table if exists: {table}")
+        factory = self.connection.generator.factory
+        # column list and primary key are ignored
+        stmt = factory.table_class(
+            table, [], primary_key=LocalId("id")
+        ).drop_if_exists_stmt()
+        if stmt:
+            await self.execute(stmt)
+
     async def create_objects(self, tables: list[type[DataclassInstance]]) -> None:
         "Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions."
 

@@ -476,7 +476,6 @@ class Table(DatabaseObject, QualifiedObject):
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
-        key_name = LocalId(f"pk_{self.primary_key.local_id}")
         defs.append(
             f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({self.primary_key})"
         )
@@ -485,6 +484,9 @@ class Table(DatabaseObject, QualifiedObject):
 
     def drop_stmt(self) -> str:
         return f"DROP TABLE {self.name};"
+
+    def drop_if_exists_stmt(self) -> str:
+        return f"DROP TABLE IF EXISTS {self.name};"
 
     def alter_table_stmt(self, statements: list[str]) -> str:
         return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"

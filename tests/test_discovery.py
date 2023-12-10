@@ -1,13 +1,15 @@
 import unittest
 
-from pysqlsync.base import GeneratorOptions
+from pysqlsync.base import ClassRef, GeneratorOptions
 from pysqlsync.formation.object_types import QualifiedId
 from pysqlsync.formation.py_to_sql import NamespaceMapping, dataclass_to_table
 from pysqlsync.model.id_types import LocalId
 from tests import tables
+from tests.model import user
 from tests.params import (
     MSSQLBase,
     MySQLBase,
+    OracleBase,
     PostgreSQLBase,
     TestEngineBase,
     disable_integration_tests,
@@ -16,19 +18,17 @@ from tests.params import (
 
 @unittest.skipIf(disable_integration_tests(), "database tests are disabled")
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
-    @property
-    def options(self) -> GeneratorOptions:
-        return GeneratorOptions(namespaces={tables: None})
-
     async def asyncSetUp(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute('DROP TABLE IF EXISTS "NumericTable";')
-            await conn.execute('DROP TABLE IF EXISTS "Person";')
-            await conn.execute('DROP TABLE IF EXISTS "Address";')
+        async with self.engine.create_connection(self.parameters) as conn:
+            await conn.drop_table_if_exists(
+                QualifiedId(None, tables.NumericTable.__name__)
+            )
+            await conn.drop_table_if_exists(QualifiedId(None, tables.Person.__name__))
+            await conn.drop_table_if_exists(QualifiedId(None, tables.Address.__name__))
             await conn.drop_schema(LocalId("sample"))
 
     async def test_table(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        async with self.engine.create_connection(self.parameters) as conn:
             current_namespace = await conn.current_schema()
             options = conn.connection.generator.converter.options
             options.namespaces = NamespaceMapping({tables: current_namespace})
@@ -46,7 +46,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertMultiLineEqual(str(table_def), str(table_ref))
 
     async def test_relation(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        async with self.engine.create_connection(self.parameters) as conn:
             current_namespace = await conn.current_schema()
             options = conn.connection.generator.converter.options
             options.namespaces = NamespaceMapping({tables: current_namespace})
@@ -71,20 +71,19 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertMultiLineEqual(str(person_def), str(person_ref))
 
     async def test_formation(self) -> None:
-        async with self.engine.create_connection(
-            self.parameters, GeneratorOptions(namespaces={tables: "sample"})
-        ) as conn:
+        options = GeneratorOptions(namespaces={user: "sample"})
+        async with self.engine.create_connection(self.parameters, options) as conn:
             generator = conn.connection.generator
 
             # create objects in the database
-            execute_stmt = generator.create(tables=[tables.UserTable])
+            execute_stmt = generator.create(tables=[user.UserTable])
             if execute_stmt is None:
                 self.fail()
             await conn.execute(execute_stmt)
 
             # get reference schema
             generator.reset()
-            create_stmt = generator.create(tables=[tables.UserTable])
+            create_stmt = generator.create(tables=[user.UserTable])
             if create_stmt is None:
                 self.fail()
 
@@ -103,6 +102,10 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(create_ns, discover_ns)
 
             await conn.drop_objects()
+
+
+# class TestOracleDiscovery(OracleBase, TestDiscovery):
+#     pass
 
 
 class TestPostgreSQLDiscovery(PostgreSQLBase, TestDiscovery):

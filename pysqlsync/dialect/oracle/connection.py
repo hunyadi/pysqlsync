@@ -1,10 +1,10 @@
 import logging
 import re
 import typing
-from typing import Any, Iterable, TypeVar
+from typing import Any, Iterable, Optional, TypeVar
 
 import oracledb
-from strong_typing.inspection import DataclassInstance
+from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext
 from pysqlsync.util.dispatch import thread_dispatch
@@ -74,5 +74,16 @@ class OracleContext(BaseContext):
     def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             cur.execute(statement)
+            if is_dataclass_type(signature):
+                cur.rowfactory = lambda *args: signature(*args)
+
             records = cur.fetchall()
-            return self._resultset_unwrap_tuple(signature, records)
+
+            if is_dataclass_type(signature):
+                return records
+            else:
+                return self._resultset_unwrap_tuple(signature, records)
+
+    @override
+    async def current_schema(self) -> Optional[str]:
+        return None
