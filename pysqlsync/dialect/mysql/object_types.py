@@ -25,7 +25,9 @@ class MySQLTable(Table):
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
-        defs.append(f"PRIMARY KEY ({self.primary_key})")
+        defs.append(
+            f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({self.primary_key})"
+        )
         definition = ",\n".join(defs)
         comment = (
             f"\nCOMMENT = {quote(self.short_description)}"

@@ -385,7 +385,7 @@ class DataclassConverter:
             elif self.options.enum_mode is EnumMode.INLINE:
                 return SqlEnumType([str(e.value) for e in typ])
             elif self.options.enum_mode is EnumMode.RELATION:
-                return SqlIntegerType(4)
+                return self.simple_type_to_sql_data_type(int32)
             elif self.options.enum_mode is EnumMode.CHECK:
                 return self.simple_type_to_sql_data_type(value_type)
 
@@ -724,7 +724,7 @@ class DataclassConverter:
                             [
                                 self.options.factory.column_class(
                                     LocalId("id"),
-                                    SqlIntegerType(4),
+                                    self.simple_type_to_sql_data_type(int32),
                                     False,
                                     identity=True,
                                 ),

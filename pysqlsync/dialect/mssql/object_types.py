@@ -43,7 +43,7 @@ class MSSQLTable(Table):
             statements.append(
                 f"ALTER TABLE {self.name} ADD\n"
                 + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints)
-                + "\n;"
+                + ";"
             )
 
         return join_or_none(statements)

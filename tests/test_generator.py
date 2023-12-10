@@ -29,7 +29,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"boolean" boolean NOT NULL,\n'
             '"nullable_boolean" boolean,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_BooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -38,7 +38,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"boolean" bit NOT NULL,\n'
             '"nullable_boolean" bit,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_BooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -47,7 +47,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"boolean" tinyint NOT NULL,\n'
             '"nullable_boolean" tinyint,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_BooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -65,7 +65,7 @@ class TestGenerator(unittest.TestCase):
                     '"integer_64" bigint NOT NULL,\n'
                     '"integer" bigint NOT NULL,\n'
                     '"nullable_integer" bigint,\n'
-                    'PRIMARY KEY ("id")\n'
+                    'CONSTRAINT "pk_NumericTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
 
@@ -82,7 +82,7 @@ class TestGenerator(unittest.TestCase):
                     '"integer_32" integer NOT NULL DEFAULT 2147483647,\n'
                     '"integer_64" bigint NOT NULL DEFAULT 0,\n'
                     '"integer" bigint NOT NULL DEFAULT 23,\n'
-                    'PRIMARY KEY ("id")\n'
+                    'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
         self.assertMultiLineEqual(
@@ -94,7 +94,7 @@ class TestGenerator(unittest.TestCase):
             '"integer_32" integer NOT NULL,\n'
             '"integer_64" bigint NOT NULL,\n'
             '"integer" bigint NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
             ");\n"
             'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_8" DEFAULT 127 FOR "integer_8";\n'
             'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_16" DEFAULT 32767 FOR "integer_16";\n'
@@ -115,7 +115,7 @@ class TestGenerator(unittest.TestCase):
                     '"float_64" double precision NOT NULL,\n'
                     '"optional_float_32" real,\n'
                     '"optional_float_64" double precision,\n'
-                    'PRIMARY KEY ("id")\n'
+                    'CONSTRAINT "pk_FixedPrecisionFloatTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
 
@@ -130,7 +130,7 @@ class TestGenerator(unittest.TestCase):
                     '"decimal_value" decimal NOT NULL,\n'
                     '"optional_decimal" decimal,\n'
                     '"decimal_precision" decimal(5, 2) NOT NULL,\n'
-                    'PRIMARY KEY ("id")\n'
+                    'CONSTRAINT "pk_DecimalTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
 
@@ -144,7 +144,7 @@ class TestGenerator(unittest.TestCase):
             '"nullable_arbitrary_length_string" text,\n'
             '"maximum_length_string" varchar(128) NOT NULL,\n'
             '"nullable_maximum_length_string" varchar(128),\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_StringTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -155,7 +155,7 @@ class TestGenerator(unittest.TestCase):
             '"nullable_arbitrary_length_string" varchar(max),\n'
             '"maximum_length_string" varchar(128) NOT NULL,\n'
             '"nullable_maximum_length_string" varchar(128),\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_StringTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -166,7 +166,7 @@ class TestGenerator(unittest.TestCase):
             '"nullable_arbitrary_length_string" mediumtext,\n'
             '"maximum_length_string" varchar(128) NOT NULL,\n'
             '"nullable_maximum_length_string" varchar(128),\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_StringTable" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -181,7 +181,7 @@ class TestGenerator(unittest.TestCase):
             '"iso_time" time NOT NULL,\n'
             '"optional_date_time" timestamp,\n'
             '"timestamp_precision" timestamp(6) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -193,7 +193,7 @@ class TestGenerator(unittest.TestCase):
             '"iso_time" time NOT NULL,\n'
             '"optional_date_time" datetime2,\n'
             '"timestamp_precision" datetime2 NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -205,7 +205,7 @@ class TestGenerator(unittest.TestCase):
             '"iso_time" time NOT NULL,\n'
             '"optional_date_time" datetime,\n'
             '"timestamp_precision" datetime(6) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -218,7 +218,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"state" "WorkflowState" NOT NULL,\n'
             '"optional_state" "WorkflowState",\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_EnumTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -227,7 +227,7 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             """"state" ENUM ('active', 'inactive', 'deleted') CHARACTER SET ascii COLLATE ascii_bin NOT NULL,\n"""
             """"optional_state" ENUM ('active', 'inactive', 'deleted') CHARACTER SET ascii COLLATE ascii_bin,\n"""
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_EnumTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -236,20 +236,18 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"state" integer NOT NULL,\n'
             '"optional_state" integer,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_EnumTable" PRIMARY KEY ("id")\n'
             ");\n"
             'CREATE TABLE "WorkflowState" (\n'
             '"id" integer NOT NULL IDENTITY,\n'
             '"value" varchar(64) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_WorkflowState" PRIMARY KEY ("id")\n'
             ");\n"
             'ALTER TABLE "EnumTable" ADD\n'
             'CONSTRAINT "fk_EnumTable_state" FOREIGN KEY ("state") REFERENCES "WorkflowState" ("id"),\n'
-            'CONSTRAINT "fk_EnumTable_optional_state" FOREIGN KEY ("optional_state") REFERENCES "WorkflowState" ("id")\n'
-            ";\n"
+            'CONSTRAINT "fk_EnumTable_optional_state" FOREIGN KEY ("optional_state") REFERENCES "WorkflowState" ("id");\n'
             'ALTER TABLE "WorkflowState" ADD\n'
-            'CONSTRAINT "uq_WorkflowState" UNIQUE ("value")\n'
-            ";",
+            'CONSTRAINT "uq_WorkflowState" UNIQUE ("value");',
         )
 
     def test_create_ipaddress_table(self) -> None:
@@ -263,7 +261,7 @@ class TestGenerator(unittest.TestCase):
             '"ipv4_or_ipv6" inet NOT NULL,\n'
             '"optional_ipv4" inet,\n'
             '"optional_ipv6" inet,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_IPAddressTable" PRIMARY KEY ("id")\n'
             ");",
         )
         for dialect in ["mssql", "mysql"]:
@@ -277,7 +275,7 @@ class TestGenerator(unittest.TestCase):
                     '"ipv4_or_ipv6" binary(16) NOT NULL,\n'
                     '"optional_ipv4" binary(4),\n'
                     '"optional_ipv6" binary(16),\n'
-                    'PRIMARY KEY ("id")\n'
+                    'CONSTRAINT "pk_IPAddressTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
 
@@ -291,7 +289,7 @@ class TestGenerator(unittest.TestCase):
             '"multiple" char(4) NOT NULL,\n'
             '"union" varchar(255) NOT NULL,\n'
             '"unbounded" text NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_LiteralTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -302,7 +300,7 @@ class TestGenerator(unittest.TestCase):
             '"multiple" char(4) NOT NULL,\n'
             '"union" varchar(255) NOT NULL,\n'
             '"unbounded" varchar(max) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_LiteralTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -313,7 +311,7 @@ class TestGenerator(unittest.TestCase):
             '"multiple" char(4) NOT NULL,\n'
             '"union" varchar(255) NOT NULL,\n'
             '"unbounded" mediumtext NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_LiteralTable" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -324,7 +322,7 @@ class TestGenerator(unittest.TestCase):
             'CREATE TABLE "DataTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"data" text NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DataTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -332,7 +330,7 @@ class TestGenerator(unittest.TestCase):
             'CREATE TABLE "DataTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"data" varchar(max) NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DataTable" PRIMARY KEY ("id")\n'
             ");",
         )
         self.assertMultiLineEqual(
@@ -340,7 +338,7 @@ class TestGenerator(unittest.TestCase):
             'CREATE TABLE "DataTable" (\n'
             '"id" bigint NOT NULL,\n'
             '"data" mediumtext NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_DataTable" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -352,20 +350,19 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"city" text NOT NULL,\n'
             '"state" text,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Address" PRIMARY KEY ("id")\n'
             ");\n"
             'CREATE TABLE "Person" (\n'
             '"id" bigint NOT NULL,\n'
             '"name" text NOT NULL,\n'
             '"address" bigint NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Person" PRIMARY KEY ("id")\n'
             ");\n"
             """COMMENT ON TABLE "Person" IS 'A person.';\n"""
             """COMMENT ON COLUMN "Person"."name" IS 'The person''s full name.';\n"""
             """COMMENT ON COLUMN "Person"."address" IS 'The address of the person''s permanent residence.';\n"""
             'ALTER TABLE "Person"\n'
-            'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")\n'
-            ";",
+            'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id");',
         )
         self.assertMultiLineEqual(
             get_create_stmt(tables.Person, dialect="mssql"),
@@ -373,17 +370,16 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"city" varchar(max) NOT NULL,\n'
             '"state" varchar(max),\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Address" PRIMARY KEY ("id")\n'
             ");\n"
             'CREATE TABLE "Person" (\n'
             '"id" bigint NOT NULL,\n'
             '"name" varchar(max) NOT NULL,\n'
             """"address" bigint NOT NULL,\n"""
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Person" PRIMARY KEY ("id")\n'
             ");\n"
             'ALTER TABLE "Person" ADD\n'
-            'CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")\n'
-            ";",
+            'CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id");',
         )
         self.assertMultiLineEqual(
             get_create_stmt(tables.Person, dialect="mysql"),
@@ -391,18 +387,17 @@ class TestGenerator(unittest.TestCase):
             '"id" bigint NOT NULL,\n'
             '"city" mediumtext NOT NULL,\n'
             '"state" mediumtext,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Address" PRIMARY KEY ("id")\n'
             ");\n"
             'CREATE TABLE "Person" (\n'
             '"id" bigint NOT NULL,\n'
             """"name" mediumtext NOT NULL COMMENT 'The person''s full name.',\n"""
             """"address" bigint NOT NULL COMMENT 'The address of the person''s permanent residence.',\n"""
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Person" PRIMARY KEY ("id")\n'
             ")\n"
             "COMMENT = 'A person.';\n"
             'ALTER TABLE "Person"\n'
-            'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id")\n'
-            ";",
+            'ADD CONSTRAINT "fk_Person_address" FOREIGN KEY ("address") REFERENCES "Address" ("id");',
         )
 
     def test_create_type_with_description(self) -> None:
@@ -419,7 +414,7 @@ class TestGenerator(unittest.TestCase):
             'CREATE TABLE "Location" (\n'
             '"id" bigint NOT NULL,\n'
             '"coords" "Coordinates" NOT NULL,\n'
-            'PRIMARY KEY ("id")\n'
+            'CONSTRAINT "pk_Location" PRIMARY KEY ("id")\n'
             ");",
         )
 
@@ -444,7 +439,7 @@ class TestGenerator(unittest.TestCase):
             'USING (VALUES (?, ?)) AS source("id", "data")\n'
             'ON target."id" = source."id"\n'
             "WHEN MATCHED THEN\n"
-            'UPDATE SET target."id" = source."id", target."data" = source."data"\n'
+            'UPDATE SET target."data" = source."data"\n'
             "WHEN NOT MATCHED BY TARGET THEN\n"
             'INSERT ("id", "data") VALUES (source."id", source."data")\n'
             ";",
@@ -484,7 +479,6 @@ class TestGenerator(unittest.TestCase):
             'ON target."id" = source."id"\n'
             "WHEN MATCHED THEN\n"
             "UPDATE SET "
-            'target."id" = source."id", '
             'target."boolean" = source."boolean", '
             'target."nullable_boolean" = source."nullable_boolean"\n'
             "WHEN NOT MATCHED BY TARGET THEN\n"

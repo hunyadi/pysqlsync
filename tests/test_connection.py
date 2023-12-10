@@ -3,17 +3,13 @@ import uuid
 from datetime import datetime
 
 from pysqlsync.base import GeneratorOptions
-from pysqlsync.formation.py_to_sql import (
-    DataclassConverter,
-    DataclassConverterOptions,
-    EnumMode,
-    NamespaceMapping,
-)
+from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.id_types import QualifiedId
 from tests import tables
 from tests.params import (
     MSSQLBase,
     MySQLBase,
+    OracleBase,
     PostgreSQLBase,
     TestEngineBase,
     disable_integration_tests,
@@ -29,9 +25,14 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
 
     async def test_connection(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
-            await conn.execute(
-                'CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text);'
-            )
+            if self.engine.name == "oracle":
+                await conn.execute(
+                    'CREATE TABLE "DataTable" ("id" number PRIMARY KEY, "data" clob);'
+                )
+            else:
+                await conn.execute(
+                    'CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text);'
+                )
             await conn.execute('DROP TABLE "DataTable";')
 
     async def test_upsert(self) -> None:
@@ -113,13 +114,11 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.drop_objects()
 
     async def test_rows_upsert(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
-            options = DataclassConverterOptions(
-                enum_mode=EnumMode.RELATION,
-                namespaces=NamespaceMapping({tables: None}),
-                factory=conn.connection.generator.factory,
-            )
-            converter = DataclassConverter(options=options)
+        options = GeneratorOptions(
+            namespaces={tables: None}, enum_mode=EnumMode.RELATION
+        )
+        async with self.engine.create_connection(self.parameters, options) as conn:
+            converter = conn.connection.generator.converter
             catalog = converter.dataclasses_to_catalog([tables.EnumTable])
             await conn.execute(str(catalog))
             conn.connection.generator.state = catalog
@@ -155,13 +154,30 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
                 ],
             )
             self.assertEqual(
-                await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable";'), 9
+                await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable"'), 9
             )
             self.assertEqual(
-                await conn.query_one(int, 'SELECT COUNT(*) FROM "WorkflowState";'), 3
+                await conn.query_one(int, 'SELECT COUNT(*) FROM "WorkflowState"'), 3
             )
             await conn.execute(table.drop_stmt())
             await conn.execute(state_table.drop_stmt())
+
+
+class TestOracleConnection(OracleBase, TestConnection):
+    def drop_table_stmt(self, table: QualifiedId) -> str:
+        return (
+            "BEGIN\n"
+            f"    EXECUTE IMMEDIATE 'DROP TABLE {table}';\n"
+            "EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;\n"
+            "END;"
+        )
+
+    async def asyncSetUp(self) -> None:
+        async with self.engine.create_connection(self.parameters, self.options) as conn:
+            await conn.execute(self.drop_table_stmt(QualifiedId(None, "DataTable")))
+            await conn.execute(self.drop_table_stmt(QualifiedId(None, "EnumTable")))
+            await conn.execute(self.drop_table_stmt(QualifiedId(None, "UserTable")))
+            await conn.execute(self.drop_table_stmt(QualifiedId(None, "WorkflowState")))
 
 
 class TestPostgreSQLConnection(PostgreSQLBase, TestConnection):

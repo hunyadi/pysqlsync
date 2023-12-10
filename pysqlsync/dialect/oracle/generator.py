@@ -1,8 +1,8 @@
-import datetime
 import ipaddress
 import uuid
 from typing import Any, Callable, Optional
 
+from strong_typing.auxiliary import int8, int16, int32, int64
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
@@ -16,63 +16,54 @@ from pysqlsync.formation.py_to_sql import (
     NamespaceMapping,
     StructMode,
 )
-from pysqlsync.model.data_types import SqlFixedBinaryType
 from pysqlsync.util.typing import override
 
-from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLVariableCharacterType
-from .mutation import MSSQLMutator
-from .object_types import MSSQLObjectFactory
+from .data_types import (
+    OracleFixedBinaryType,
+    OracleIntegerType,
+    OracleVariableBinaryType,
+    OracleVariableCharacterType,
+)
+from .object_types import OracleObjectFactory
 
 
-class MSSQLGenerator(BaseGenerator):
-    """
-    Generator for Microsoft SQL Server (T-SQL).
+class OracleGenerator(BaseGenerator):
+    "Generator for Oracle."
 
-    Assumes a UTF-8 collation and `SET ANSI_DEFAULTS ON`. UTF-8 collation makes `varchar` store UTF-8 characters.
-    """
+    converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(
-            options, MSSQLObjectFactory(), MSSQLMutator(options.synchronization)
-        )
+        super().__init__(options, OracleObjectFactory())
 
-        if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
+        if options.enum_mode is EnumMode.TYPE:
             raise FormationError(
                 f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
-            )
-        if options.struct_mode is StructMode.TYPE:
-            raise FormationError(
-                f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
-            )
-        if options.array_mode is ArrayMode.ARRAY:
-            raise FormationError(
-                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
             )
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
-                enum_mode=options.enum_mode or EnumMode.RELATION,
+                enum_mode=options.enum_mode or EnumMode.INLINE,
                 struct_mode=options.struct_mode or StructMode.JSON,
                 array_mode=options.array_mode or ArrayMode.JSON,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
                 substitutions={
-                    bool: MSSQLBooleanType(),
-                    datetime.datetime: MSSQLDateTimeType(),
-                    str: MSSQLVariableCharacterType(),
-                    uuid.UUID: SqlFixedBinaryType(16),
-                    JsonType: MSSQLVariableCharacterType(),
-                    ipaddress.IPv4Address: SqlFixedBinaryType(4),
-                    ipaddress.IPv6Address: SqlFixedBinaryType(16),
+                    bytes: OracleVariableBinaryType(),
+                    int: OracleIntegerType(),
+                    int8: OracleIntegerType(),
+                    int16: OracleIntegerType(),
+                    int32: OracleIntegerType(),
+                    int64: OracleIntegerType(),
+                    str: OracleVariableCharacterType(),
+                    uuid.UUID: OracleFixedBinaryType(16),
+                    JsonType: OracleVariableCharacterType(),
+                    ipaddress.IPv4Address: OracleFixedBinaryType(4),
+                    ipaddress.IPv6Address: OracleFixedBinaryType(16),
                 },
-                factory=self.factory,
                 skip_annotations=options.skip_annotations,
+                factory=self.factory,
             )
         )
-
-    @override
-    def get_current_schema_stmt(self) -> str:
-        return "SCHEMA_NAME()"
 
     @override
     def get_table_insert_stmt(
@@ -82,17 +73,18 @@ class MSSQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join("?" for _ in columns)
+        value_list = ", ".join(f":{index}" for index, _ in enumerate(columns, start=1))
         statements.append(f"({column_list}) VALUES ({value_list})")
+        statements.append(";")
         return "\n".join(statements)
 
     def _get_merge_preamble(self, table: Table, columns: list[Column]) -> list[str]:
         statements: list[str] = []
 
-        statements.append(f"MERGE INTO {table.name} AS target")
+        statements.append(f"MERGE INTO {table.name} target")
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join("?" for _ in columns)
-        statements.append(f"USING (VALUES ({value_list})) AS source({column_list})")
+        value_list = ", ".join(f":{index}" for index, _ in enumerate(columns, start=1))
+        statements.append(f"USING (VALUES ({value_list})) source({column_list})")
 
         match_columns = [column for column in columns if table.is_lookup_column(column)]
         if match_columns:
@@ -100,7 +92,8 @@ class MSSQLGenerator(BaseGenerator):
                 f"target.{column.name} = source.{column.name}"
                 for column in match_columns
             )
-            statements.append(f"ON {match_condition}")
+
+            statements.append(f"ON ({match_condition})")
 
         return statements
 
@@ -111,7 +104,7 @@ class MSSQLGenerator(BaseGenerator):
         columns = [column for column in table.get_columns(order) if not column.identity]
         statements = self._get_merge_preamble(table, columns)
 
-        statements.append("WHEN NOT MATCHED BY TARGET THEN")
+        statements.append("WHEN NOT MATCHED THEN")
         column_list = ", ".join(str(column.name) for column in columns)
         insert_list = ", ".join(f"source.{column.name}" for column in columns)
         statements.append(f"INSERT ({column_list}) VALUES ({insert_list})")
@@ -138,7 +131,7 @@ class MSSQLGenerator(BaseGenerator):
             )
             statements.append(f"UPDATE SET {update_list}")
         if insert_columns:
-            statements.append("WHEN NOT MATCHED BY TARGET THEN")
+            statements.append("WHEN NOT MATCHED THEN")
             column_list = ", ".join(str(column.name) for column in insert_columns)
             insert_list = ", ".join(
                 f"source.{column.name}" for column in insert_columns
@@ -150,7 +143,7 @@ class MSSQLGenerator(BaseGenerator):
 
     @override
     def get_table_delete_stmt(self, table: Table) -> str:
-        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = ?"
+        return f"DELETE FROM {table.name} WHERE {table.get_primary_column().name} = :1"
 
     @override
     def get_field_extractor(

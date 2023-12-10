@@ -15,6 +15,24 @@ class TestEngineBase(abc.ABC):
         ...
 
 
+class OracleBase(TestEngineBase):
+    "Base class for testing Oracle features."
+
+    @property
+    def engine(self) -> BaseEngine:
+        return get_dialect("oracle")
+
+    @property
+    def parameters(self) -> ConnectionParameters:
+        return ConnectionParameters(
+            host="localhost",
+            port=1521,
+            username="system",
+            password="<YourStrong@Passw0rd>",
+            database="FREEPDB1",
+        )
+
+
 class PostgreSQLBase(TestEngineBase):
     "Base class for testing PostgreSQL features."
 
