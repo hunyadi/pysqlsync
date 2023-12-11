@@ -557,6 +557,9 @@ class Namespace(DatabaseObject):
         self.structs = ObjectDict(structs or [])
         self.tables = ObjectDict(tables or [])
 
+    def __bool__(self) -> bool:
+        return len(self.enums) > 0 or len(self.structs) > 0 or len(self.tables) > 0
+
     def get_referenced_namespaces(self) -> set[LocalId]:
         items: set[SupportsQualifiedId] = set()
         for s in self.structs.values():

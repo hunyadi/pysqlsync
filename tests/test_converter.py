@@ -300,17 +300,29 @@ class TestConverter(unittest.TestCase):
         )
         target = copy.deepcopy(source)
         target_ns = target.namespaces["public"]
-        target_ns.tables["UserTable"].columns.remove("homepage_url")
-        target_ns.tables["UserTable"].columns["short_name"].nullable = True
-        target_ns.tables["UserTable"].columns.add(
-            Column(LocalId("social_url"), SqlVariableCharacterType(), False)
+        user_table = target_ns.tables["UserTable"]
+        user_table.columns["created_at"].default = "CURRENT_TIMESTAMP()"
+        user_table.columns.remove("deleted_at")
+        user_table.columns["short_name"].nullable = True
+        user_table.columns["homepage_url"].default = "'https://example.com/'"
+        user_table.columns["homepage_url"].nullable = False
+        user_table.columns.add(
+            Column(
+                LocalId("social_url"),
+                SqlVariableCharacterType(),
+                False,
+                default="'https://community.canvaslms.com/'",
+            )
         )
         self.assertEqual(
             Mutator().mutate_catalog_stmt(source, target),
             'ALTER TABLE "public"."UserTable"\n'
-            'ADD COLUMN "social_url" text NOT NULL,\n'
+            """ADD COLUMN "social_url" text NOT NULL DEFAULT 'https://community.canvaslms.com/',\n"""
+            'ALTER COLUMN "created_at" SET DEFAULT CURRENT_TIMESTAMP(),\n'
             'ALTER COLUMN "short_name" DROP NOT NULL,\n'
-            'DROP COLUMN "homepage_url";',
+            'ALTER COLUMN "homepage_url" SET NOT NULL,\n'
+            """ALTER COLUMN "homepage_url" SET DEFAULT 'https://example.com/',\n"""
+            'DROP COLUMN "deleted_at";',
         )
 
 

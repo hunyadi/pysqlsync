@@ -17,8 +17,12 @@ from tests.params import (
     MySQLBase,
     PostgreSQLBase,
     TestEngineBase,
+    configure,
     has_env_var,
 )
+
+if __name__ == "__main__":
+    configure()
 
 
 def generate_input_file(data_file_path: str, record_count: int) -> None:
@@ -95,13 +99,4 @@ class TestMySQLConnection(MySQLBase, TestPerformance):
 del TestPerformance
 
 if __name__ == "__main__":
-    import logging
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-
-    ch = logging.FileHandler(os.path.join(os.path.dirname(__file__), "test.log"), "w")
-    ch.setLevel(logging.DEBUG)
-    logger.addHandler(ch)
-
     unittest.main()

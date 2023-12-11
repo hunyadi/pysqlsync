@@ -1,5 +1,7 @@
 import abc
+import logging
 import os
+import os.path
 
 from pysqlsync.base import BaseEngine, ConnectionParameters
 from pysqlsync.factory import get_dialect
@@ -94,4 +96,23 @@ def has_env_var(name: str) -> bool:
     :param name: Environment variable to check.
     """
 
-    return os.getenv(f"TEST_{name}", "0") == "1"
+    return os.environ.get(f"TEST_{name}", "0") == "1"
+
+
+def configure() -> None:
+    """
+    Configures logging in unit and integration tests. To be invoked in module `__main__`.
+    """
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    ch = logging.FileHandler(os.path.join(os.path.dirname(__file__), "test.log"), "w")
+    ch.setLevel(logging.DEBUG)
+    logger.addHandler(ch)
+
+    os.environ["TEST_INTEGRATION"] = "1"
+    os.environ["TEST_POSTGRESQL"] = "1"
+    os.environ["TEST_MYSQL"] = "1"
+    # os.environ["TEST_ORACLE"] = "1"
+    # os.environ["TEST_MSSQL"] = "1"

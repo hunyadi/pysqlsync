@@ -23,8 +23,12 @@ from tests.params import (
     OracleBase,
     PostgreSQLBase,
     TestEngineBase,
+    configure,
     has_env_var,
 )
+
+if __name__ == "__main__":
+    configure()
 
 
 @dataclass

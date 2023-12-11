@@ -18,6 +18,8 @@ from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union, ove
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
 
+from pysqlsync.python_types import dataclass_to_code, module_to_code
+
 from .formation.inspection import get_entity_types
 from .formation.mutation import Mutator, MutatorOptions
 from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
@@ -185,6 +187,10 @@ class BaseGenerator(abc.ABC):
             if not tables:
                 LOGGER.warning("no tables to create")
 
+            for table in tables:
+                code = dataclass_to_code(table)
+                LOGGER.debug(f"analyzing dataclass `{table.__name__}`:\n{code}")
+
             target = self.converter.dataclasses_to_catalog(tables)
             statement = self.get_mutate_stmt(target)
             self.state = target
@@ -192,6 +198,10 @@ class BaseGenerator(abc.ABC):
         elif modules is not None:
             if not modules:
                 LOGGER.warning("no schemas to create")
+
+            for module in modules:
+                code = module_to_code(module)
+                LOGGER.debug(f"analyzing module `{module.__name__}`:\n{code}")
 
             target = self.converter.modules_to_catalog(modules)
             statement = self.get_mutate_stmt(target)
@@ -1095,6 +1105,7 @@ class Explorer(abc.ABC):
             LOGGER.debug(f"found {len(ns.enums)} enum(s) in namespace {ns.name}")
             LOGGER.debug(f"found {len(ns.structs)} struct(s) in namespace {ns.name}")
             LOGGER.debug(f"found {len(ns.tables)} table(s) in namespace {ns.name}")
+        LOGGER.debug(f"discovered state:\n{str(generator.state)}")
 
     @overload
     async def synchronize(self, *, module: types.ModuleType) -> None:
@@ -1133,6 +1144,7 @@ class Explorer(abc.ABC):
         generator.reset()
         generator.create(tables=get_entity_types(entity_modules))
         target_state = generator.state
+        LOGGER.debug(f"desired state:\n{str(generator.state)}")
 
         # acquire current database schema
         await self.discover(modules=entity_modules)

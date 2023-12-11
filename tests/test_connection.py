@@ -13,9 +13,13 @@ from tests.params import (
     OracleBase,
     PostgreSQLBase,
     TestEngineBase,
+    configure,
     has_env_var,
 )
 from tests.timed_test import TimedAsyncioTestCase
+
+if __name__ == "__main__":
+    configure()
 
 
 @unittest.skipUnless(has_env_var("INTEGRATION"), "database tests are disabled")
