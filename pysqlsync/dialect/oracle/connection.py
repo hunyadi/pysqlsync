@@ -7,11 +7,14 @@ import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext, QueryException
+from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.resultset import resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
+
+from .data_types import sql_to_oracle_type
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -71,10 +74,29 @@ class OracleContext(BaseContext):
 
     @override
     @thread_dispatch
-    def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
+    def _execute_all(self, statement: str, records: Iterable[tuple[Any, ...]]) -> None:
         statement = statement.rstrip("\r\n\t\v ;")
         with self.native_connection.cursor() as cur:
-            cur.executemany(statement, list(args))
+            cur.executemany(statement, list(records))
+
+    @override
+    @thread_dispatch
+    def _execute_typed(
+        self,
+        statement: str,
+        records: Iterable[tuple[Any, ...]],
+        table: Table,
+        order: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        statement = statement.rstrip("\r\n\t\v ;")
+        with self.native_connection.cursor() as cur:
+            cur.setinputsizes(
+                *tuple(
+                    sql_to_oracle_type(cur, column.data_type)
+                    for column in table.get_columns(order)
+                )
+            )
+            cur.executemany(statement, list(records))
 
     @override
     @thread_dispatch

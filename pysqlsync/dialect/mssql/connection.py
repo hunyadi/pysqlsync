@@ -81,6 +81,25 @@ class MSSQLContext(BaseContext):
 
     @override
     @thread_dispatch
+    def _execute_typed(
+        self,
+        statement: str,
+        records: Iterable[tuple[Any, ...]],
+        table: Table,
+        order: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        with self.native_connection.cursor() as cur:
+            cur.fast_executemany = True
+            cur.setinputsizes(
+                [
+                    sql_to_odbc_type(column.data_type)
+                    for column in table.get_columns(order)
+                ]
+            )
+            cur.executemany(statement, records)
+
+    @override
+    @thread_dispatch
     def _query_all(self, signature: type[T], statement: str) -> list[T]:
         with self.native_connection.cursor() as cur:
             records = cur.execute(statement).fetchall()
@@ -122,71 +141,3 @@ class MSSQLContext(BaseContext):
             await self.execute(f"DROP TABLE IF EXISTS {table_list};")
 
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace};")
-
-    @thread_dispatch
-    def _execute_typed(
-        self,
-        statement: str,
-        records: Iterable[tuple[Any, ...]],
-        table: Table,
-        field_names: Optional[tuple[str, ...]] = None,
-    ) -> None:
-        with self.native_connection.cursor() as cur:
-            cur.fast_executemany = True
-            cur.setinputsizes(
-                [
-                    sql_to_odbc_type(column.data_type)
-                    for column in table.get_columns(field_names)
-                ]
-            )
-            cur.executemany(statement, records)
-
-    @override
-    async def _insert_rows(
-        self,
-        table: Table,
-        records: Iterable[tuple[Any, ...]],
-        *,
-        field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
-    ) -> None:
-        record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
-        )
-        order = tuple(name for name in field_names if name) if field_names else None
-        statement = self.connection.generator.get_table_insert_stmt(table, order)
-        await self._execute_typed(statement, record_generator, table, order)
-
-    @override
-    async def _upsert_rows(
-        self,
-        table: Table,
-        records: Iterable[tuple[Any, ...]],
-        *,
-        field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
-    ) -> None:
-        record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
-        )
-        order = tuple(name for name in field_names if name) if field_names else None
-        statement = self.connection.generator.get_table_upsert_stmt(table, order)
-        await self._execute_typed(statement, record_generator, table, order)
-
-    @override
-    async def _delete_rows(
-        self, table: Table, key_type: type, key_values: Iterable[Any]
-    ) -> None:
-        generator = self.connection.generator
-        transformer = generator.get_value_transformer(
-            table.get_primary_column(), key_type
-        )
-        if transformer is not None:
-            records = ((transformer(key),) for key in key_values)
-        else:
-            records = ((key,) for key in key_values)
-
-        statement = generator.get_table_delete_stmt(table)
-        await self._execute_typed(
-            statement, records, table, (table.get_primary_column().name.local_id,)
-        )

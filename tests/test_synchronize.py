@@ -20,6 +20,7 @@ from tests.model import event, school
 from tests.params import (
     MSSQLBase,
     MySQLBase,
+    OracleBase,
     PostgreSQLBase,
     TestEngineBase,
     has_env_var,
@@ -38,11 +39,14 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters, self.options) as conn:
             await conn.drop_schema(LocalId("sample"))
+            await conn.drop_schema(LocalId("event"))
+            await conn.drop_schema(LocalId("school"))
 
     @property
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(
-            namespaces={tables: "sample"}, foreign_constraints=False
+            namespaces={tables: "sample", event: "event", school: "school"},
+            foreign_constraints=False,
         )
 
     async def test_create_schema(self) -> None:
@@ -221,14 +225,20 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
             # update 2 records and insert 3 records
             # caveat: Microsoft SQL ignores explicit value for IDENTITY column when inserting new record
+            # caveat: Oracle increments `nextval` even if a match is found
             await conn.upsert_data(
                 cls,
                 [
                     cls(id=2, unique="value 2"),
                     cls(id=3, unique="value 3"),
-                    cls(id=4, unique="value 4"),
-                    cls(id=5, unique="value 5"),
-                    cls(id=6, unique="value 6"),
+                ],
+            )
+            await conn.insert_data(
+                cls,
+                [
+                    cls(id=DEFAULT, unique="value 4"),
+                    cls(id=DEFAULT, unique="value 5"),
+                    cls(id=DEFAULT, unique="value 6"),
                 ],
             )
             count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table_name}")
@@ -242,9 +252,9 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.drop_objects()
 
 
-# @unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
-# class TestOracleSynchronize(OracleBase, TestSynchronize):
-#     pass
+@unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
+class TestOracleSynchronize(OracleBase, TestSynchronize):
+    pass
 
 
 @unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")

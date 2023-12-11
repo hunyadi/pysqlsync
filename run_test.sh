@@ -3,6 +3,15 @@ set -e
 # PostgreSQL and MySQL
 TEST_INTEGRATION=1 TEST_POSTGRESQL=1 TEST_MYSQL=1 python3 -m unittest discover
 
+# MySQL
+# CONTAINER=mysql-db
+# docker ps -q --filter "name=$CONTAINER" | xargs -r docker stop
+# docker ps -aq --filter "name=$CONTAINER" | xargs -r docker rm
+# docker run -d --name $CONTAINER -p 3306:3306 -e "MYSQL_ROOT_PASSWORD=<YourStrong@Passw0rd>" -e MYSQL_DATABASE=levente_hunyadi mysql:8.0
+# sleep 30
+# TEST_INTEGRATION=1 TEST_MYSQL=1 python3 -m unittest discover
+# docker stop $CONTAINER && docker rm $CONTAINER
+
 # Oracle
 CONTAINER=oracle-db
 docker ps -q --filter "name=$CONTAINER" | xargs -r docker stop

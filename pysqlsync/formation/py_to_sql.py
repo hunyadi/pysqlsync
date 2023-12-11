@@ -186,7 +186,9 @@ class NamespaceMapping:
         if module in self.dictionary:
             return self.dictionary[module]  # include special return value `None`
         else:
-            return module.__name__
+            raise ValueError(
+                f"expected: database schema name mapping for module: {module.__name__}"
+            )
 
 
 @enum.unique

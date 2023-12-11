@@ -15,6 +15,7 @@ from pysqlsync.formation.object_types import (
 )
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
+from pysqlsync.util.typing import override
 
 from .data_types import (
     MySQLDateTimeType,
@@ -55,6 +56,7 @@ class MySQLExplorer(AnsiExplorer):
             MySQLObjectFactory(),
         )
 
+    @override
     def get_qualified_id(self, namespace: str, id: str) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 

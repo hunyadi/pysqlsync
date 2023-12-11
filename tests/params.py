@@ -82,7 +82,7 @@ class MySQLBase(TestEngineBase):
             host="localhost",
             port=3306,
             username="root",
-            password=None,
+            password=None,  # "<YourStrong@Passw0rd>",
             database="levente_hunyadi",
         )
 

@@ -534,6 +534,8 @@ class BaseContext(abc.ABC):
 
         if not statement:
             raise ValueError("empty statement")
+        if not statement.strip():
+            raise ValueError("blank statement")
 
         if isinstance(args, Sized):
             LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
@@ -544,16 +546,29 @@ class BaseContext(abc.ABC):
             LOGGER.debug(f"execute SQL:\n{statement}")
         try:
             await self._execute_all(statement, args)
+        except QueryException:
+            raise
         except Exception as e:
             raise QueryException(statement) from e
 
     @abc.abstractmethod
     async def _execute_all(
-        self, statement: str, args: Iterable[tuple[Any, ...]]
+        self, statement: str, records: Iterable[tuple[Any, ...]]
     ) -> None:
         "Executes a SQL statement with several records of data."
 
         ...
+
+    async def _execute_typed(
+        self,
+        statement: str,
+        records: Iterable[tuple[Any, ...]],
+        table: Table,
+        order: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        "Executes a SQL statement with several records of data, passing type information."
+
+        await self._execute_all(statement, records)
 
     async def query_one(self, signature: type[T], statement: str) -> T:
         "Runs a query to produce a result-set of one or more columns, and a single row."
@@ -730,10 +745,7 @@ class BaseContext(abc.ABC):
         )
         order = tuple(name for name in field_names if name) if field_names else None
         statement = self.connection.generator.get_table_insert_stmt(table, order)
-        await self.execute_all(
-            statement,
-            record_generator,
-        )
+        await self._execute_typed(statement, record_generator, table, order)
 
     async def upsert_rows(
         self,
@@ -788,10 +800,7 @@ class BaseContext(abc.ABC):
         )
         order = tuple(name for name in field_names if name) if field_names else None
         statement = self.connection.generator.get_table_upsert_stmt(table, order)
-        await self.execute_all(
-            statement,
-            record_generator,
-        )
+        await self._execute_typed(statement, record_generator, table, order)
 
     async def _generate_records(
         self,
@@ -981,7 +990,8 @@ class BaseContext(abc.ABC):
             records = ((key,) for key in key_values)
 
         statement = generator.get_table_delete_stmt(table)
-        await self.execute_all(statement, records)
+        order = (table.get_primary_column().name.local_id,)
+        await self._execute_typed(statement, records, table, order)
 
 
 def _module_or_list(

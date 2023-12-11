@@ -30,8 +30,12 @@ from tests.model import user
 
 
 class TestConverter(unittest.TestCase):
+    @property
+    def options(self) -> DataclassConverterOptions:
+        return DataclassConverterOptions(namespaces=NamespaceMapping({tables: None}))
+
     def test_primary_key(self) -> None:
-        table_def = dataclass_to_table(tables.Address)
+        table_def = dataclass_to_table(tables.Address, options=self.options)
         self.assertListEqual(
             list(table_def.columns.values()),
             [
@@ -41,8 +45,47 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
+    def test_default(self) -> None:
+        table_def = dataclass_to_table(tables.DefaultNumericTable, options=self.options)
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(
+                    LocalId("integer_8"),
+                    SqlIntegerType(2),
+                    False,
+                    default="127",
+                ),
+                Column(
+                    LocalId("integer_16"),
+                    SqlIntegerType(2),
+                    False,
+                    default="32767",
+                ),
+                Column(
+                    LocalId("integer_32"),
+                    SqlIntegerType(4),
+                    False,
+                    default="2147483647",
+                ),
+                Column(
+                    LocalId("integer_64"),
+                    SqlIntegerType(8),
+                    False,
+                    default="0",
+                ),
+                Column(
+                    LocalId("integer"),
+                    SqlIntegerType(8),
+                    False,
+                    default="23",
+                ),
+            ],
+        )
+
     def test_identity(self) -> None:
-        table_def = dataclass_to_table(tables.UniqueTable)
+        table_def = dataclass_to_table(tables.UniqueTable, options=self.options)
         self.assertListEqual(
             list(table_def.columns.values()),
             [
@@ -56,8 +99,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_foreign_key(self) -> None:
-        options = DataclassConverterOptions(namespaces=NamespaceMapping({tables: None}))
-        table_def = dataclass_to_table(tables.Person, options=options)
+        table_def = dataclass_to_table(tables.Person, options=self.options)
         self.assertEqual(table_def.name, QualifiedId(None, "Person"))
         self.assertEqual(table_def.description, "A person.")
         self.assertListEqual(
@@ -80,7 +122,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_recursive_table(self) -> None:
-        table_def = dataclass_to_table(tables.Employee)
+        table_def = dataclass_to_table(tables.Employee, options=self.options)
         self.assertListEqual(
             list(table_def.columns.values()),
             [
@@ -139,8 +181,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_literal_type(self) -> None:
-        options = DataclassConverterOptions(namespaces=NamespaceMapping({tables: None}))
-        table_def = dataclass_to_table(tables.LiteralTable, options=options)
+        table_def = dataclass_to_table(tables.LiteralTable, options=self.options)
         self.assertListEqual(
             list(table_def.columns.values()),
             [
@@ -169,7 +210,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_struct_definition(self) -> None:
-        struct_def = dataclass_to_struct(tables.Coordinates)
+        struct_def = dataclass_to_struct(tables.Coordinates, options=self.options)
         self.assertEqual(
             struct_def.description, "Coordinates in the geographic coordinate system."
         )
@@ -184,7 +225,10 @@ class TestConverter(unittest.TestCase):
     def test_struct_reference(self) -> None:
         table_def = dataclass_to_table(
             tables.Location,
-            options=DataclassConverterOptions(struct_mode=StructMode.TYPE),
+            options=DataclassConverterOptions(
+                struct_mode=StructMode.TYPE,
+                namespaces=NamespaceMapping({tables: "sample"}),
+            ),
         )
         self.assertListEqual(
             list(table_def.columns.values()),
@@ -193,7 +237,7 @@ class TestConverter(unittest.TestCase):
                 Column(
                     LocalId("coords"),
                     SqlUserDefinedType(
-                        QualifiedId(tables.__name__, tables.Coordinates.__name__)
+                        QualifiedId("sample", tables.Coordinates.__name__)
                     ),
                     False,
                 ),
