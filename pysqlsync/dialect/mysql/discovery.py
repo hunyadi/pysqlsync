@@ -12,6 +12,7 @@ from pysqlsync.formation.object_types import (
     Column,
     ConstraintReference,
     ForeignConstraint,
+    Namespace,
 )
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
@@ -57,7 +58,9 @@ class MySQLExplorer(AnsiExplorer):
         )
 
     @override
-    def get_qualified_id(self, namespace: str, id: str) -> SupportsQualifiedId:
+    def get_qualified_id(
+        self, namespace: Optional[str], id: str
+    ) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -158,3 +161,9 @@ class MySQLExplorer(AnsiExplorer):
             )
             or None
         )
+
+    async def get_namespace_current(self) -> Namespace:
+        return await self.get_namespace_flat()
+
+    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
+        return await self.get_namespace_flat(namespace_id)

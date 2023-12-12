@@ -592,7 +592,12 @@ class BaseContext(abc.ABC):
         LOGGER.debug(
             f"query SQL with into {python_type_to_str(signature)}:\n{statement}"
         )
-        return await self._query_all(signature, statement)
+        try:
+            return await self._query_all(signature, statement)
+        except QueryException:
+            raise
+        except Exception as e:
+            raise QueryException(statement) from e
 
     @abc.abstractmethod
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
@@ -1034,7 +1039,9 @@ class Explorer(abc.ABC):
     def __init__(self, conn: BaseContext) -> None:
         self.conn = conn
 
-    def get_qualified_id(self, namespace: str, id: str) -> SupportsQualifiedId:
+    def get_qualified_id(
+        self, namespace: Optional[str], id: str
+    ) -> SupportsQualifiedId:
         return QualifiedId(namespace, id)
 
     @abc.abstractmethod
@@ -1057,6 +1064,12 @@ class Explorer(abc.ABC):
 
     @abc.abstractmethod
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
+        "Constructs a database object model of a namespace (database schema)."
+        ...
+
+    @abc.abstractmethod
+    async def get_namespace_current(self) -> Namespace:
+        "Constructs a database object model of the current namespace (database schema)."
         ...
 
     @overload
@@ -1093,11 +1106,10 @@ class Explorer(abc.ABC):
 
         for entity_module in entity_modules:
             ns_name = generator.converter.options.namespaces.get(entity_module.__name__)
-            if ns_name is None:
-                raise DiscoveryError(
-                    "discovery expects a (pseudo) namespace but options map to blank name"
-                )
-            ns = await self.get_namespace(LocalId(ns_name))
+            if ns_name is not None:
+                ns = await self.get_namespace(LocalId(ns_name))
+            else:
+                ns = await self.get_namespace_current()
             generator.state.merge(Catalog([ns]))
 
         LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")

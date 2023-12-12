@@ -354,47 +354,88 @@ class AnsiExplorer(Explorer):
                 name=table_id, columns=columns, primary_key=primary_key
             )
 
-    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
+    async def get_namespace_qualified(
+        self, namespace_id: Optional[LocalId] = None
+    ) -> Namespace:
+        """
+        Constructs a database object model of a namespace (database schema).
+
+        To be invoked by database dialects with qualified name support.
+        """
+
         tables: list[Table] = []
 
         # create namespace using qualified IDs
+        if namespace_id is not None:
+            schema_expr = quote(namespace_id.local_id)
+        else:
+            schema_expr = self.conn.connection.generator.get_current_schema_stmt()
         table_names = await self.conn.query_all(
             str,
             "SELECT table_name\n"
             "FROM information_schema.tables\n"
-            f"WHERE table_schema = {quote(namespace_id.id)}\n"
+            f"WHERE table_schema = {schema_expr}\n"
             "ORDER BY table_name ASC",
         )
         if table_names:
+            if namespace_id is not None:
+                scope_id = namespace_id.local_id
+            else:
+                scope_id = None
+
             for table_name in table_names:
                 table = await self.get_table(
-                    self.get_qualified_id(namespace_id.local_id, table_name)
+                    self.get_qualified_id(scope_id, table_name)
                 )
                 tables.append(table)
 
             return self.factory.namespace_class(
-                name=namespace_id, enums=[], structs=[], tables=tables
+                name=LocalId(scope_id or ""), enums=[], structs=[], tables=tables
             )
+        else:
+            return self.factory.namespace_class()
+
+    async def get_namespace_flat(
+        self, namespace_id: Optional[LocalId] = None
+    ) -> Namespace:
+        """
+        Constructs a database object model of a namespace (database schema).
+
+        To be invoked by database dialects without qualified name support.
+        """
+
+        tables: list[Table] = []
 
         # create namespace using flat IDs
+        if namespace_id is not None:
+            schema_expr = f"'{escape_like(namespace_id.id, '~')}~_~_%'"
+            condition = f"table_name LIKE {schema_expr} ESCAPE '~'"
+        else:
+            condition = "table_name NOT LIKE '%~_~_%' ESCAPE '~'"
         table_names = await self.conn.query_all(
             str,
             "SELECT table_name\n"
             "FROM information_schema.tables\n"
-            f"WHERE table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'\n"
+            f"WHERE table_schema = {self.conn.connection.generator.get_current_schema_stmt()} AND {condition}\n"
             "ORDER BY table_name ASC",
         )
         if table_names:
-            for table_name in table_names:
-                table_name = table_name.removeprefix(f"{namespace_id.local_id}__")
+            if namespace_id is not None:
+                scope_id = namespace_id.local_id
+            else:
+                scope_id = None
 
-                table = await self.get_table(
-                    self.get_qualified_id(namespace_id.local_id, table_name)
-                )
+            for table_name in table_names:
+                if namespace_id is not None:
+                    local_id = table_name.removeprefix(f"{namespace_id.local_id}__")
+                else:
+                    local_id = table_name
+
+                table = await self.get_table(self.get_qualified_id(scope_id, local_id))
                 tables.append(table)
 
             return self.factory.namespace_class(
                 name=LocalId(""), enums=[], structs=[], tables=tables
             )
-
-        return self.factory.namespace_class()
+        else:
+            return self.factory.namespace_class()

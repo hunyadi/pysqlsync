@@ -125,7 +125,7 @@ class OracleContext(BaseContext):
         )
         tables = await self.query_all(
             str,
-            f"SELECT table_name FROM all_tables WHERE {condition}",
+            f"SELECT table_name FROM dba_tables WHERE {condition}",
         )
         statement = "\n".join(
             f"DROP TABLE {LocalId(table)} CASCADE CONSTRAINTS PURGE;"

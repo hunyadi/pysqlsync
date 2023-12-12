@@ -328,6 +328,12 @@ class PostgreSQLExplorer(Explorer):
             description=table_record.description,
         )
 
+    async def get_namespace_current(self) -> Namespace:
+        schema = await self.conn.current_schema()
+        if schema is None:
+            raise RuntimeError("unable to fetch current schema")
+        return await self.get_namespace(LocalId(schema))
+
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         enum_records = await self.conn.query_all(
             PostgreSQLEnumMeta,

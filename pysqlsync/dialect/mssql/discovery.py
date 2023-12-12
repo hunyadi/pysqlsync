@@ -1,11 +1,18 @@
+from typing import Optional
+
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import AnsiExplorer
-from pysqlsync.formation.object_types import Column
+from pysqlsync.formation.object_types import Column, Namespace, Table
 from pysqlsync.model.data_types import quote
-from pysqlsync.model.id_types import SupportsQualifiedId
+from pysqlsync.model.id_types import LocalId, SupportsQualifiedId
 
-from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLVariableCharacterType
+from .data_types import (
+    MSSQLBooleanType,
+    MSSQLDateTimeType,
+    MSSQLEncoding,
+    MSSQLVariableCharacterType,
+)
 from .object_types import MSSQLObjectFactory
 
 
@@ -19,6 +26,9 @@ class MSSQLExplorer(AnsiExplorer):
                         "bit": MSSQLBooleanType(),
                         "datetime": MSSQLDateTimeType(),
                         "datetime2": MSSQLDateTimeType(),
+                        "nvarchar": MSSQLVariableCharacterType(
+                            encoding=MSSQLEncoding.UTF16
+                        ),
                         "varchar": MSSQLVariableCharacterType(),
                         "text": MSSQLVariableCharacterType(),
                     }
@@ -42,3 +52,42 @@ class MSSQLExplorer(AnsiExplorer):
                 c.identity = True
 
         return columns
+
+    async def get_namespace_current(self) -> Namespace:
+        return await self._get_namespace()
+
+    async def get_namespace(self, namespace_id: LocalId) -> Namespace:
+        return await self._get_namespace(namespace_id)
+
+    async def _get_namespace(self, namespace_id: Optional[LocalId] = None) -> Namespace:
+        tables: list[Table] = []
+
+        # create namespace using qualified IDs
+        if namespace_id is not None:
+            schema_id = f"SCHEMA_ID({quote(namespace_id.local_id)})"
+        else:
+            schema_id = "SCHEMA_ID()"
+        table_names = await self.conn.query_all(
+            str,
+            "SELECT name\n"
+            "FROM sys.tables\n"
+            f"WHERE schema_id = {schema_id} AND is_ms_shipped = 0\n"
+            "ORDER BY name ASC",
+        )
+        if table_names:
+            if namespace_id is not None:
+                scope_id = namespace_id.local_id
+            else:
+                scope_id = None
+
+            for table_name in table_names:
+                table = await self.get_table(
+                    self.get_qualified_id(scope_id, table_name)
+                )
+                tables.append(table)
+
+            return self.factory.namespace_class(
+                name=LocalId(scope_id or ""), enums=[], structs=[], tables=tables
+            )
+        else:
+            return self.factory.namespace_class()

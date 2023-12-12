@@ -18,3 +18,5 @@ In order to inspect database startup logs, run:
 ```sh
 docker logs oracle-db
 ```
+
+Finally, run unit and integration tests.

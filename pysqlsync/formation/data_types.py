@@ -154,7 +154,7 @@ class SqlDiscovery:
         "Determines the column type from SQL column attribute data extracted from the information schema table."
 
         sql_type: Optional[SqlDataType] = None
-        if type_schema is None or type_schema == "pg_catalog":
+        if type_schema is None or type_schema == "pg_catalog" or type_schema == "SYS":
             sql_type = copy.copy(self.options.substitutions.get(type_name))
 
         if sql_type is None and type_def is not None:
@@ -164,7 +164,11 @@ class SqlDiscovery:
             sql_type = self.sql_data_type_from_name(type_name, type_schema)
 
         if sql_type is None:
-            raise TypeError(f"unrecognized SQL type: {type_name}")
+            if type_schema is not None:
+                name = f"{type_schema}.{type_name}"
+            else:
+                name = type_name
+            raise TypeError(f"unrecognized SQL type: {name}")
 
         if isinstance(sql_type, SqlDecimalType):
             if numeric_precision is not None:

@@ -1,8 +1,9 @@
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
 
-from pysqlsync.base import BaseContext, DiscoveryError, Explorer
+from pysqlsync.base import BaseContext, Explorer
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.object_types import (
     Column,
@@ -30,11 +31,14 @@ from .data_types import (
 )
 from .object_types import OracleObjectFactory
 
+LOGGER = logging.getLogger("pysqlsync.oracle")
+
 
 @dataclass
 class OracleColumnMeta:
     column_name: str
     data_type: str
+    data_type_owner: str
     data_length: int
     data_precision: int
     data_scale: int
@@ -66,6 +70,7 @@ class OracleExplorer(Explorer):
                     "BLOB": OracleVariableBinaryType(),
                     "CLOB": OracleVariableCharacterType(),
                     "INTERVAL DAY": OracleTimeType(),
+                    "LONG": OracleVariableCharacterType(),
                     "NUMBER": OracleIntegerType(),
                     "RAW": OracleVariableBinaryType(),
                     "TIMESTAMP": OracleTimestampType(),
@@ -75,7 +80,9 @@ class OracleExplorer(Explorer):
         )
         self.factory = OracleObjectFactory()
 
-    def get_qualified_id(self, namespace: str, id: str) -> SupportsQualifiedId:
+    def get_qualified_id(
+        self, namespace: Optional[str], id: str
+    ) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -102,8 +109,9 @@ class OracleExplorer(Explorer):
         table_comments = await self.conn.query_all(
             str,
             "SELECT tc.comments\n"
-            "FROM all_tables t JOIN all_tab_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name\n"
-            f"WHERE t.dropped = 'NO' AND {condition}",
+            "FROM dba_tables t JOIN dba_tab_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name\n"
+            f"WHERE t.owner != 'SYS' AND {condition}\n AND t.tablespace_name != 'SYSAUX'\n"
+            "    AND t.status = 'VALID' AND t.temporary = 'N' AND t.secondary = 'N' AND t.dropped = 'NO' AND t.read_only = 'NO'",
         )
 
         column_records = await self.conn.query_all(
@@ -111,6 +119,7 @@ class OracleExplorer(Explorer):
             "SELECT\n"
             "    t.column_name,\n"
             "    t.data_type,\n"
+            "    t.data_type_owner,\n"
             "    t.data_length,\n"
             "    t.data_precision,\n"
             "    t.data_scale,\n"
@@ -119,8 +128,8 @@ class OracleExplorer(Explorer):
             "    t.char_length,\n"
             "    t.identity_column = 'YES' AS is_identity,\n"
             "    tc.comments\n"
-            "FROM all_tab_columns t\n"
-            "    JOIN all_col_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name AND t.column_name = tc.column_name\n"
+            "FROM dba_tab_columns t\n"
+            "    JOIN dba_col_comments tc ON t.owner = tc.owner AND t.table_name = tc.table_name AND t.column_name = tc.column_name\n"
             f"WHERE {condition}\n"
             "ORDER BY column_id",
         )
@@ -140,6 +149,7 @@ class OracleExplorer(Explorer):
 
             data_type = self.discovery.sql_data_type_from_spec(
                 type_name=data_type,
+                type_schema=col.data_type_owner,
                 type_def=col.data_type,
                 character_maximum_length=char_length,
                 numeric_precision=col.data_precision,
@@ -166,10 +176,10 @@ class OracleExplorer(Explorer):
             "    tc.column_name AS source_column,\n"
             "    r.table_name AS target_table,\n"
             "    rc.column_name AS target_column\n"
-            "FROM all_constraints t\n"
-            "    JOIN all_cons_columns tc ON t.owner = tc.owner AND t.constraint_name = tc.constraint_name\n"
-            "    LEFT JOIN all_constraints r ON t.r_owner = r.owner AND t.r_constraint_name = r.constraint_name\n"
-            "    LEFT JOIN all_cons_columns rc ON r.owner = rc.owner AND r.constraint_name = rc.constraint_name\n"
+            "FROM dba_constraints t\n"
+            "    JOIN dba_cons_columns tc ON t.owner = tc.owner AND t.constraint_name = tc.constraint_name\n"
+            "    LEFT JOIN dba_constraints r ON t.r_owner = r.owner AND t.r_constraint_name = r.constraint_name\n"
+            "    LEFT JOIN dba_cons_columns rc ON r.owner = rc.owner AND r.constraint_name = rc.constraint_name\n"
             f"WHERE {condition}\n"
             "ORDER BY tc.position",
         )
@@ -179,24 +189,21 @@ class OracleExplorer(Explorer):
         for con in constraint_records:
             if con.constraint_type == "P":
                 if primary_key is not None:
-                    raise NotImplementedError(
-                        f"composite primary key in table: {table_id}"
-                    )
+                    LOGGER.warning(f"composite primary key in table: {table_id}")
+                    continue
                 primary_key = LocalId(con.source_column)
             elif con.constraint_type == "U":
                 if con.constraint_name in constraints:
-                    raise NotImplementedError(
-                        f"composite unique key in table: {table_id}"
-                    )
+                    LOGGER.warning(f"composite unique key in table: {table_id}")
+                    continue
                 constraints[con.constraint_name] = UniqueConstraint(
                     LocalId(con.constraint_name),
                     LocalId(con.source_column),
                 )
             elif con.constraint_type == "R":
                 if con.constraint_name in constraints:
-                    raise NotImplementedError(
-                        f"composite foreign key in table: {table_id}"
-                    )
+                    LOGGER.warning(f"composite foreign key in table: {table_id}")
+                    continue
                 constraints[con.constraint_name] = ForeignConstraint(
                     LocalId(con.constraint_name),
                     LocalId(con.source_column),
@@ -207,7 +214,7 @@ class OracleExplorer(Explorer):
                 )
 
         if primary_key is None:
-            raise DiscoveryError(f"primary key required in table: {table_id}")
+            primary_key = LocalId("ROWID")
 
         return self.factory.table_class(
             name=table_id,
@@ -217,14 +224,25 @@ class OracleExplorer(Explorer):
             description=table_comments[0] if table_comments else None,
         )
 
+    async def get_namespace_current(self) -> Namespace:
+        return await self._get_namespace()
+
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
-        condition = (
-            f"table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'"
-        )
+        return await self._get_namespace(namespace_id)
+
+    async def _get_namespace(self, namespace_id: Optional[LocalId] = None) -> Namespace:
+        if namespace_id is not None:
+            condition = (
+                f"table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'"
+            )
+        else:
+            condition = "table_name NOT LIKE '%~_~_%' ESCAPE '~'"
 
         table_names = await self.conn.query_all(
             str,
-            f"SELECT table_name FROM all_tables WHERE {condition}",
+            "SELECT table_name FROM dba_tables\n"
+            f"WHERE owner != 'SYS' AND {condition}\n AND table_name NOT LIKE '%$%' AND tablespace_name != 'SYSAUX'\n"
+            "    AND status = 'VALID' AND temporary = 'N' AND secondary = 'N' AND dropped = 'NO' AND read_only = 'NO'",
         )
 
         tables: list[Table] = []

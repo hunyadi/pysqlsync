@@ -19,7 +19,7 @@ class OracleTable(Table):
     def drop_if_exists_stmt(self) -> str:
         return (
             "BEGIN\n"
-            f"    EXECUTE IMMEDIATE 'DROP TABLE {self.name}';\n"
+            f"    EXECUTE IMMEDIATE 'DROP TABLE {self.name} CASCADE CONSTRAINTS PURGE';\n"
             "EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;\n"
             "END;"
         )

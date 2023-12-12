@@ -10,13 +10,14 @@ from pysqlsync.base import BaseContext, ClassRef, GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
 from pysqlsync.data.generator import random_objects
 from pysqlsync.formation.inspection import get_entity_types
+from pysqlsync.formation.mutation import MutatorOptions
 from pysqlsync.formation.object_types import FormationError, Table
 from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode, StructMode
-from pysqlsync.model.id_types import LocalId
+from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.model.key_types import DEFAULT
 from pysqlsync.model.properties import get_primary_key_name_type
 from tests import tables
-from tests.model import event, school
+from tests.model import event, school, user
 from tests.params import (
     MSSQLBase,
     MySQLBase,
@@ -45,19 +46,27 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.drop_schema(LocalId("sample"))
             await conn.drop_schema(LocalId("event"))
             await conn.drop_schema(LocalId("school"))
+            await conn.drop_table_if_exists(QualifiedId(None, user.UserTable.__name__))
 
     @property
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(
-            namespaces={tables: "sample", event: "event", school: "school"},
+            namespaces={tables: "sample", event: "event", school: "school", user: None},
             foreign_constraints=False,
         )
 
     async def test_create_schema(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        options = GeneratorOptions(
+            namespaces={tables: "sample", event: "event", school: "school", user: None},
+            foreign_constraints=True,
+            synchronization=MutatorOptions(
+                allow_drop_namespace=False, allow_drop_table=False
+            ),
+        )
+        async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             self.assertFalse(conn.connection.generator.state)
-            await explorer.synchronize(modules=[tables, event, school])
+            await explorer.synchronize(modules=[tables, event, school, user])
             self.assertTrue(conn.connection.generator.state)
 
     async def test_discover_schema(self) -> None:

@@ -1,3 +1,6 @@
+import enum
+from typing import Optional
+
 import pyodbc
 
 from pysqlsync.model.data_types import (
@@ -23,12 +26,30 @@ class MSSQLBooleanType(SqlBooleanType):
         return "bit"
 
 
+class MSSQLEncoding(enum.Enum):
+    UTF8 = "utf-8"
+    UTF16 = "utf-16"
+
+
 class MSSQLVariableCharacterType(SqlVariableCharacterType):
+    encoding: Optional[MSSQLEncoding] = None
+
+    def __init__(
+        self, limit: Optional[int] = None, encoding: Optional[MSSQLEncoding] = None
+    ) -> None:
+        super().__init__(limit)
+        self.encoding = encoding
+
     def __str__(self) -> str:
-        if self.limit is not None and self.limit > 0 and self.limit != 2147483647:
-            return f"varchar({self.limit})"
+        if self.encoding is MSSQLEncoding.UTF16:
+            chartype = "nvarchar"
         else:
-            return "varchar(max)"
+            chartype = "varchar"
+
+        if self.limit is not None and self.limit > 0 and self.limit != 2147483647:
+            return f"{chartype}({self.limit})"
+        else:
+            return f"{chartype}(max)"
 
 
 class MSSQLDateTimeType(SqlTimestampType):

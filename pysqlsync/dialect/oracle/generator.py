@@ -36,7 +36,9 @@ class OracleGenerator(BaseGenerator):
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(options, OracleObjectFactory(), OracleMutator())
+        super().__init__(
+            options, OracleObjectFactory(), OracleMutator(options.synchronization)
+        )
 
         if options.enum_mode is EnumMode.TYPE or options.enum_mode is EnumMode.INLINE:
             raise FormationError(
@@ -78,6 +80,10 @@ class OracleGenerator(BaseGenerator):
                 factory=self.factory,
             )
         )
+
+    @override
+    def get_current_schema_stmt(self) -> str:
+        return "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
 
     @override
     def placeholder(self, index: int) -> str:
