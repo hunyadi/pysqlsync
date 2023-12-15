@@ -1,7 +1,7 @@
 import enum
 import ipaddress
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from typing import Literal, Optional, Union
 from uuid import UUID
@@ -101,6 +101,12 @@ class DateTimeTable:
     iso_time: time
     optional_date_time: Optional[datetime]
     timestamp_precision: Annotated[datetime, TimePrecision(6)]
+
+
+@dataclass
+class DefaultDateTimeTable:
+    id: PrimaryKey[int]
+    iso_date_time: datetime = datetime(1989, 10, 24, 23, 59, 59, tzinfo=timezone.utc)
 
 
 @dataclass

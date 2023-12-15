@@ -19,7 +19,7 @@ class OracleMutator(Mutator):
             changes.append(str(target.data_type))
         if source.default != target.default:
             if target.default is not None:
-                changes.append(f"DEFAULT {target.default}")
+                changes.append(f"DEFAULT {target.default_expr}")
             else:
                 changes.append("DEFAULT NULL")
         if source.nullable != target.nullable:

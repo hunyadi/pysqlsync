@@ -209,6 +209,41 @@ class TestGenerator(unittest.TestCase):
             ");",
         )
 
+    def test_create_default_datetime_table(self) -> None:
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DefaultDateTimeTable, dialect="postgresql"),
+            'CREATE TABLE "DefaultDateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            """"iso_date_time" timestamp NOT NULL DEFAULT '1989-10-24 23:59:59',\n"""
+            'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DefaultDateTimeTable, dialect="oracle"),
+            'CREATE TABLE "DefaultDateTimeTable" (\n'
+            '"id" number NOT NULL,\n'
+            """"iso_date_time" timestamp DEFAULT TIMESTAMP '1989-10-24 23:59:59' NOT NULL,\n"""
+            'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DefaultDateTimeTable, dialect="mysql"),
+            'CREATE TABLE "DefaultDateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            """"iso_date_time" datetime NOT NULL DEFAULT '1989-10-24 23:59:59',\n"""
+            'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMultiLineEqual(
+            get_create_stmt(tables.DefaultDateTimeTable, dialect="mssql"),
+            'CREATE TABLE "DefaultDateTimeTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            """"iso_date_time" datetime2 NOT NULL,\n"""
+            'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
+            ");\n"
+            """ALTER TABLE "DefaultDateTimeTable" ADD CONSTRAINT "df_iso_date_time" DEFAULT '1989-10-24 23:59:59' FOR "iso_date_time";""",
+        )
+
     def test_create_enum_table(self) -> None:
         self.maxDiff = None
         self.assertMultiLineEqual(

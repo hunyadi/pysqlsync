@@ -40,6 +40,8 @@ class OracleConnection(BaseConnection):
             dsn=f"{host}:{port}/{database}",
         )
         conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'")
 
         self.native = conn
         return OracleContext(self)

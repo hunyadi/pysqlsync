@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Optional
@@ -22,6 +23,9 @@ def constant(v: Any) -> str:
         return str(v)
     elif isinstance(v, bool):
         return "TRUE" if v else "FALSE"
+    elif isinstance(v, datetime.datetime):
+        timestamp = v.astimezone(tz=datetime.timezone.utc).replace(tzinfo=None)
+        return quote(timestamp.isoformat(sep=" "))
     else:
         raise NotImplementedError(f"unknown constant representation for value: {v}")
 

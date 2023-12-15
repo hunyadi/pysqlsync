@@ -1,3 +1,5 @@
+import datetime
+import re
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Optional
@@ -22,6 +24,31 @@ from pysqlsync.model.id_types import GlobalId, LocalId, QualifiedId, SupportsQua
 
 from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
+
+
+def to_default_expr(expr: Optional[str]) -> Optional[str]:
+    "Converts a PostgreSQL-specific default expression into a standard default expression."
+
+    if expr is None:
+        return None
+
+    m = re.match(
+        r"^'(?P<year>\d{4})-(?P<mon>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})'::timestamp without time zone$",
+        expr,
+    )
+    if m:
+        timestamp = datetime.datetime(
+            int(m.group("year")),
+            int(m.group("mon")),
+            int(m.group("day")),
+            int(m.group("hour")),
+            int(m.group("min")),
+            int(m.group("sec")),
+            tzinfo=None,
+        )
+        return quote(timestamp.isoformat(sep=" "))
+    else:
+        return expr
 
 
 @dataclass
@@ -251,7 +278,7 @@ class PostgreSQLExplorer(Explorer):
                     data_type,
                     bool(col.is_nullable),
                     identity=col.is_identity,
-                    default=col.default_value,
+                    default=to_default_expr(col.default_value),
                     description=col.description or None,
                 )
             )
