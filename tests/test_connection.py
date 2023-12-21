@@ -12,6 +12,7 @@ from tests.params import (
     MySQLBase,
     OracleBase,
     PostgreSQLBase,
+    RedshiftBase,
     TestEngineBase,
     configure,
     has_env_var,
@@ -196,6 +197,11 @@ class TestMSSQLConnection(MSSQLBase, TestConnection):
 
 @unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLConnection(MySQLBase, TestConnection):
+    pass
+
+
+@unittest.skipUnless(has_env_var("REDSHIFT"), "AWS Redshift tests are disabled")
+class TestRedshiftConnection(RedshiftBase, TestConnection):
     pass
 
 

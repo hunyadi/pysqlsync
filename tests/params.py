@@ -89,6 +89,24 @@ class MySQLBase(TestEngineBase):
         )
 
 
+class RedshiftBase(TestEngineBase):
+    "Base class for testing AWS Redshift features."
+
+    @property
+    def engine(self) -> BaseEngine:
+        return get_dialect("redshift")
+
+    @property
+    def parameters(self) -> ConnectionParameters:
+        return ConnectionParameters(
+            host=os.getenv("REDSHIFT_HOST"),
+            port=5439,
+            username="admin",
+            password="<YourStrong.Passw0rd>",
+            database="dev",
+        )
+
+
 def has_env_var(name: str) -> bool:
     """
     True if tests are to be executed. To be used with `@unittest.skipUnless`.
@@ -116,3 +134,4 @@ def configure() -> None:
     os.environ["TEST_MYSQL"] = "1"
     # os.environ["TEST_ORACLE"] = "1"
     # os.environ["TEST_MSSQL"] = "1"
+    # os.environ["TEST_REDSHIFT"] = "1"
