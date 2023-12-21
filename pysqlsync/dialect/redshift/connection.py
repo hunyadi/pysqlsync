@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import typing
 from typing import Any, Iterable, TypeVar

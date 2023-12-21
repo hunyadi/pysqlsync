@@ -99,13 +99,14 @@ class PostgreSQLGenerator(BaseGenerator):
         )
         statements.append(f"({column_list}) VALUES ({value_list})")
         value_columns = table.get_value_columns()
+        keys = ", ".join(str(key) for key in table.primary_key)
         if value_columns:
-            statements.append(f"ON CONFLICT ({table.primary_key}) DO UPDATE SET")
+            statements.append(f"ON CONFLICT ({keys}) DO UPDATE SET")
             defs = [
                 f"{column.name} = EXCLUDED.{column.name}" for column in value_columns
             ]
             statements.append(",\n".join(defs))
         else:
-            statements.append(f"ON CONFLICT ({table.primary_key}) DO NOTHING")
+            statements.append(f"ON CONFLICT ({keys}) DO NOTHING")
         statements.append(";")
         return "\n".join(statements)

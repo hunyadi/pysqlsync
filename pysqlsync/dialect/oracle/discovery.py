@@ -4,16 +4,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
+from pysqlsync.formation.constraints import ForeignFactory, UniqueFactory
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.object_types import (
-    Column,
-    Constraint,
-    ConstraintReference,
-    ForeignConstraint,
-    Namespace,
-    Table,
-    UniqueConstraint,
-)
+from pysqlsync.formation.object_types import Column, Constraint, Namespace, Table
 from pysqlsync.model.data_types import escape_like, quote
 from pysqlsync.model.id_types import (
     LocalId,
@@ -184,43 +177,31 @@ class OracleExplorer(Explorer):
             "ORDER BY tc.position",
         )
 
-        primary_key: Optional[LocalId] = None
-        constraints: dict[str, Constraint] = {}
+        primary: list[LocalId] = []
+        unique = UniqueFactory()
+        foreign = ForeignFactory()
         for con in constraint_records:
             if con.constraint_type == "P":
-                if primary_key is not None:
-                    LOGGER.warning(f"composite primary key in table: {table_id}")
-                    continue
-                primary_key = LocalId(con.source_column)
+                primary.append(LocalId(con.source_column))
             elif con.constraint_type == "U":
-                if con.constraint_name in constraints:
-                    LOGGER.warning(f"composite unique key in table: {table_id}")
-                    continue
-                constraints[con.constraint_name] = UniqueConstraint(
-                    LocalId(con.constraint_name),
-                    LocalId(con.source_column),
-                )
+                unique.add(con.constraint_name, LocalId(con.source_column))
             elif con.constraint_type == "R":
-                if con.constraint_name in constraints:
-                    LOGGER.warning(f"composite foreign key in table: {table_id}")
-                    continue
-                constraints[con.constraint_name] = ForeignConstraint(
-                    LocalId(con.constraint_name),
+                foreign.add(
+                    con.constraint_name,
                     LocalId(con.source_column),
-                    ConstraintReference(
-                        self.split_composite_id(con.target_table),
-                        LocalId(con.target_column),
-                    ),
+                    self.split_composite_id(con.target_table),
+                    LocalId(con.target_column),
                 )
 
-        if primary_key is None:
-            primary_key = LocalId("ROWID")
+        constraints: list[Constraint] = []
+        constraints.extend(unique.fetch())
+        constraints.extend(foreign.fetch())
 
         return self.factory.table_class(
             name=table_id,
             columns=columns,
-            primary_key=primary_key,
-            constraints=list(constraints.values()) or None,
+            primary_key=tuple(primary),
+            constraints=constraints or None,
             description=table_comments[0] if table_comments else None,
         )
 

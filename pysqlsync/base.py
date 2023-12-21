@@ -650,9 +650,7 @@ class BaseContext(abc.ABC):
         LOGGER.debug(f"drop table if exists: {table}")
         factory = self.connection.generator.factory
         # column list and primary key are ignored
-        stmt = factory.table_class(
-            table, [], primary_key=LocalId("id")
-        ).drop_if_exists_stmt()
+        stmt = factory.table_class(table, [], primary_key=()).drop_if_exists_stmt()
         if stmt:
             await self.execute(stmt)
 

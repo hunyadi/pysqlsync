@@ -1,19 +1,15 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from pysqlsync.base import BaseContext, DiscoveryError
+from pysqlsync.base import BaseContext
+from pysqlsync.formation.constraints import ForeignFactory
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import (
     AnsiColumnMeta,
     AnsiConstraintMeta,
     AnsiExplorer,
 )
-from pysqlsync.formation.object_types import (
-    Column,
-    ConstraintReference,
-    ForeignConstraint,
-    Namespace,
-)
+from pysqlsync.formation.object_types import Column, ForeignConstraint, Namespace
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
 from pysqlsync.util.typing import override
@@ -135,19 +131,15 @@ class MySQLExplorer(AnsiExplorer):
             f"WHERE ref.table_name = {quote(table_id.local_id)} AND {self._where_table(table_id, 'kcu')}\n",
         )
 
-        constraints: dict[str, ForeignConstraint] = {}
+        constraints = ForeignFactory()
         for con in constraint_meta:
-            if con.fk_constraint_name in constraints:
-                raise DiscoveryError(f"composite foreign key in table: {table_id}")
-            constraints[con.fk_constraint_name] = ForeignConstraint(
-                LocalId(con.fk_constraint_name),
+            constraints.add(
+                con.fk_constraint_name,
                 LocalId(con.fk_column_name),
-                ConstraintReference(
-                    self.split_composite_id(con.uq_table_name),
-                    LocalId(con.uq_column_name),
-                ),
+                self.split_composite_id(con.uq_table_name),
+                LocalId(con.uq_column_name),
             )
-        return list(constraints.values())
+        return constraints.fetch()
 
     async def get_table_description(
         self, table_id: SupportsQualifiedId

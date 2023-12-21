@@ -95,7 +95,7 @@ class TestConverter(unittest.TestCase):
         )
         self.assertListEqual(
             list(table_def.constraints.values()),
-            [UniqueConstraint(LocalId("uq_UniqueTable_unique"), LocalId("unique"))],
+            [UniqueConstraint(LocalId("uq_UniqueTable_unique"), (LocalId("unique"),))],
         )
 
     def test_foreign_key(self) -> None:

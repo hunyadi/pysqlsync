@@ -100,9 +100,9 @@ class MySQLGenerator(BaseGenerator):
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join("%s" for column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
-        statements.append(
-            f"ON DUPLICATE KEY UPDATE {table.primary_key} = {table.primary_key}"
-        )
+        statements.append("ON DUPLICATE KEY UPDATE")
+        defs = [f"{key} = {key}" for key in table.primary_key]
+        statements.append(",\n".join(defs))
         statements.append(";")
         return "\n".join(statements)
 
@@ -118,9 +118,9 @@ class MySQLGenerator(BaseGenerator):
         value_columns = table.get_value_columns()
         if value_columns:
             defs = [_field_update(column.name) for column in value_columns]
-            statements.append(",\n".join(defs))
         else:
-            statements.append(_field_update(table.primary_key))
+            defs = [_field_update(key) for key in table.primary_key]
+        statements.append(",\n".join(defs))
         statements.append(";")
         return "\n".join(statements)
 

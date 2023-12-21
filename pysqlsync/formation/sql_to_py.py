@@ -145,7 +145,7 @@ class SqlConverter:
             if not isinstance(c, ReferenceConstraint):
                 continue
 
-            if column.name != c.foreign_column:
+            if column.name not in c.foreign_columns:
                 continue
 
             if isinstance(c, ForeignConstraint):

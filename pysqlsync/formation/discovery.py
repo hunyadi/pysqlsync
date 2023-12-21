@@ -6,11 +6,11 @@ from typing import Optional
 from ..base import BaseContext, DiscoveryError, Explorer
 from ..model.data_types import escape_like, quote
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
+from .constraints import ForeignFactory, UniqueFactory
 from .data_types import SqlDiscovery
 from .object_types import (
     Column,
     Constraint,
-    ConstraintReference,
     ForeignConstraint,
     Namespace,
     ObjectFactory,
@@ -229,7 +229,9 @@ class AnsiExplorer(Explorer):
             )
         return columns
 
-    async def get_table_primary_key(self, table_id: SupportsQualifiedId) -> LocalId:
+    async def get_table_primary_key(
+        self, table_id: SupportsQualifiedId
+    ) -> tuple[LocalId, ...]:
         primary_meta = await self.conn.query_all(
             str,
             "SELECT\n"
@@ -244,11 +246,7 @@ class AnsiExplorer(Explorer):
             "ORDER BY kcu.ordinal_position",
         )
 
-        if len(primary_meta) < 1:
-            raise DiscoveryError(f"primary key required in table: {table_id}")
-        elif len(primary_meta) > 1:
-            raise DiscoveryError(f"composite primary key in table: {table_id}")
-        return LocalId(primary_meta[0])
+        return tuple(LocalId(column) for column in primary_meta)
 
     async def get_unique_constraints(
         self, table_id: SupportsQualifiedId
@@ -270,14 +268,10 @@ class AnsiExplorer(Explorer):
             "ORDER BY kcu.ordinal_position",
         )
 
-        constraints: dict[str, UniqueConstraint] = {}
+        constraints = UniqueFactory()
         for con in constraint_meta:
-            if con.constraint_name in constraints:
-                raise DiscoveryError(f"composite unique key in table: {table_id}")
-            constraints[con.constraint_name] = UniqueConstraint(
-                LocalId(con.constraint_name), LocalId(con.column_name)
-            )
-        return list(constraints.values())
+            constraints.add(con.constraint_name, LocalId(con.column_name))
+        return constraints.fetch()
 
     async def get_referential_constraints(
         self, table_id: SupportsQualifiedId
@@ -309,19 +303,15 @@ class AnsiExplorer(Explorer):
             "ORDER BY kcu1.ordinal_position",
         )
 
-        constraints: dict[str, ForeignConstraint] = {}
+        constraints = ForeignFactory()
         for con in constraint_meta:
-            if con.fk_constraint_name in constraints:
-                raise DiscoveryError(f"composite foreign key in table: {table_id}")
-            constraints[con.fk_constraint_name] = ForeignConstraint(
-                LocalId(con.fk_constraint_name),
+            constraints.add(
+                con.fk_constraint_name,
                 LocalId(con.fk_column_name),
-                ConstraintReference(
-                    QualifiedId(con.uq_table_schema, con.uq_table_name),
-                    LocalId(con.uq_column_name),
-                ),
+                QualifiedId(con.uq_table_schema, con.uq_table_name),
+                LocalId(con.uq_column_name),
             )
-        return list(constraints.values())
+        return constraints.fetch()
 
     async def get_table_description(
         self, table_id: SupportsQualifiedId
@@ -349,7 +339,7 @@ class AnsiExplorer(Explorer):
             )
         else:
             # assume first column is the primary key
-            primary_key = columns[0].name
+            primary_key = (columns[0].name,)
             return self.factory.table_class(
                 name=table_id, columns=columns, primary_key=primary_key
             )

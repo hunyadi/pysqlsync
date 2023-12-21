@@ -549,12 +549,12 @@ class DataclassConverter:
                 constraints.append(
                     ForeignConstraint(
                         LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
-                        LocalId(enum_field.name),
+                        (LocalId(enum_field.name),),
                         ConstraintReference(
                             self.create_qualified_id(
                                 enum_field.type.__module__, enum_field.type.__name__
                             ),
-                            LocalId("id"),
+                            (LocalId("id"),),
                         ),
                     ),
                 )
@@ -571,7 +571,7 @@ class DataclassConverter:
         return self.options.factory.table_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
             columns=columns,
-            primary_key=LocalId(dataclass_primary_key_name(cls)),
+            primary_key=(LocalId(dataclass_primary_key_name(cls)),),
             constraints=constraints or None,
             description=doc.full_description,
         )
@@ -588,7 +588,8 @@ class DataclassConverter:
             if props.is_unique:
                 constraints.append(
                     UniqueConstraint(
-                        LocalId(f"uq_{cls.__name__}_{field.name}"), LocalId(field.name)
+                        LocalId(f"uq_{cls.__name__}_{field.name}"),
+                        (LocalId(field.name),),
                     )
                 )
 
@@ -598,12 +599,12 @@ class DataclassConverter:
                 constraints.append(
                     ForeignConstraint(
                         LocalId(f"fk_{cls.__name__}_{field.name}"),
-                        LocalId(field.name),
+                        (LocalId(field.name),),
                         ConstraintReference(
                             self.create_qualified_id(
                                 field.type.__module__, field.type.__name__
                             ),
-                            LocalId(dataclass_primary_key_name(field.type)),
+                            (LocalId(dataclass_primary_key_name(field.type)),),
                         ),
                     )
                 )
@@ -617,11 +618,11 @@ class DataclassConverter:
                     constraints.append(
                         DiscriminatedConstraint(
                             LocalId(f"dk_{cls.__name__}_{field.name}"),
-                            LocalId(field.name),
+                            (LocalId(field.name),),
                             [
                                 ConstraintReference(
                                     self.create_qualified_id(t.__module__, t.__name__),
-                                    LocalId(dataclass_primary_key_name(t)),
+                                    (LocalId(dataclass_primary_key_name(t)),),
                                 )
                                 for t in member_types
                             ],
@@ -738,11 +739,11 @@ class DataclassConverter:
                                     False,
                                 ),
                             ],
-                            primary_key=LocalId("id"),
+                            primary_key=(LocalId("id"),),
                             constraints=[
                                 UniqueConstraint(
                                     LocalId(f"uq_{enum_field.type.__name__}"),
-                                    LocalId("value"),
+                                    (LocalId("value"),),
                                 )
                             ],
                         )
@@ -789,28 +790,28 @@ class DataclassConverter:
                                 False,
                             ),
                         ],
-                        primary_key=LocalId("uuid"),
+                        primary_key=(LocalId("uuid"),),
                         constraints=[
                             ForeignConstraint(
                                 LocalId(f"jk_{column_left}"),
-                                LocalId(column_left),
+                                (LocalId(column_left),),
                                 ConstraintReference(
                                     self.create_qualified_id(
                                         entity.__module__,
                                         entity.__name__,
                                     ),
-                                    primary_key_left,
+                                    (primary_key_left,),
                                 ),
                             ),
                             ForeignConstraint(
                                 LocalId(f"jk_{column_right}"),
-                                LocalId(column_right),
+                                (LocalId(column_right),),
                                 ConstraintReference(
                                     self.create_qualified_id(
                                         item_type.__module__,
                                         item_type.__name__,
                                     ),
-                                    primary_key_right,
+                                    (primary_key_right,),
                                 ),
                             ),
                         ],

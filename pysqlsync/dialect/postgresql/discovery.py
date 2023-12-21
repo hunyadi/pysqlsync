@@ -5,19 +5,16 @@ from itertools import groupby
 from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
+from pysqlsync.formation.constraints import ForeignFactory, UniqueFactory
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.discovery import DiscoveryError
 from pysqlsync.formation.object_types import (
     Column,
     Constraint,
-    ConstraintReference,
     EnumType,
-    ForeignConstraint,
     Namespace,
     StructMember,
     StructType,
     Table,
-    UniqueConstraint,
 )
 from pysqlsync.model.data_types import SqlArrayType, SqlUserDefinedType, quote
 from pysqlsync.model.id_types import GlobalId, LocalId, QualifiedId, SupportsQualifiedId
@@ -312,46 +309,31 @@ class PostgreSQLExplorer(Explorer):
             "    LEFT JOIN pg_catalog.pg_attribute AS att_t ON cons.fkeyrel = att_t.attrelid AND cons.fkeycol = att_t.attnum",
         )
 
-        primary_key: Optional[LocalId] = None
-        constraints: dict[str, Constraint] = {}
+        primary: list[LocalId] = []
+        unique = UniqueFactory()
+        foreign = ForeignFactory()
         for con in constraint_records:
             if con.constraint_type == b"p":
-                if primary_key is not None:
-                    raise NotImplementedError(
-                        f"composite primary key in table: {table_id}"
-                    )
-                primary_key = LocalId(con.source_column)
+                primary.append(LocalId(con.source_column))
             elif con.constraint_type == b"u":
-                if con.constraint_name in constraints:
-                    raise NotImplementedError(
-                        f"composite unique key in table: {table_id}"
-                    )
-                constraints[con.constraint_name] = UniqueConstraint(
-                    LocalId(con.constraint_name),
-                    LocalId(con.source_column),
-                )
+                unique.add(con.constraint_name, LocalId(con.source_column))
             elif con.constraint_type == b"f":
-                if con.constraint_name in constraints:
-                    raise NotImplementedError(
-                        f"composite foreign key in table: {table_id}"
-                    )
-                constraints[con.constraint_name] = ForeignConstraint(
-                    LocalId(con.constraint_name),
+                foreign.add(
+                    con.constraint_name,
                     LocalId(con.source_column),
-                    ConstraintReference(
-                        QualifiedId(con.target_namespace, con.target_table),
-                        LocalId(con.target_column),
-                    ),
+                    QualifiedId(con.target_namespace, con.target_table),
+                    LocalId(con.target_column),
                 )
 
-        if primary_key is None:
-            raise DiscoveryError(f"primary key required in table: {table_id}")
+        constraints: list[Constraint] = []
+        constraints.extend(unique.fetch())
+        constraints.extend(foreign.fetch())
 
         return self.factory.table_class(
             name=table_id,
             columns=columns,
-            primary_key=primary_key,
-            constraints=list(constraints.values()) or None,
+            primary_key=tuple(primary),
+            constraints=constraints or None,
             description=table_record.description,
         )
 

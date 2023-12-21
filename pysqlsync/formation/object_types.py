@@ -197,11 +197,11 @@ class ConstraintReference:
     A reference that a constraint points to.
 
     :param table: The table that the constraint points to.
-    :param column: The column in the table that the constraint points to.
+    :param columns: The columns in the table that the constraint points to.
     """
 
     table: SupportsQualifiedId
-    column: LocalId
+    columns: tuple[LocalId, ...]
 
 
 @dataclass
@@ -231,21 +231,22 @@ class Constraint(abc.ABC):
 class UniqueConstraint(Constraint):
     "A unique constraint."
 
-    unique_column: LocalId
+    unique_columns: tuple[LocalId, ...]
 
     def is_alter_table(self) -> bool:
         return True
 
     @property
     def spec(self) -> str:
-        return f"{self.name} UNIQUE ({self.unique_column})"
+        columns = ", ".join(str(column) for column in self.unique_columns)
+        return f"{self.name} UNIQUE ({columns})"
 
 
 @dataclass
 class ReferenceConstraint(Constraint):
     "A constraint that references another table, such as a foreign or discriminated key constraint."
 
-    foreign_column: LocalId
+    foreign_columns: tuple[LocalId, ...]
 
 
 @dataclass
@@ -259,7 +260,9 @@ class ForeignConstraint(ReferenceConstraint):
 
     @property
     def spec(self) -> str:
-        return f"{self.name} FOREIGN KEY ({self.foreign_column}) REFERENCES {self.reference.table} ({self.reference.column})"
+        source_columns = ", ".join(str(column) for column in self.foreign_columns)
+        target_columns = ", ".join(str(column) for column in self.reference.columns)
+        return f"{self.name} FOREIGN KEY ({source_columns}) REFERENCES {self.reference.table} ({target_columns})"
 
 
 @dataclass
@@ -297,13 +300,13 @@ class Table(DatabaseObject, QualifiedObject):
     A database table.
 
     :param columns: The columns that the table consists of.
-    :param primary_key: The primary key of the table.
+    :param primary_key: The primary key column(s) of the table.
     :param constraints: Any constraints applied to the table.
     :param description: A textual description of the table.
     """
 
     columns: ObjectDict[Column]
-    primary_key: LocalId
+    primary_key: tuple[LocalId, ...]
     constraints: ObjectDict[Constraint]
     description: Optional[str]
 
@@ -312,7 +315,7 @@ class Table(DatabaseObject, QualifiedObject):
         name: SupportsQualifiedId,
         columns: list[Column],
         *,
-        primary_key: LocalId,
+        primary_key: tuple[LocalId, ...],
         constraints: Optional[list[Constraint]] = None,
         description: Optional[str] = None,
     ) -> None:
@@ -325,9 +328,8 @@ class Table(DatabaseObject, QualifiedObject):
     def __str__(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
-        defs.append(
-            f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({self.primary_key})"
-        )
+        keys = ", ".join(str(key) for key in self.primary_key)
+        defs.append(f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({keys})")
         defs.extend(str(c) for c in self.constraints.values())
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
@@ -356,16 +358,24 @@ class Table(DatabaseObject, QualifiedObject):
         else:
             return list(self.columns.values())
 
+    def check_primary(self) -> None:
+        if len(self.primary_key) == 0:
+            raise KeyError(f"no primary key defined in table: {self.name}")
+        if len(self.primary_key) > 1:
+            raise KeyError(f"composite primary defined in table: {self.name}")
+
     def is_primary_column(self, column_id: LocalId) -> bool:
         "True if the specified column is a primary key."
 
-        return column_id == self.primary_key
+        self.check_primary()
+        return column_id in self.primary_key
 
     def get_primary_column(self) -> Column:
         "Returns the primary key column."
 
+        self.check_primary()
         for column in self.columns.values():
-            if column.name == self.primary_key:
+            if column.name in self.primary_key:
                 return column
 
         raise KeyError(f"no primary column in table: {self.name}")
@@ -382,7 +392,7 @@ class Table(DatabaseObject, QualifiedObject):
         return [
             column
             for column in self.get_columns(field_names)
-            if column.name != self.primary_key and not column.identity
+            if column.name not in self.primary_key and not column.identity
         ]
 
     def is_unique_column(self, column: Column) -> bool:
@@ -391,32 +401,18 @@ class Table(DatabaseObject, QualifiedObject):
         for constraint in self.constraints.values():
             if not isinstance(constraint, UniqueConstraint):
                 continue
-            if column.name != constraint.unique_column:
+            if len(constraint.unique_columns) > 1:
+                continue
+            if column.name not in constraint.unique_columns:
                 continue
             return True
 
         return False
 
-    def get_unique_columns(self) -> list[Column]:
-        "Returns all columns that must have unique values."
-
-        return [
-            column for column in self.columns.values() if self.is_unique_column(column)
-        ]
-
     def is_lookup_column(self, column: Column) -> bool:
         "True if the column may be used to look up a record by its value."
 
         return self.is_primary_column(column.name) or self.is_unique_column(column)
-
-    def get_lookup_columns(self) -> list[Column]:
-        "Returns all columns that are part of the primary key or must have unique values."
-
-        return [
-            column
-            for column in self.columns.values()
-            if self.is_primary_column(column.name) or self.is_unique_column(column)
-        ]
 
     def is_lookup_table(self) -> bool:
         "Checks whether the table maps a primary key to a unique value."
@@ -439,7 +435,9 @@ class Table(DatabaseObject, QualifiedObject):
         for constraint in self.constraints.values():
             if not isinstance(constraint, ForeignConstraint):
                 continue
-            if column.name != constraint.foreign_column:
+            if len(constraint.foreign_columns) > 1:
+                continue
+            if column.name not in constraint.foreign_columns:
                 continue
             return True
 
@@ -451,7 +449,9 @@ class Table(DatabaseObject, QualifiedObject):
         for constraint in self.constraints.values():
             if not isinstance(constraint, ForeignConstraint):
                 continue
-            if column_id != constraint.foreign_column:
+            if len(constraint.foreign_columns) > 1:
+                continue
+            if column_id not in constraint.foreign_columns:
                 continue
             return constraint.reference
 
@@ -476,9 +476,8 @@ class Table(DatabaseObject, QualifiedObject):
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
-        defs.append(
-            f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({self.primary_key})"
-        )
+        keys = ", ".join(str(key) for key in self.primary_key)
+        defs.append(f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({keys})")
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 
