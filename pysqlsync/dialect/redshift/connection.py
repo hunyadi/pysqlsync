@@ -1,11 +1,17 @@
+import dataclasses
 import logging
+import re
 import typing
-from typing import Any, Iterable, TypeVar
+from io import BytesIO
+from typing import Any, Iterable, Optional, TypeVar
 
 import redshift_connector
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.base import BaseConnection, BaseContext, ClassRef, QueryException
+from pysqlsync.formation.object_types import Table
+from pysqlsync.model.id_types import LocalId, SupportsQualifiedId
+from pysqlsync.model.properties import is_identity_type
 from pysqlsync.resultset import resultset_unwrap_object, resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
@@ -54,22 +60,91 @@ class RedshiftContext(BaseContext):
     @override
     @thread_dispatch
     def _execute(self, statement: str) -> None:
-        with self.native_connection.cursor() as cur:
-            cur.execute(statement)
+        with self.native_connection.cursor() as cursor:
+            # The library `redshift_connector` executes all statements as prepared statements, which locks out
+            # the possibility to execute multiple statements in one go. We artificially split SQL scripts into
+            # multiple statements to work around this limitation in the connector.
+            statement = statement.rstrip("\r\n\t\v ;")
+            for s in re.split(r";$", statement, flags=re.MULTILINE):
+                try:
+                    cursor.execute(s)
+                except Exception as e:
+                    raise QueryException(s) from e
 
     @override
     @thread_dispatch
     def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
-        with self.native_connection.cursor() as cur:
-            cur.executemany(statement, args)
+        with self.native_connection.cursor() as cursor:
+            cursor.executemany(statement, args)
 
     @override
     @thread_dispatch
     def _query_all(self, signature: type[T], statement: str) -> list[T]:
-        with self.native_connection.cursor() as cur:
-            records = cur.execute(statement).fetchall()
+        with self.native_connection.cursor() as cursor:
+            records = cursor.execute(statement).fetchall()
 
             if is_dataclass_type(signature):
                 return resultset_unwrap_object(signature, records)  # type: ignore
             else:
                 return resultset_unwrap_tuple(signature, records)
+
+    @override
+    @thread_dispatch
+    def insert_data(self, table: type[D], data: Iterable[D]) -> None:
+        if not is_dataclass_type(table):
+            raise TypeError(f"expected dataclass type, got: {table}")
+        generator = self.connection.generator
+        table_name = generator.get_qualified_id(ClassRef(table))
+        columns = [
+            LocalId(field.name)
+            for field in dataclasses.fields(table)
+            if not is_identity_type(field.type)
+        ]
+        records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
+        self._insert_copy_stream(table_name, columns, records)
+
+    @override
+    async def _insert_rows(
+        self,
+        table: Table,
+        records: Iterable[tuple[Any, ...]],
+        *,
+        field_types: tuple[type, ...],
+        field_names: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        order = tuple(name for name in field_names if name) if field_names else None
+        columns = [col.name for col in table.get_columns(order)]
+        record_generator = await self._generate_records(
+            table, records, field_types=field_types, field_names=field_names
+        )
+        await self._insert_copy_stream_async(table.name, columns, record_generator)
+
+    @thread_dispatch
+    def _insert_copy_stream_async(
+        self,
+        table_name: SupportsQualifiedId,
+        columns: list[LocalId],
+        records: Iterable[tuple[Any, ...]],
+    ) -> None:
+        self._insert_copy_stream(table_name, columns, records)
+
+    def _insert_copy_stream(
+        self,
+        table_name: SupportsQualifiedId,
+        columns: list[LocalId],
+        records: Iterable[tuple[Any, ...]],
+    ) -> None:
+        column_list = ", ".join(str(column) for column in columns)
+        copy_query = f"COPY {table_name} ({column_list}) FROM STDIN"
+
+        with BytesIO() as f:
+            for record in records:
+                f.write(b"|".join(str(value).encode("utf-8") for value in record))
+                f.write(b"\n")
+            stream_data = f.getvalue()
+
+        cursor = self.native_connection.cursor()
+        try:
+            cursor.execute(copy_query, stream=BytesIO(stream_data))
+        finally:
+            cursor.close()

@@ -537,28 +537,27 @@ class DataclassConverter:
             raise TypeError(f"error processing data-class: {cls}") from e
 
         # foreign/primary key constraints
-        constraints = (
-            self.dataclass_to_constraints(cls)
-            if self.options.foreign_constraints
-            else []
-        )
+        constraints = []
+        if self.options.foreign_constraints:
+            constraints.extend(self.dataclass_to_constraints(cls))
 
-        # checks
-        if self.options.enum_mode is EnumMode.RELATION:
-            for enum_field in dataclass_enum_fields(cls):
-                constraints.append(
-                    ForeignConstraint(
-                        LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
-                        (LocalId(enum_field.name),),
-                        ConstraintReference(
-                            self.create_qualified_id(
-                                enum_field.type.__module__, enum_field.type.__name__
+            # relationships for enumeration types
+            if self.options.enum_mode is EnumMode.RELATION:
+                for enum_field in dataclass_enum_fields(cls):
+                    constraints.append(
+                        ForeignConstraint(
+                            LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                            (LocalId(enum_field.name),),
+                            ConstraintReference(
+                                self.create_qualified_id(
+                                    enum_field.type.__module__, enum_field.type.__name__
+                                ),
+                                (LocalId("id"),),
                             ),
-                            (LocalId("id"),),
                         ),
-                    ),
-                )
-        elif self.options.enum_mode is EnumMode.CHECK:
+                    )
+
+        if self.options.enum_mode is EnumMode.CHECK:
             for enum_field in dataclass_enum_fields(cls):
                 enum_values = ", ".join(constant(e.value) for e in enum_field.type)
                 constraints.append(
@@ -593,41 +592,45 @@ class DataclassConverter:
                     )
                 )
 
-        for field in dataclass_fields_as_required(cls):
-            if is_entity_type(field.type):
-                # foreign keys
-                constraints.append(
-                    ForeignConstraint(
-                        LocalId(f"fk_{cls.__name__}_{field.name}"),
-                        (LocalId(field.name),),
-                        ConstraintReference(
-                            self.create_qualified_id(
-                                field.type.__module__, field.type.__name__
-                            ),
-                            (LocalId(dataclass_primary_key_name(field.type)),),
-                        ),
-                    )
-                )
-
-            if is_type_union(field.type):
-                member_types = [
-                    evaluate_member_type(t, cls) for t in unwrap_union_types(field.type)
-                ]
-                if all(is_entity_type(t) for t in member_types):
-                    # discriminated keys
+        if self.options.foreign_constraints:
+            for field in dataclass_fields_as_required(cls):
+                if is_entity_type(field.type):
+                    # foreign keys
                     constraints.append(
-                        DiscriminatedConstraint(
-                            LocalId(f"dk_{cls.__name__}_{field.name}"),
+                        ForeignConstraint(
+                            LocalId(f"fk_{cls.__name__}_{field.name}"),
                             (LocalId(field.name),),
-                            [
-                                ConstraintReference(
-                                    self.create_qualified_id(t.__module__, t.__name__),
-                                    (LocalId(dataclass_primary_key_name(t)),),
-                                )
-                                for t in member_types
-                            ],
+                            ConstraintReference(
+                                self.create_qualified_id(
+                                    field.type.__module__, field.type.__name__
+                                ),
+                                (LocalId(dataclass_primary_key_name(field.type)),),
+                            ),
                         )
                     )
+
+                if is_type_union(field.type):
+                    member_types = [
+                        evaluate_member_type(t, cls)
+                        for t in unwrap_union_types(field.type)
+                    ]
+                    if all(is_entity_type(t) for t in member_types):
+                        # discriminated keys
+                        constraints.append(
+                            DiscriminatedConstraint(
+                                LocalId(f"dk_{cls.__name__}_{field.name}"),
+                                (LocalId(field.name),),
+                                [
+                                    ConstraintReference(
+                                        self.create_qualified_id(
+                                            t.__module__, t.__name__
+                                        ),
+                                        (LocalId(dataclass_primary_key_name(t)),),
+                                    )
+                                    for t in member_types
+                                ],
+                            )
+                        )
 
         return constraints
 
