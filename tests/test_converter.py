@@ -1,6 +1,8 @@
 import copy
 import unittest
 
+from strong_typing.inspection import create_module
+
 from pysqlsync.formation.mutation import Mutator, MutatorOptions
 from pysqlsync.formation.object_types import Column, StructMember, UniqueConstraint
 from pysqlsync.formation.py_to_sql import (
@@ -24,8 +26,8 @@ from pysqlsync.model.data_types import (
     SqlVariableCharacterType,
 )
 from pysqlsync.model.id_types import LocalId, QualifiedId
-from pysqlsync.python_types import dataclass_to_code
-from tests import empty, tables
+from pysqlsync.python_types import dataclass_to_code, module_to_code
+from tests import tables
 from tests.model import user
 
 
@@ -253,9 +255,13 @@ class TestConverter(unittest.TestCase):
                 namespaces=NamespaceMapping({tables: "public"}),
             ),
         )
+
+        module = create_module(f"{self.__module__}.empty")
         for table in catalog.namespaces["public"].tables.values():
-            cls = table_to_dataclass(table, SqlConverterOptions({"public": empty}))
-            str(dataclass_to_code(cls))
+            cls = table_to_dataclass(table, SqlConverterOptions({"public": module}))
+            self.assertTrue(dataclass_to_code(cls))
+
+        self.assertTrue(module_to_code(module))
 
     def test_mutate(self) -> None:
         source = module_to_catalog(
