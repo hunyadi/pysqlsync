@@ -208,7 +208,8 @@ class BaseGenerator(abc.ABC):
             self.state = target
             return statement
         else:
-            raise NotImplementedError()
+            # should never be triggered; either `tables` or `modules` must be defined at this point
+            raise NotImplementedError("match condition not exhaustive")
 
     def drop(self) -> Optional[str]:
         """
@@ -1022,6 +1023,7 @@ def _module_or_list(
     elif module is not None:
         entity_modules = [module]
     else:
+        # should never be triggered; either `module` or `modules` must be defined at this point
         raise NotImplementedError("match condition not exhaustive")
 
     return entity_modules

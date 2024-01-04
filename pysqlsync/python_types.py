@@ -43,7 +43,9 @@ def module_to_stream(module: ModuleType, target: TextIO) -> None:
         elif is_dataclass_type(cls):
             dataclass_to_stream(cls, target)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "classes in module must be of enumeration or data-class type"
+            )
         print(file=target)
 
 

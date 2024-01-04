@@ -51,7 +51,7 @@ class TrinoContext(BaseContext):
     async def _execute_all(
         self, statement: str, args: Iterable[tuple[Any, ...]]
     ) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError("operation not supported for Trino")
 
     @override
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
@@ -65,7 +65,7 @@ class TrinoContext(BaseContext):
 
     @override
     async def insert_data(self, table: type[T], data: Iterable[T]) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError("operation not supported for Trino")
 
     @override
     async def _insert_rows(
@@ -76,7 +76,7 @@ class TrinoContext(BaseContext):
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError("operation not supported for Trino")
 
     @override
     async def _upsert_rows(
@@ -87,4 +87,4 @@ class TrinoContext(BaseContext):
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError("operation not supported for Trino")

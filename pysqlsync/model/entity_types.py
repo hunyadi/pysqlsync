@@ -60,9 +60,15 @@ def make_entity(cls: type[DataclassInstance], key: str) -> type[DataclassInstanc
     class_module = cls.__module__
     class_doc = cls.__doc__
 
-    class_type = dataclasses.make_dataclass(
-        class_name, target_fields, namespace={"__module__": class_module}
-    )
+    if sys.version_info >= (3, 12):
+        class_type = dataclasses.make_dataclass(
+            class_name, target_fields, module=class_module
+        )
+    else:
+        class_type = dataclasses.make_dataclass(
+            class_name, target_fields, namespace={"__module__": class_module}
+        )
+
     class_type.__doc__ = class_doc
     setattr(sys.modules[class_module], class_name, class_type)
     return class_type

@@ -175,8 +175,16 @@ class SqlConverter:
         # default arguments must follow non-default arguments
         fields.sort(key=lambda f: f[2].default is not dataclasses.MISSING)
 
+        # look up target module
+        module = self.options.namespaces[table.name.scope_id]
+
         # produce class definition with docstring
-        typ = dataclasses.make_dataclass(class_name, fields)  # type: ignore
+        if sys.version_info >= (3, 12):
+            typ = dataclasses.make_dataclass(class_name, fields, module=module.__name__)
+        else:
+            typ = dataclasses.make_dataclass(
+                class_name, fields, namespace={"__module__": module.__name__}  # type: ignore
+            )
         with StringIO() as out:
             for field in dataclasses.fields(typ):
                 description = field.metadata.get("description")
@@ -194,8 +202,6 @@ class SqlConverter:
         typ.__doc__ = docstring
 
         # assign the newly created type to the target module
-        module = self.options.namespaces[table.name.scope_id]
-        typ.__module__ = module.__name__
         setattr(sys.modules[module.__name__], class_name, typ)
 
         return typ

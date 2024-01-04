@@ -26,4 +26,4 @@ class TrinoGenerator(BaseGenerator):
 
     @override
     def placeholder(self, index: int) -> str:
-        raise NotImplementedError()
+        raise NotImplementedError("operation not supported for Trino")

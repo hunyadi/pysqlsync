@@ -277,7 +277,9 @@ class DiscriminatedConstraint(ReferenceConstraint):
 
     @property
     def spec(self) -> str:
-        raise NotImplementedError()
+        raise NotImplementedError(
+            "cannot represent discriminated constraint in SQL DDL"
+        )
 
 
 @dataclass
