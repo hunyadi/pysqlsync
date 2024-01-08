@@ -1,11 +1,28 @@
 # core
-json_strong_typing >= 0.2.9
+json_strong_typing >= 0.3.2
+typing_extensions >= 4.8; python_version<"3.12"
+
+# development tools
+build >= 1.0
+mypy >= 1.8
+flake8 >= 7.0
 
 # data export/import
-tsv2py
+tsv2py >= 0.5.2
 
-# database drivers
-asyncpg >= 0.28
+# PostgreSQL
+asyncpg >= 0.29
+asyncpg-stubs >= 0.29
+
+# Oracle
+oracledb >= 1.4
+
+# MySQL
 aiomysql >= 0.2
-aiotrino >= 0.2
+PyMySQL[rsa]
+
+# Microsoft SQL Server
 pyodbc >= 5.0
+
+# Trino
+aiotrino >= 0.2

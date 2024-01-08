@@ -131,11 +131,22 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         return count
 
     async def test_insert_update_delete_rows(self) -> None:
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        await self.insert_update_delete_rows(self.options)
+
+    async def test_insert_update_delete_rows_relation(self) -> None:
+        options = GeneratorOptions(
+            namespaces={tables: "sample", event: "event", school: "school", user: None},
+            foreign_constraints=False,
+            enum_mode=EnumMode.RELATION,
+        )
+        await self.insert_update_delete_rows(options)
+
+    async def insert_update_delete_rows(self, options: GeneratorOptions) -> None:
+        async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
 
-        async with self.engine.create_connection(self.parameters, self.options) as conn:
+        async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
             entity_types = get_entity_types([tables])

@@ -919,6 +919,10 @@ class BaseContext(abc.ABC):
         if table.is_relation(column):
             relation = generator.state.get_referenced_table(table.name, column.name)
             if relation.is_lookup_table():
+                LOGGER.debug(
+                    f"found lookup table column {column.name} in table {table.name}"
+                )
+
                 enum_dict: dict[str, int]
 
                 if field_type is str:

@@ -1,0 +1,194 @@
+---
+name: pysqlsync database tests
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  postgresql:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: levente.hunyadi
+          POSTGRES_PASSWORD: "<YourStrong@Passw0rd>"
+          POSTGRES_DB: levente.hunyadi
+        ports:
+          - 5432:5432
+        # set health checks to wait until PostgreSQL has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip --disable-pip-version-check install -r requirements.txt
+
+      - name: Build package
+        run: |
+          ./check.sh
+          python -m build
+
+      - name: Run integration tests
+        run: |
+          TEST_INTEGRATION=1 TEST_POSTGRESQL=1 python -m unittest discover
+
+  oracle:
+    runs-on: ubuntu-latest
+
+    services:
+      oracle:
+        image: container-registry.oracle.com/database/free:latest
+        env:
+          ORACLE_PWD: "<YourStrong@Passw0rd>"
+        ports:
+          - 1521:1521
+        # set health checks to wait until Oracle has started
+        options: >-
+          --health-interval 20s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip --disable-pip-version-check install -r requirements.txt
+
+      - name: Build package
+        run: |
+          ./check.sh
+          python -m build
+
+      - name: Run integration tests
+        run: |
+          TEST_INTEGRATION=1 TEST_ORACLE=1 python -m unittest discover
+
+  mysql:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "<YourStrong@Passw0rd>"
+          MYSQL_DATABASE: levente_hunyadi
+        ports:
+          - 3306:3306
+        # set health checks to wait until MySQL has started
+        options: >-
+          --health-cmd "mysqladmin ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip --disable-pip-version-check install -r requirements.txt
+
+      - name: Build package
+        run: |
+          ./check.sh
+          python -m build
+
+      - name: Run integration tests
+        run: |
+          TEST_INTEGRATION=1 TEST_MYSQL=1 python -m unittest discover
+
+  mssql:
+    runs-on: ubuntu-latest
+
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "<YourStrong@Passw0rd>"
+          SQLCMDPASSWORD: "<YourStrong@Passw0rd>"
+        ports:
+          - 1433:1433
+        # set health checks to wait until Microsoft SQL Server has started
+        options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Microsoft ODBC
+        run: sudo ACCEPT_EULA=Y apt-get install msodbcsql18 -y
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip --disable-pip-version-check install -r requirements.txt
+
+      - name: Build package
+        run: |
+          ./check.sh
+          python -m build
+
+      - name: Run integration tests
+        run: |
+          TEST_INTEGRATION=1 TEST_MSSQL=1 python -m unittest discover

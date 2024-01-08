@@ -4,6 +4,7 @@ import decimal
 import keyword
 import sys
 import types
+import typing
 from dataclasses import dataclass
 from io import StringIO
 from typing import Annotated, Any, Optional, Union
@@ -122,7 +123,7 @@ class SqlConverter:
 
     def column_to_field(
         self, table: Table, column: Column
-    ) -> tuple[str, TypeLike, dataclasses.Field]:
+    ) -> tuple[str, type, dataclasses.Field]:
         """
         Generates a dataclass field corresponding to a table column.
 
@@ -154,11 +155,10 @@ class SqlConverter:
                 union_types = tuple(self.qual_to_module(r.table) for r in c.references)
                 field_type = Union[union_types]
 
-        return (
-            field_name,
-            field_type,
-            dataclasses.field(default=default),
-        )
+        # use cast to ensure compatibility with signature of `make_dataclass`
+        data_type = typing.cast(type, field_type)
+
+        return (field_name, data_type, dataclasses.field(default=default))
 
     def table_to_dataclass(self, table: Table) -> type[DataclassInstance]:
         """
@@ -183,7 +183,7 @@ class SqlConverter:
             typ = dataclasses.make_dataclass(class_name, fields, module=module.__name__)
         else:
             typ = dataclasses.make_dataclass(
-                class_name, fields, namespace={"__module__": module.__name__}  # type: ignore
+                class_name, fields, namespace={"__module__": module.__name__}
             )
         with StringIO() as out:
             for field in dataclasses.fields(typ):

@@ -541,21 +541,21 @@ class DataclassConverter:
         if self.options.foreign_constraints:
             constraints.extend(self.dataclass_to_constraints(cls))
 
-            # relationships for enumeration types
-            if self.options.enum_mode is EnumMode.RELATION:
-                for enum_field in dataclass_enum_fields(cls):
-                    constraints.append(
-                        ForeignConstraint(
-                            LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
-                            (LocalId(enum_field.name),),
-                            ConstraintReference(
-                                self.create_qualified_id(
-                                    enum_field.type.__module__, enum_field.type.__name__
-                                ),
-                                (LocalId("id"),),
+        # relationships for enumeration types ignore foreign constraints option and always create a foreign key
+        if self.options.enum_mode is EnumMode.RELATION:
+            for enum_field in dataclass_enum_fields(cls):
+                constraints.append(
+                    ForeignConstraint(
+                        LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                        (LocalId(enum_field.name),),
+                        ConstraintReference(
+                            self.create_qualified_id(
+                                enum_field.type.__module__, enum_field.type.__name__
                             ),
+                            (LocalId("id"),),
                         ),
-                    )
+                    ),
+                )
 
         if self.options.enum_mode is EnumMode.CHECK:
             for enum_field in dataclass_enum_fields(cls):

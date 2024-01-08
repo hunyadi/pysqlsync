@@ -48,7 +48,7 @@ class PostgreSQLBase(TestEngineBase):
             host="localhost",
             port=5432,
             username="levente.hunyadi",
-            password=None,
+            password="<YourStrong@Passw0rd>",
             database="levente.hunyadi",
         )
 
@@ -84,7 +84,7 @@ class MySQLBase(TestEngineBase):
             host="localhost",
             port=3306,
             username="root",
-            password=None,  # "<YourStrong@Passw0rd>",
+            password="<YourStrong@Passw0rd>",
             database="levente_hunyadi",
         )
 
