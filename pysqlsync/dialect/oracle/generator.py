@@ -29,6 +29,9 @@ from .data_types import (
 )
 from .object_types import OracleObjectFactory
 
+MIN_DATETIME = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+MIN_DATE = datetime.date.min
+
 
 class OracleGenerator(BaseGenerator):
     "Generator for Oracle."
@@ -100,9 +103,9 @@ class OracleGenerator(BaseGenerator):
         elif field_type is datetime.time:
             return (
                 lambda obj: datetime.datetime.combine(
-                    datetime.date.min, getattr(obj, field_name)
+                    MIN_DATE, getattr(obj, field_name)
                 )
-                - datetime.datetime.min
+                - MIN_DATETIME
             )
 
         return super().get_field_extractor(column, field_name, field_type)

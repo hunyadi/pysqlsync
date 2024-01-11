@@ -40,8 +40,10 @@ runs:
     - name: Fetch unit and/or integration tests
       uses: actions/checkout@v4
       with:
+        # include `.github` to allow post-run for this composite action
         sparse-checkout: |
           .
+          .github
           tests
 
     - name: Install test requirements
