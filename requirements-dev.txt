@@ -7,9 +7,6 @@ build >= 1.0
 mypy >= 1.8
 flake8 >= 7.0
 
-# data export/import
-tsv2py >= 0.5.2
-
 # PostgreSQL
 asyncpg >= 0.29
 asyncpg-stubs >= 0.29
