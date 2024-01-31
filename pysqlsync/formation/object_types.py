@@ -537,6 +537,16 @@ class Namespace(DatabaseObject):
     @overload
     def __init__(
         self,
+        *,
+        enums: list[EnumType],
+        structs: list[StructType],
+        tables: list[Table],
+    ) -> None:
+        ...
+
+    @overload
+    def __init__(
+        self,
         name: LocalId,
         *,
         enums: list[EnumType],

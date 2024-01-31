@@ -392,7 +392,7 @@ class PostgreSQLExplorer(Explorer):
             table = await self.get_table(QualifiedId(namespace_id.id, table_name))
             tables.append(table)
 
-        if tables:
+        if enums or structs or tables:
             return self.factory.namespace_class(
                 namespace_id, enums=enums, structs=structs, tables=tables
             )

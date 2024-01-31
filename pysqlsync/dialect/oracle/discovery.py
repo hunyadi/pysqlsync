@@ -232,8 +232,6 @@ class OracleExplorer(Explorer):
             tables.append(table)
 
         if tables:
-            return self.factory.namespace_class(
-                LocalId(""), enums=[], structs=[], tables=tables
-            )
+            return self.factory.namespace_class(enums=[], structs=[], tables=tables)
         else:
             return self.factory.namespace_class()
