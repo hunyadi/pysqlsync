@@ -1,2 +1,2 @@
 # data export/import
-tsv2py >= 0.5.2
+tsv2py >= 0.6
