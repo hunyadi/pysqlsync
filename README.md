@@ -156,10 +156,12 @@ Formation is the process of generating a series of SQL statements from a collect
 
 ## Database standard and engine support
 
-* ANSI (when calling `str()` on Python objects such as `Table`, `Column` or `Constraint`)
-* PostgreSQL (via `asyncpg`)
-* Microsoft SQL Server (via `pyodbc`)
-* MySQL (via `aiomysql`)
+* PostgreSQL (with [asyncpg](https://magicstack.github.io/asyncpg/))
+* Microsoft SQL Server (with [pyodbc](https://github.com/mkleehammer/pyodbc/wiki))
+* Oracle (with [oracledb](https://python-oracledb.readthedocs.io/))
+* MySQL (with [aiomysql](https://aiomysql.readthedocs.io/))
+
+When calling `str()` on Python objects such as `Table`, `Column` or `Constraint`, the library returns an ANSI-compliant representation.
 
 ## Python classes for database objects
 
@@ -180,4 +182,4 @@ All objects are identified either with a local ID (e.g. namespaces and columns) 
 
 pysqlsync comes with several database dialects shipped with the library. However, it is possible to create and register new dialects that behave the same way as built-in dialects. In terms of capabilities, there are no differences between built-in and user-defined dialects.
 
-If you are about to write integration for a new database dialect, it is recommended that you take one of the existing dialects (e.g. PostgreSQL, Microsoft SQL Server or MySQL), and use it as a template. For more information, explore the folder `pysqlsync/dialect`.
+If you are about to write integration for a new database dialect, it is recommended that you take one of the existing dialects (e.g. PostgreSQL, Microsoft SQL Server, Oracle or MySQL), and use it as a template. For more information, explore the folder `pysqlsync/dialect`.
