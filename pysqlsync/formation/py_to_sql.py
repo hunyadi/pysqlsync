@@ -118,14 +118,6 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
     return value_types.pop()
 
 
-def is_relationship(field_type: TypeLike) -> bool:
-    if not is_generic_list(field_type):
-        return False
-
-    elem_type = unwrap_generic_list(field_type)
-    return is_entity_type(elem_type)
-
-
 def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
@@ -437,19 +429,21 @@ class DataclassConverter:
             item_type = unwrap_generic_list(typ)
             if is_simple_type(item_type):
                 if self.options.array_mode is ArrayMode.ARRAY:
-                    if (
-                        is_type_enum(item_type)
-                        and self.options.enum_mode is EnumMode.RELATION
+                    if self.options.enum_mode is EnumMode.RELATION and is_type_enum(
+                        item_type
                     ):
+                        # list of enumeration type cannot become SQL array when enumeration values
+                        # are stored in their own table (and not represented as a SQL type)
                         raise TypeError(
-                            "array of enumeration type cannot expand into a relation with a reference constraint"
+                            f"use a join table; cannot convert list of enumeration type to SQL array: {typ}"
                         )
                     return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
                 elif self.options.array_mode is ArrayMode.JSON:
                     return self.member_to_sql_data_type(JsonType, cls)
             if is_entity_type(item_type):
+                # list of entity type (i.e. type with primary key) cannot become SQL array (only list of struct type can)
                 raise TypeError(
-                    f"use a join table, unable to convert list of entity type with primary key: {typ}"
+                    f"use a join table; cannot convert list of entity type to SQL array: {typ}"
                 )
             if isinstance(item_type, type):
                 if self.options.array_mode is ArrayMode.ARRAY:
@@ -519,6 +513,17 @@ class DataclassConverter:
             description=description,
         )
 
+    def is_relationship(self, field_type: TypeLike) -> bool:
+        "True if the field expands into a separate relation (table)."
+
+        if not is_generic_list(field_type):
+            return False
+
+        elem_type = unwrap_generic_list(field_type)
+        return (
+            self.options.enum_mode is EnumMode.RELATION and is_type_enum(elem_type)
+        ) or is_entity_type(elem_type)
+
     def dataclass_to_table(self, cls: type[DataclassInstance]) -> Table:
         "Converts a data-class with a primary key into a SQL table type."
 
@@ -531,7 +536,7 @@ class DataclassConverter:
             columns = [
                 self.member_to_column(field, cls, doc)
                 for field in dataclass_fields(cls)
-                if not is_relationship(field.type)
+                if not self.is_relationship(field.type)
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
@@ -721,11 +726,12 @@ class DataclassConverter:
         if self.options.enum_mode is EnumMode.RELATION:
             for entity in table_types:
                 for enum_field in dataclass_enum_fields(entity):
-                    table_defs = tables.setdefault(enum_field.type.__module__, [])
+                    enum_type = enum_field.type
+                    table_defs = tables.setdefault(enum_type.__module__, [])
                     table_defs.append(
                         self.options.factory.table_class(
                             self.create_qualified_id(
-                                enum_field.type.__module__, enum_field.type.__name__
+                                enum_type.__module__, enum_type.__name__
                             ),
                             [
                                 self.options.factory.column_class(
@@ -745,7 +751,7 @@ class DataclassConverter:
                             primary_key=(LocalId("id"),),
                             constraints=[
                                 UniqueConstraint(
-                                    LocalId(f"uq_{enum_field.type.__name__}"),
+                                    LocalId(f"uq_{enum_type.__name__}"),
                                     (LocalId("value"),),
                                 )
                             ],
@@ -754,23 +760,33 @@ class DataclassConverter:
         # create join tables for one-to-many relationships
         for entity in table_types:
             for field in dataclass_fields(entity):
-                if not is_generic_list(field.type):
+                if not self.is_relationship(field.type):
                     continue
 
+                # "primary" refers to the primary key name/type of the tables participating in the one-to-many relationship
+                # "join" refers to the join table column names
                 item_type = unwrap_generic_list(field.type)
-                if not is_entity_type(item_type):
-                    continue
+                primary_left_name = LocalId(dataclass_primary_key_name(entity))
+                if is_entity_type(item_type):
+                    primary_right_name = LocalId(dataclass_primary_key_name(item_type))
+                    primary_right_type = self.member_to_sql_data_type(
+                        dataclass_primary_key_type(item_type), item_type
+                    )
+                elif is_type_enum(item_type):
+                    # use the same name and type as used when generating the enumeration table
+                    primary_right_name = LocalId("id")
+                    primary_right_type = self.simple_type_to_sql_data_type(int32)
+                else:
+                    raise TypeError(f"unrecognized join relation type: {item_type}")
 
-                primary_key_left = LocalId(dataclass_primary_key_name(entity))
-                primary_key_right = LocalId(dataclass_primary_key_name(item_type))
-                column_left = f"{entity.__name__}_{field.name}"
-                column_right = f"{item_type.__name__}_{primary_key_right.id}"
+                join_left_name = f"{entity.__name__}_{field.name}"
+                join_right_name = f"{item_type.__name__}_{primary_right_name.id}"
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
                     self.options.factory.table_class(
                         self.create_qualified_id(
                             entity.__module__,
-                            f"{column_left}_{item_type.__name__}",
+                            f"{join_left_name}_{item_type.__name__}",
                         ),
                         [
                             self.options.factory.column_class(
@@ -779,42 +795,40 @@ class DataclassConverter:
                                 False,
                             ),
                             self.options.factory.column_class(
-                                LocalId(column_left),
+                                LocalId(join_left_name),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
                                 ),
                                 False,
                             ),
                             self.options.factory.column_class(
-                                LocalId(column_right),
-                                self.member_to_sql_data_type(
-                                    dataclass_primary_key_type(item_type), item_type
-                                ),
+                                LocalId(join_right_name),
+                                primary_right_type,
                                 False,
                             ),
                         ],
                         primary_key=(LocalId("uuid"),),
                         constraints=[
                             ForeignConstraint(
-                                LocalId(f"jk_{column_left}"),
-                                (LocalId(column_left),),
+                                LocalId(f"jk_{join_left_name}"),
+                                (LocalId(join_left_name),),
                                 ConstraintReference(
                                     self.create_qualified_id(
                                         entity.__module__,
                                         entity.__name__,
                                     ),
-                                    (primary_key_left,),
+                                    (primary_left_name,),
                                 ),
                             ),
                             ForeignConstraint(
-                                LocalId(f"jk_{column_right}"),
-                                (LocalId(column_right),),
+                                LocalId(f"jk_{join_right_name}"),
+                                (LocalId(join_right_name),),
                                 ConstraintReference(
                                     self.create_qualified_id(
                                         item_type.__module__,
                                         item_type.__name__,
                                     ),
-                                    (primary_key_right,),
+                                    (primary_right_name,),
                                 ),
                             ),
                         ],
