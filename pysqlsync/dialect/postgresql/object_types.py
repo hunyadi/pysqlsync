@@ -2,6 +2,7 @@ import re
 from typing import Optional
 
 from pysqlsync.formation.object_types import Namespace, ObjectFactory, StructType, Table
+from pysqlsync.model.id_types import LocalId
 
 _sql_quoted_str_table = str.maketrans(
     {
@@ -41,6 +42,10 @@ class PostgreSQLTable(Table):
                     f"COMMENT ON COLUMN {self.name}.{column.name} IS {sql_quoted_string(column.description)};"
                 )
         return "\n".join(statements)
+
+    @property
+    def primary_key_constraint_id(self) -> LocalId:
+        return LocalId(f"pk_{self.name.local_id.replace('.', '_')}")
 
 
 class PostgreSQLStructType(StructType):
