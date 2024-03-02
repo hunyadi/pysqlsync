@@ -4,7 +4,13 @@ import unittest
 from strong_typing.inspection import create_module
 
 from pysqlsync.formation.mutation import Mutator, MutatorOptions
-from pysqlsync.formation.object_types import Column, StructMember, UniqueConstraint
+from pysqlsync.formation.object_types import (
+    Column,
+    ConstraintReference,
+    ForeignConstraint,
+    StructMember,
+    UniqueConstraint,
+)
 from pysqlsync.formation.py_to_sql import (
     ENUM_NAME_LENGTH,
     DataclassConverter,
@@ -156,13 +162,14 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
-    def test_enum_relation(self) -> None:
+    def test_extensible_enum(self) -> None:
         options = DataclassConverterOptions(
-            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({tables: None})
+            enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None})
         )
         converter = DataclassConverter(options=options)
-        catalog = converter.dataclasses_to_catalog([tables.EnumTable])
-        table_def = catalog.get_table(QualifiedId(None, tables.EnumTable.__name__))
+        catalog = converter.dataclasses_to_catalog([tables.ExtensibleEnumTable])
+        table_name = tables.ExtensibleEnumTable.__name__
+        table_def = catalog.get_table(QualifiedId(None, table_name))
         self.assertListEqual(
             list(table_def.columns.values()),
             [
@@ -171,13 +178,84 @@ class TestConverter(unittest.TestCase):
                 Column(LocalId("optional_state"), SqlIntegerType(4), True),
             ],
         )
-        enum_def = catalog.get_table(QualifiedId(None, tables.WorkflowState.__name__))
+        enum_name = tables.ExtensibleEnum.__name__
+        enum_def = catalog.get_table(QualifiedId(None, enum_name))
         self.assertListEqual(
             list(enum_def.columns.values()),
             [
                 Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
                 Column(
                     LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                ),
+            ],
+        )
+        self.assertListEqual(
+            list(table_def.constraints.values()),
+            [
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_state"),
+                    foreign_columns=(LocalId(id="state"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
+                ),
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_optional_state"),
+                    foreign_columns=(LocalId(id="optional_state"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
+                ),
+            ],
+        )
+
+    def test_enum_relation(self) -> None:
+        options = DataclassConverterOptions(
+            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({tables: None})
+        )
+        converter = DataclassConverter(options=options)
+        catalog = converter.dataclasses_to_catalog([tables.EnumTable])
+        table_name = tables.EnumTable.__name__
+        table_def = catalog.get_table(QualifiedId(None, table_name))
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(LocalId("state"), SqlIntegerType(4), False),
+                Column(LocalId("optional_state"), SqlIntegerType(4), True),
+            ],
+        )
+        enum_name = tables.WorkflowState.__name__
+        enum_def = catalog.get_table(QualifiedId(None, enum_name))
+        self.assertListEqual(
+            list(enum_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
+                Column(
+                    LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                ),
+            ],
+        )
+        self.assertListEqual(
+            list(table_def.constraints.values()),
+            [
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_state"),
+                    foreign_columns=(LocalId(id="state"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
+                ),
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_optional_state"),
+                    foreign_columns=(LocalId(id="optional_state"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
                 ),
             ],
         )

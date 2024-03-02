@@ -22,7 +22,15 @@ from strong_typing.auxiliary import (
 from pysqlsync.model.key_types import DEFAULT, Identity, PrimaryKey, Unique
 
 
+class ExtensibleEnum(enum.Enum):
+    "Extensible enumerations must have at most one member."
+
+    unspecified = "__unspecified__"
+
+
 class WorkflowState(enum.Enum):
+    "Regular enumerations must have at least two members."
+
     active = "active"
     inactive = "inactive"
     deleted = "deleted"
@@ -114,6 +122,13 @@ class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
     optional_state: Optional[WorkflowState]
+
+
+@dataclass
+class ExtensibleEnumTable:
+    id: PrimaryKey[int]
+    state: Union[ExtensibleEnum, Annotated[str, MaxLength(64)]]
+    optional_state: Union[ExtensibleEnum, Annotated[str, MaxLength(64)], None]
 
 
 @dataclass

@@ -118,6 +118,38 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
     return value_types.pop()
 
 
+def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
+    """
+    True if the type represents an extensible enumeration type.
+
+    :param typ: A type to check.
+    :param cls: Context in which to evaluate the type (e.g. a class).
+    """
+
+    if not is_type_union(typ):
+        return False
+    member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(typ)]
+    for member_type in member_types:
+        if member_type is None:
+            continue
+
+        member_type = unwrap_annotated_type(member_type)
+        if member_type is not str and not is_type_enum(member_type):
+            return False
+    return True
+
+
+def unwrap_extensible_enum_type(typ: TypeLike, cls: type) -> type[enum.Enum]:
+    if is_type_union(typ):
+        member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(typ)]
+        for member_type in member_types:
+            if is_type_enum(member_type):
+                return member_type
+    raise TypeError(
+        "extensible enum types are of the form `E | str` where `E` is a subclass of `enum.Enum`"
+    )
+
+
 def dataclass_fields_as_required(
     cls: type[DataclassInstance],
 ) -> Iterable[DataclassField]:
@@ -150,6 +182,16 @@ def dataclass_enum_fields(cls: type[DataclassInstance]) -> Iterable[DataclassEnu
     for field in dataclass_fields_as_required(cls):
         if is_type_enum(field.type):
             yield DataclassEnumField(field.name, field.type)
+
+
+def dataclass_extensible_enum_fields(
+    cls: type[DataclassInstance],
+) -> Iterable[DataclassEnumField]:
+    for field in dataclass_fields_as_required(cls):
+        if is_extensible_enum_type(field.type, cls):
+            yield DataclassEnumField(
+                field.name, unwrap_extensible_enum_type(field.type, cls)
+            )
 
 
 class NamespaceMapping:
@@ -379,11 +421,36 @@ class DataclassConverter:
             elif self.options.enum_mode is EnumMode.INLINE:
                 return SqlEnumType([str(e.value) for e in typ])
             elif self.options.enum_mode is EnumMode.RELATION:
-                return self.simple_type_to_sql_data_type(int32)
+                return self._enumeration_key_type()
             elif self.options.enum_mode is EnumMode.CHECK:
                 return self.simple_type_to_sql_data_type(value_type)
 
         raise TypeError(f"not a simple type: {typ}")
+
+    def _enumeration_key_type(self) -> SqlDataType:
+        "Key type for storing enumeration values in a dedicated table."
+
+        return self.simple_type_to_sql_data_type(int32)
+
+    def _is_relationship(self, field_type: TypeLike) -> bool:
+        """
+        True if the field expands into a separate relation (table).
+
+        :param typ: A type to check.
+        :param cls: Context in which to evaluate the type (e.g. a class).
+        """
+
+        field_type = unwrap_annotated_type(field_type)
+
+        # relations must be one-to-many
+        if not is_generic_list(field_type):
+            return False
+
+        # related type must be an entity, or (depending on options) an enumeration type
+        elem_type = unwrap_generic_list(field_type)
+        return (
+            self.options.enum_mode is EnumMode.RELATION and is_type_enum(elem_type)
+        ) or is_entity_type(elem_type)
 
     def member_to_sql_data_type(self, typ: TypeLike, cls: type) -> SqlDataType:
         """
@@ -458,6 +525,8 @@ class DataclassConverter:
                     return self.member_to_sql_data_type(JsonType, cls)
 
             raise TypeError(f"unsupported array data type: {item_type}")
+        if is_extensible_enum_type(typ, cls):
+            return self._enumeration_key_type()
         if is_type_union(typ):
             member_types = [
                 evaluate_member_type(t, cls) for t in unwrap_union_types(typ)
@@ -513,17 +582,6 @@ class DataclassConverter:
             description=description,
         )
 
-    def is_relationship(self, field_type: TypeLike) -> bool:
-        "True if the field expands into a separate relation (table)."
-
-        if not is_generic_list(field_type):
-            return False
-
-        elem_type = unwrap_generic_list(field_type)
-        return (
-            self.options.enum_mode is EnumMode.RELATION and is_type_enum(elem_type)
-        ) or is_entity_type(elem_type)
-
     def dataclass_to_table(self, cls: type[DataclassInstance]) -> Table:
         "Converts a data-class with a primary key into a SQL table type."
 
@@ -536,7 +594,7 @@ class DataclassConverter:
             columns = [
                 self.member_to_column(field, cls, doc)
                 for field in dataclass_fields(cls)
-                if not self.is_relationship(field.type)
+                if not self._is_relationship(field.type)
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
@@ -545,6 +603,21 @@ class DataclassConverter:
         constraints = []
         if self.options.foreign_constraints:
             constraints.extend(self.dataclass_to_constraints(cls))
+
+        # relationships for extensible enumeration types ignore foreign constraints option and always create a foreign key
+        for enum_field in dataclass_extensible_enum_fields(cls):
+            constraints.append(
+                ForeignConstraint(
+                    LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                    (LocalId(enum_field.name),),
+                    ConstraintReference(
+                        self.create_qualified_id(
+                            enum_field.type.__module__, enum_field.type.__name__
+                        ),
+                        (LocalId("id"),),
+                    ),
+                ),
+            )
 
         # relationships for enumeration types ignore foreign constraints option and always create a foreign key
         if self.options.enum_mode is EnumMode.RELATION:
@@ -676,6 +749,32 @@ class DataclassConverter:
             description=doc.full_description,
         )
 
+    def _enum_table(self, enum_type: type[enum.Enum]) -> Table:
+        enum_table_name = enum_type.__name__
+        return self.options.factory.table_class(
+            self.create_qualified_id(enum_type.__module__, enum_table_name),
+            [
+                self.options.factory.column_class(
+                    LocalId("id"),
+                    self._enumeration_key_type(),
+                    False,
+                    identity=True,
+                ),
+                self.options.factory.column_class(
+                    LocalId("value"),
+                    self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
+                    False,
+                ),
+            ],
+            primary_key=(LocalId("id"),),
+            constraints=[
+                UniqueConstraint(
+                    LocalId(f"uq_{enum_table_name}"),
+                    (LocalId("value"),),
+                )
+            ],
+        )
+
     def dataclasses_to_catalog(
         self, entity_types: list[type[DataclassInstance]]
     ) -> Catalog:
@@ -693,6 +792,11 @@ class DataclassConverter:
             enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
             enum_types.sort(key=lambda e: e.__name__)
             for enum_type in enum_types:
+                enum_values = [str(e.value) for e in enum_type]
+                if len(enum_values) < 2:
+                    # enumerations with too few members expand into extensible enumeration tables
+                    continue
+
                 enum_defs = enums.setdefault(enum_type.__module__, [])
                 enum_defs.append(
                     EnumType(
@@ -700,7 +804,7 @@ class DataclassConverter:
                             self.options.namespaces.get(enum_type.__module__),
                             enum_type.__name__,
                         ),
-                        [str(e.value) for e in enum_type],
+                        enum_values,
                     )
                 )
 
@@ -722,45 +826,29 @@ class DataclassConverter:
             table_defs = tables.setdefault(table_type.__module__, [])
             table_defs.append(self.dataclass_to_table(table_type))
 
-        # create tables for enumerations
+        # discover regular enumerations
+        regular_enum_types: set[type[enum.Enum]] = set()
         if self.options.enum_mode is EnumMode.RELATION:
             for entity in table_types:
                 for enum_field in dataclass_enum_fields(entity):
-                    enum_type = enum_field.type
-                    table_defs = tables.setdefault(enum_type.__module__, [])
-                    table_defs.append(
-                        self.options.factory.table_class(
-                            self.create_qualified_id(
-                                enum_type.__module__, enum_type.__name__
-                            ),
-                            [
-                                self.options.factory.column_class(
-                                    LocalId("id"),
-                                    self.simple_type_to_sql_data_type(int32),
-                                    False,
-                                    identity=True,
-                                ),
-                                self.options.factory.column_class(
-                                    LocalId("value"),
-                                    self.member_to_sql_data_type(
-                                        ENUM_LABEL_TYPE, type(None)
-                                    ),
-                                    False,
-                                ),
-                            ],
-                            primary_key=(LocalId("id"),),
-                            constraints=[
-                                UniqueConstraint(
-                                    LocalId(f"uq_{enum_type.__name__}"),
-                                    (LocalId("value"),),
-                                )
-                            ],
-                        )
-                    )
+                    regular_enum_types.add(enum_field.type)
+        for enum_type in sorted(list(regular_enum_types), key=lambda e: e.__name__):
+            table_defs = tables.setdefault(enum_type.__module__, [])
+            table_defs.append(self._enum_table(enum_type))
+
+        # discover extensible enumerations
+        extensible_enum_types: set[type[enum.Enum]] = set()
+        for entity in table_types:
+            for enum_field in dataclass_extensible_enum_fields(entity):
+                extensible_enum_types.add(enum_field.type)
+        for enum_type in sorted(list(extensible_enum_types), key=lambda e: e.__name__):
+            table_defs = tables.setdefault(enum_type.__module__, [])
+            table_defs.append(self._enum_table(enum_type))
+
         # create join tables for one-to-many relationships
         for entity in table_types:
             for field in dataclass_fields(entity):
-                if not self.is_relationship(field.type):
+                if not self._is_relationship(field.type):
                     continue
 
                 # "primary" refers to the primary key name/type of the tables participating in the one-to-many relationship
@@ -775,7 +863,7 @@ class DataclassConverter:
                 elif is_type_enum(item_type):
                     # use the same name and type as used when generating the enumeration table
                     primary_right_name = LocalId("id")
-                    primary_right_type = self.simple_type_to_sql_data_type(int32)
+                    primary_right_type = self._enumeration_key_type()
                 else:
                     raise TypeError(f"unrecognized join relation type: {item_type}")
 

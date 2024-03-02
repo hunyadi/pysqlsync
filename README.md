@@ -134,6 +134,8 @@ Formation is the process of generating a series of SQL statements from a collect
 * a SQL data type corresponding to the enumeration value type, and a `CHECK` constraint on the column to block invalid values, or
 * a foreign/primary key relation (reference constraint), coupled with a lookup table, in which the lookup table consists of an identity column acting as the primary key and a unique column storing the enumeration values.
 
+Extensible enumerations (declared with `E | str` or `E | str | None` where `E` is a subclasses of `enum.Enum`) are always expanded into a relation (i.e. separate table) regardless of `EnumMode`.
+
 ### Data-classes
 
 `StructMode` determines how to convert composite types that are not mapped into SQL tables. A data-class type may be converted into
