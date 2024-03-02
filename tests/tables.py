@@ -124,6 +124,12 @@ class EnumTable:
     optional_state: Optional[WorkflowState]
 
 
+# @dataclass
+# class EnumArrayTable:
+#     id: PrimaryKey[int]
+#     states: list[WorkflowState]
+
+
 @dataclass
 class ExtensibleEnumTable:
     id: PrimaryKey[int]

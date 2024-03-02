@@ -25,6 +25,7 @@ from strong_typing.core import JsonType
 from strong_typing.inspection import DataclassInstance, TypeLike
 
 from ..model.data_types import (
+    SqlArrayType,
     SqlBooleanType,
     SqlDataType,
     SqlDateType,
@@ -97,6 +98,9 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
         return JsonType
     elif isinstance(sql_type, SqlUserDefinedType):
         return sql_type.ref.compact_id
+    elif isinstance(sql_type, SqlArrayType):
+        item_type = (sql_type_to_python(sql_type.element_type),)
+        return list[item_type]  # type: ignore
 
     raise TypeError(f"unrecognized SQL type: {sql_type}")
 
