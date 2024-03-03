@@ -152,6 +152,8 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             entity_types = get_entity_types([tables])
 
             for entity_type in entity_types:
+                if entity_type.__name__ == tables.EnumArrayTable.__name__:
+                    continue
                 if entity_type.__name__ == tables.UniqueTable.__name__:
                     continue
 

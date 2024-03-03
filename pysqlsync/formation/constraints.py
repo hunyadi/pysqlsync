@@ -29,15 +29,24 @@ class ColumnPair:
     target: LocalId
 
 
+@dataclass
+class ConstraintLink:
+    target_table: SupportsQualifiedId
+    column_pairs: list[ColumnPair]
+
+    def __init__(self, target_table: SupportsQualifiedId) -> None:
+        self.target_table = target_table
+        self.column_pairs = []
+
+
 class ForeignFactory:
     "Builds a list of foreign key constraints from a table of constraint names, source and target columns."
 
-    target_table: Optional[SupportsQualifiedId]
-    name_to_items: dict[str, list[ColumnPair]]
+    name_to_constraint: dict[str, ConstraintLink]
 
     def __init__(self) -> None:
         self.target_table = None
-        self.name_to_items = {}
+        self.name_to_constraint = {}
 
     def add(
         self,
@@ -46,30 +55,28 @@ class ForeignFactory:
         target_table: SupportsQualifiedId,
         target_column: LocalId,
     ) -> None:
-        if self.target_table is not None and self.target_table != target_table:
-            raise ValueError("inconsistent target table for foreign constraint")
+        link = self.name_to_constraint.get(constraint_name)
+        if link is not None:
+            if target_table != link.target_table:
+                raise ValueError("inconsistent target table for foreign constraint")
         else:
-            self.target_table = target_table
+            link = ConstraintLink(target_table)
+            self.name_to_constraint[constraint_name] = link
 
-        self.name_to_items.setdefault(constraint_name, []).append(
-            ColumnPair(source_column, target_column)
-        )
+        link.column_pairs.append(ColumnPair(source_column, target_column))
 
     def fetch(self) -> list[ForeignConstraint]:
-        if not self.name_to_items:
+        if not self.name_to_constraint:
             return []
-
-        if self.target_table is None:
-            raise ValueError("missing target table for foreign constraint")
 
         return [
             ForeignConstraint(
                 LocalId(name),
-                tuple(item.source for item in items),
+                tuple(item.source for item in link.column_pairs),
                 ConstraintReference(
-                    self.target_table,
-                    tuple(item.target for item in items),
+                    link.target_table,
+                    tuple(item.target for item in link.column_pairs),
                 ),
             )
-            for name, items in self.name_to_items.items()
+            for name, link in self.name_to_constraint.items()
         ]
