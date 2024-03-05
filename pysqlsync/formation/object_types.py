@@ -6,8 +6,18 @@ from typing import Iterable, Optional, overload
 from strong_typing.topological import topological_sort
 
 from ..model.data_types import SqlDataType, SqlUserDefinedType, constant
-from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
+from ..model.id_types import LocalId, SupportsQualifiedId
 from .object_dict import ObjectDict
+
+
+def identifier(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def deleted(name: str) -> str:
+    "Name for a soft-deleted object."
+
+    return f"pysqlsync${name}"
 
 
 class StatementList(list[str]):
@@ -76,19 +86,17 @@ class QualifiedObject(abc.ABC):
 
 class DatabaseObject(abc.ABC):
     @abc.abstractmethod
-    def create_stmt(self) -> str:
-        ...
+    def create_stmt(self) -> str: ...
 
     @abc.abstractmethod
-    def drop_stmt(self) -> str:
-        ...
+    def drop_stmt(self) -> str: ...
 
 
 @dataclass
 class EnumType(DatabaseObject, QualifiedObject):
     values: list[str]
 
-    def __init__(self, enum_id: QualifiedId, values: list[str]) -> None:
+    def __init__(self, enum_id: SupportsQualifiedId, values: list[str]) -> None:
         super().__init__(enum_id)
         self.values = values
 
@@ -98,6 +106,19 @@ class EnumType(DatabaseObject, QualifiedObject):
 
     def drop_stmt(self) -> str:
         return f"DROP TYPE {self.name};"
+
+    def soft_drop_stmt(self) -> str:
+        "Causes the enumeration type to become inaccessible by obfuscating its name."
+
+        return self.rename_stmt(deleted(self.name.local_id))
+
+    def hard_drop_stmt(self) -> str:
+        "Removes the enumeration type that had previously been soft-deleted."
+
+        return f"DROP TYPE {self.name.rename(deleted(self.name.local_id))};"
+
+    def rename_stmt(self, name: str) -> str:
+        return f"ALTER TYPE {self.name} RENAME TO {identifier(name)};"
 
     def __str__(self) -> str:
         return self.create_stmt()
@@ -190,6 +211,19 @@ class Column(DatabaseObject):
     def drop_stmt(self) -> str:
         return f"DROP COLUMN {self.name}"
 
+    def soft_drop_stmt(self) -> str:
+        "Causes the column to become inaccessible by obfuscating its name."
+
+        return self.rename_stmt(deleted(self.name.local_id))
+
+    def hard_drop_stmt(self) -> str:
+        "Removes the column that had previously been soft-deleted."
+
+        return f"DROP COLUMN {LocalId(deleted(self.name.local_id))}"
+
+    def rename_stmt(self, name: str) -> str:
+        return f"RENAME COLUMN {self.name} TO {identifier(name)}"
+
 
 @dataclass
 class ConstraintReference:
@@ -215,8 +249,7 @@ class Constraint(abc.ABC):
     name: LocalId
 
     @abc.abstractproperty
-    def spec(self) -> str:
-        ...
+    def spec(self) -> str: ...
 
     def is_alter_table(self) -> bool:
         "True if the constraint is to be applied with an ALTER TABLE statement."
@@ -527,12 +560,10 @@ class Namespace(DatabaseObject):
     tables: ObjectDict[Table]
 
     @overload
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, name: LocalId) -> None:
-        ...
+    def __init__(self, name: LocalId) -> None: ...
 
     @overload
     def __init__(
@@ -541,8 +572,7 @@ class Namespace(DatabaseObject):
         enums: list[EnumType],
         structs: list[StructType],
         tables: list[Table],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     def __init__(
@@ -552,8 +582,7 @@ class Namespace(DatabaseObject):
         enums: list[EnumType],
         structs: list[StructType],
         tables: list[Table],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def __init__(
         self,

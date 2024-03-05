@@ -285,7 +285,22 @@ class TestOracleSynchronize(OracleBase, TestSynchronize):
 
 @unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
-    pass
+    async def test_enum_migration(self) -> None:
+        options = GeneratorOptions(
+            enum_mode=EnumMode.TYPE,
+            namespaces={tables: "sample"},
+        )
+        async with self.engine.create_connection(self.parameters, options) as conn:
+            explorer = self.engine.create_explorer(conn)
+            await explorer.synchronize(module=tables)
+
+        options = GeneratorOptions(
+            enum_mode=EnumMode.RELATION,
+            namespaces={tables: "sample"},
+        )
+        async with self.engine.create_connection(self.parameters, options) as conn:
+            explorer = self.engine.create_explorer(conn)
+            await explorer.synchronize(module=tables)
 
 
 @unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")

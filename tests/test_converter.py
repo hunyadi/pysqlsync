@@ -342,6 +342,7 @@ class TestConverter(unittest.TestCase):
         self.assertTrue(module_to_code(module))
 
     def test_mutate(self) -> None:
+        self.maxDiff = None
         source = module_to_catalog(
             tables,
             options=DataclassConverterOptions(
@@ -401,7 +402,8 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(
             Mutator().mutate_catalog_stmt(source, target),
             'ALTER TABLE "public"."UserTable"\n'
-            """ADD COLUMN "social_url" text NOT NULL DEFAULT 'https://community.canvaslms.com/',\n"""
+            """ADD COLUMN "social_url" text NOT NULL DEFAULT 'https://community.canvaslms.com/';\n"""
+            'ALTER TABLE "public"."UserTable"\n'
             'ALTER COLUMN "created_at" SET DEFAULT CURRENT_TIMESTAMP(),\n'
             'ALTER COLUMN "short_name" DROP NOT NULL,\n'
             'ALTER COLUMN "homepage_url" SET NOT NULL,\n'

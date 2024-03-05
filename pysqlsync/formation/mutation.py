@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..model.data_types import constant
+from ..model.data_types import SqlUserDefinedType, constant, quote
 from ..model.id_types import SupportsName
 from .object_types import (
     Catalog,
@@ -92,6 +92,32 @@ class Mutator:
         else:
             return None
 
+    def migrate_column_stmt(
+        self, source_table: Table, source: Column, target_table: Table, target: Column
+    ) -> Optional[str]:
+        return None
+
+    def is_column_migrated(self, source: Column, target: Column) -> bool:
+        if source == target or source.data_type == target.data_type:
+            return False
+
+        is_user_source = isinstance(source.data_type, SqlUserDefinedType)
+        is_user_target = isinstance(target.data_type, SqlUserDefinedType)
+
+        if is_user_source and is_user_target:
+            raise ColumnFormationError(
+                "operation not permitted; cannot migrate data between two different user-defined types",
+                source.name,
+            )
+        elif is_user_source and not is_user_target:
+            return True
+        elif not is_user_source and is_user_target:
+            raise ColumnFormationError(
+                "operation not permitted; cannot migrate data to a user-defined type",
+                source.name,
+            )
+        return False
+
     def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
         if source == target:
             return None
@@ -124,44 +150,85 @@ class Mutator:
     def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
         self.check_identity(source, target)
 
-        statements: list[str] = []
+        statements: list[Optional[str]] = []
+
+        create_columns = list(target.columns.difference(source.columns))
+        common_columns = list(source.columns.intersection(target.columns))
+        drop_columns = list(source.columns.difference(target.columns))
+        migrated_columns: list[tuple[Column, Column]] = []
+
+        # accumulate object creation statements
+        create_stmts: list[str] = []
+
+        # rename conflicting columns
         try:
-            statements.extend(
-                column.create_stmt()
-                for column in target.columns.difference(source.columns)
-            )
+            for pair in common_columns:
+                source_column, target_column = pair
+                if self.is_column_migrated(source_column, target_column):
+                    statements.append(
+                        source.alter_table_stmt([source_column.soft_drop_stmt()])
+                    )
+                    create_stmts.append(target_column.create_stmt())
+                    migrated_columns.append(pair)
+        except ColumnFormationError as e:
+            raise TableFormationError(
+                "failed to migrate columns in table", target.name
+            ) from e
+
+        # create new columns
+        try:
+            create_stmts.extend(column.create_stmt() for column in create_columns)
         except ColumnFormationError as e:
             raise TableFormationError(
                 "failed to create columns in table", target.name
             ) from e
 
+        if create_stmts:
+            statements.append(source.alter_table_stmt(create_stmts))
+
+        # accumulate object mutation statements
+        alter_stmts: list[Optional[str]] = []
+
+        # migrate data when data type changes
         try:
-            common_columns = source.columns.intersection(target.columns)
+            for source_column, target_column in migrated_columns:
+                statements.append(
+                    self.migrate_column_stmt(
+                        source, source_column, target, target_column
+                    )
+                )
+                alter_stmts.append(source_column.hard_drop_stmt())
+        except ColumnFormationError as e:
+            raise TableFormationError(
+                "failed to migrate columns in table", target.name
+            ) from e
+
+        # mutate existing columns as necessary
+        try:
             for source_column, target_column in common_columns:
-                statement = self.mutate_column_stmt(source_column, target_column)
-                if statement:
-                    statements.append(statement)
+                alter_stmts.append(
+                    self.mutate_column_stmt(source_column, target_column)
+                )
         except ColumnFormationError as e:
             raise TableFormationError(
                 "failed to update columns in table", target.name
             ) from e
 
+        # remove deleted columns
         try:
-            statements.extend(
-                column.drop_stmt()
-                for column in source.columns.difference(target.columns)
-            )
+            alter_stmts.extend(column.drop_stmt() for column in drop_columns)
         except ColumnFormationError as e:
             raise TableFormationError(
                 "failed to drop columns in table", target.name
             ) from e
 
-        statements.extend(
+        alter_stmts.extend(
             f"DROP CONSTRAINT {constraint.name}"
             for constraint in source.constraints.difference(target.constraints)
             if constraint.is_alter_table()
         )
 
+        # remove outdated constraints
         common_constraints = source.constraints.intersection(target.constraints)
         for source_constraint, target_constraint in common_constraints:
             if source_constraint != target_constraint:
@@ -170,16 +237,18 @@ class Mutator:
                     target.name,
                 )
 
-        statements.extend(
+        # add new constraints
+        alter_stmts.extend(
             f"ADD CONSTRAINT {constraint.spec}"
             for constraint in target.constraints.difference(source.constraints)
             if constraint.is_alter_table()
         )
 
-        if statements:
-            return source.alter_table_stmt(statements)
-        else:
-            return None
+        stmts = [s for s in alter_stmts if s is not None]
+        if stmts:
+            statements.append(source.alter_table_stmt(stmts))
+
+        return join_or_none(statements)
 
     def mutate_namespace_stmt(
         self, source: Namespace, target: Namespace
@@ -188,31 +257,56 @@ class Mutator:
 
         statements: StatementList = StatementList()
 
-        # create new objects
-        enum_create = target.enums.difference(source.enums)
-        statements.extend(enum.create_stmt() for enum in enum_create)
+        # identify objects to create
+        enum_create = list(target.enums.difference(source.enums))
+        struct_create = list(target.structs.difference(source.structs))
+        table_create = list(target.tables.difference(source.tables))
 
-        struct_create = target.structs.difference(source.structs)
+        # identify objects to drop
+        enum_drop = list(source.enums.difference(target.enums))
+        struct_drop = list(source.structs.difference(target.structs))
+        table_drop = list(source.tables.difference(target.tables))
+        enum_soft_deleted: list[EnumType] = []
+
+        # create new objects
+        statements.extend(enum.create_stmt() for enum in enum_create)
         statements.extend(struct.create_stmt() for struct in struct_create)
 
-        table_create = target.tables.difference(source.tables)
+        for enum_type in enum_drop:
+            for table in table_create:
+                if enum_type.name != table.name:
+                    continue
+                statements.append(enum_type.soft_drop_stmt())
+                enum_soft_deleted.append(enum_type)
+
         statements.extend(table.create_stmt() for table in table_create)
         statements.extend(table.add_constraints_stmt() for table in table_create)
 
+        # populate new objects with data
+        for enum_type in enum_drop:
+            for table in table_create:
+                if enum_type.name != table.name:
+                    continue
+
+                enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
+                statements.append(
+                    f'INSERT INTO {table.name} ("value") VALUES {enum_values};'
+                )
+
         # mutate existing object
-        enum_mutate = source.enums.intersection(target.enums)
+        enum_mutate = list(source.enums.intersection(target.enums))
         statements.extend(
             self.mutate_enum_stmt(source_enum, target_enum)
             for source_enum, target_enum in enum_mutate
         )
 
-        struct_mutate = source.structs.intersection(target.structs)
+        struct_mutate = list(source.structs.intersection(target.structs))
         statements.extend(
             self.mutate_struct_stmt(source_struct, target_struct)
             for source_struct, target_struct in struct_mutate
         )
 
-        table_mutate = source.tables.intersection(target.tables)
+        table_mutate = list(source.tables.intersection(target.tables))
         statements.extend(
             self.mutate_table_stmt(source_table, target_table)
             for source_table, target_table in table_mutate
@@ -220,16 +314,18 @@ class Mutator:
 
         # drop old objects
         if self.options.allow_drop_table:
-            table_drop = source.tables.difference(target.tables)
             statements.extend(table.drop_stmt() for table in table_drop)
 
         if self.options.allow_drop_struct:
-            struct_drop = source.structs.difference(target.structs)
             statements.extend(struct.drop_stmt() for struct in struct_drop)
 
         if self.options.allow_drop_enum:
-            enum_drop = source.enums.difference(target.enums)
-            statements.extend(enum.drop_stmt() for enum in enum_drop)
+            for enum_type in enum_drop:
+                statements.append(
+                    enum_type.hard_drop_stmt()
+                    if enum_type in enum_soft_deleted
+                    else enum_type.drop_stmt()
+                )
 
         return join_or_none(statements)
 

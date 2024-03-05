@@ -2,16 +2,30 @@ from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import (
+    Column,
     StatementList,
     StructType,
     Table,
+    deleted,
     join_or_none,
 )
+from pysqlsync.model.id_types import LocalId
 
 from .object_types import sql_quoted_string
 
 
 class PostgreSQLMutator(Mutator):
+    def migrate_column_stmt(
+        self, source_table: Table, source: Column, target_table: Table, target: Column
+    ) -> Optional[str]:
+        ref = target_table.get_constraint(target.name)
+        return (
+            f"UPDATE {source_table.name} data_table\n"
+            f'SET {target.name} = enum_table."id"\n'
+            f"FROM {ref.table} enum_table\n"
+            f'WHERE data_table.{LocalId(deleted(source.name.id))}::VARCHAR = enum_table."value";'
+        )
+
     def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
         statements: StatementList = StatementList()
         statements.append(super().mutate_table_stmt(source, target))

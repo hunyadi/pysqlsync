@@ -52,14 +52,15 @@ class SupportsQualifiedId(Protocol):
         "A fully-quoted identifier."
         ...
 
+    def rename(self, id: str) -> "SupportsQualifiedId": ...
+
 
 @runtime_checkable
 class SupportsName(Protocol):
     __slots__ = ()
 
     @abc.abstractproperty
-    def name(self) -> SupportsLocalId:
-        ...
+    def name(self) -> SupportsLocalId: ...
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,9 @@ class PrefixedId:
         else:
             return '"' + self.id.replace('"', '""') + '"'
 
+    def rename(self, id: str) -> "SupportsQualifiedId":
+        return PrefixedId(self.namespace, id)
+
     def __str__(self) -> str:
         "Quotes a qualified identifier to be embedded in a SQL statement."
 
@@ -151,6 +155,9 @@ class QualifiedId:
         else:
             return '"' + self.id.replace('"', '""') + '"'
 
+    def rename(self, id: str) -> "SupportsQualifiedId":
+        return QualifiedId(self.namespace, id)
+
     def __str__(self) -> str:
         "Quotes a qualified identifier to be embedded in a SQL statement."
 
@@ -176,6 +183,9 @@ class GlobalId:
     @property
     def quoted_id(self) -> str:
         return self.id
+
+    def rename(self, id: str) -> "SupportsQualifiedId":
+        return GlobalId(id)
 
     def __str__(self) -> str:
         return self.id

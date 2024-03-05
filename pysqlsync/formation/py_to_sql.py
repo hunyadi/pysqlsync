@@ -314,6 +314,10 @@ class DataclassConverter:
         else:
             return PrefixedId(mapped_name, object_name)
 
+    def create_qualified_prefix(self, cls: type) -> str:
+        id = self.create_qualified_id(cls.__module__, cls.__name__)
+        return id.compact_id.replace(".", "_")
+
     def simple_type_to_sql_data_type(self, typ: TypeLike) -> SqlDataType:
         substitute = self.options.substitutions.get(typ)
         if substitute is not None:
@@ -604,11 +608,13 @@ class DataclassConverter:
         if self.options.foreign_constraints:
             constraints.extend(self.dataclass_to_constraints(cls))
 
+        table_name = self.create_qualified_prefix(cls)
+
         # relationships for extensible enumeration types ignore foreign constraints option and always create a foreign key
         for enum_field in dataclass_extensible_enum_fields(cls):
             constraints.append(
                 ForeignConstraint(
-                    LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                    LocalId(f"fk_{table_name}_{enum_field.name}"),
                     (LocalId(enum_field.name),),
                     ConstraintReference(
                         self.create_qualified_id(
@@ -624,7 +630,7 @@ class DataclassConverter:
             for enum_field in dataclass_enum_fields(cls):
                 constraints.append(
                     ForeignConstraint(
-                        LocalId(f"fk_{cls.__name__}_{enum_field.name}"),
+                        LocalId(f"fk_{table_name}_{enum_field.name}"),
                         (LocalId(enum_field.name),),
                         ConstraintReference(
                             self.create_qualified_id(
@@ -640,7 +646,7 @@ class DataclassConverter:
                 enum_values = ", ".join(constant(e.value) for e in enum_field.type)
                 constraints.append(
                     CheckConstraint(
-                        LocalId(f"ch_{cls.__name__}_{enum_field.name}"),
+                        LocalId(f"ch_{table_name}_{enum_field.name}"),
                         f"{LocalId(enum_field.name)} IN ({enum_values})",
                     ),
                 )
@@ -660,12 +666,14 @@ class DataclassConverter:
 
         constraints: list[Constraint] = []
 
+        table_name = self.create_qualified_prefix(cls)
+
         for field in dataclass_fields(cls):
             props = get_field_properties(field.type)
             if props.is_unique:
                 constraints.append(
                     UniqueConstraint(
-                        LocalId(f"uq_{cls.__name__}_{field.name}"),
+                        LocalId(f"uq_{table_name}_{field.name}"),
                         (LocalId(field.name),),
                     )
                 )
@@ -676,7 +684,7 @@ class DataclassConverter:
                     # foreign keys
                     constraints.append(
                         ForeignConstraint(
-                            LocalId(f"fk_{cls.__name__}_{field.name}"),
+                            LocalId(f"fk_{table_name}_{field.name}"),
                             (LocalId(field.name),),
                             ConstraintReference(
                                 self.create_qualified_id(
@@ -696,7 +704,7 @@ class DataclassConverter:
                         # discriminated keys
                         constraints.append(
                             DiscriminatedConstraint(
-                                LocalId(f"dk_{cls.__name__}_{field.name}"),
+                                LocalId(f"dk_{table_name}_{field.name}"),
                                 (LocalId(field.name),),
                                 [
                                     ConstraintReference(
@@ -867,8 +875,11 @@ class DataclassConverter:
                 else:
                     raise TypeError(f"unrecognized join relation type: {item_type}")
 
-                join_left_name = f"{entity.__name__}_{field.name}"
-                join_right_name = f"{item_type.__name__}_{primary_right_name.id}"
+                join_left_id = self.create_qualified_prefix(entity)
+                join_right_id = self.create_qualified_prefix(item_type)
+
+                join_left_name = f"{join_left_id}_{field.name}"
+                join_right_name = f"{join_right_id}_{primary_right_name.id}"
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
                     self.options.factory.table_class(
