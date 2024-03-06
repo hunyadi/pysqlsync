@@ -277,19 +277,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
 
             await conn.drop_objects()
 
-
-@unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
-class TestOracleSynchronize(OracleBase, TestSynchronize):
-    pass
-
-
-@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
-class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
-    async def test_enum_migration(self) -> None:
-        options = GeneratorOptions(
-            enum_mode=EnumMode.TYPE,
-            namespaces={tables: "sample"},
-        )
+    async def enum_migration(self, options: GeneratorOptions) -> None:
         async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
@@ -303,6 +291,21 @@ class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
             await explorer.synchronize(module=tables)
 
 
+@unittest.skipUnless(has_env_var("ORACLE"), "Oracle tests are disabled")
+class TestOracleSynchronize(OracleBase, TestSynchronize):
+    pass
+
+
+@unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
+class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
+    async def test_enum_migration(self) -> None:
+        options = GeneratorOptions(
+            enum_mode=EnumMode.TYPE,
+            namespaces={tables: "sample"},
+        )
+        await self.enum_migration(options)
+
+
 @unittest.skipUnless(has_env_var("MSSQL"), "Microsoft SQL tests are disabled")
 class TestMSSQLSynchronize(MSSQLBase, TestSynchronize):
     pass
@@ -310,7 +313,12 @@ class TestMSSQLSynchronize(MSSQLBase, TestSynchronize):
 
 @unittest.skipUnless(has_env_var("MYSQL"), "MySQL tests are disabled")
 class TestMySQLSynchronize(MySQLBase, TestSynchronize):
-    pass
+    async def test_enum_migration(self) -> None:
+        options = GeneratorOptions(
+            enum_mode=EnumMode.INLINE,
+            namespaces={tables: "sample"},
+        )
+        await self.enum_migration(options)
 
 
 del TestSynchronize

@@ -2,13 +2,38 @@ import typing
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import Column, StatementList, Table, join_or_none
-from pysqlsync.model.data_types import quote
+from pysqlsync.formation.object_types import (
+    Column,
+    StatementList,
+    Table,
+    deleted,
+    join_or_none,
+)
+from pysqlsync.model.data_types import SqlEnumType, quote
+from pysqlsync.model.id_types import LocalId
 
 from .object_types import MySQLColumn, MySQLTable
 
 
 class MySQLMutator(Mutator):
+    def migrate_column_stmt(
+        self, source_table: Table, source: Column, target_table: Table, target: Column
+    ) -> Optional[str]:
+        statements: list[str] = []
+        ref = target_table.get_constraint(target.name)
+        if isinstance(source.data_type, SqlEnumType):
+            enum_values = ", ".join(f"({quote(v)})" for v in source.data_type.values)
+            statements.append(
+                f'INSERT INTO {ref.table} ("value") VALUES {enum_values}\n'
+                'ON DUPLICATE KEY UPDATE "value" = "value";'
+            )
+        statements.append(
+            f"UPDATE {source_table.name} data_table\n"
+            f'JOIN {ref.table} enum_table ON data_table.{LocalId(deleted(source.name.id))} = enum_table."value"\n'
+            f'SET data_table.{target.name} = enum_table."id";'
+        )
+        return "\n".join(statements)
+
     def mutate_table_stmt(
         self, source_table: Table, target_table: Table
     ) -> Optional[str]:

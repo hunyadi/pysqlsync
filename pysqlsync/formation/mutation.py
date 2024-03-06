@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..model.data_types import SqlUserDefinedType, constant, quote
+from ..model.data_types import SqlEnumType, SqlUserDefinedType, constant, quote
 from ..model.id_types import SupportsName
 from .object_types import (
     Catalog,
@@ -101,19 +101,19 @@ class Mutator:
         if source == target or source.data_type == target.data_type:
             return False
 
-        is_user_source = isinstance(source.data_type, SqlUserDefinedType)
-        is_user_target = isinstance(target.data_type, SqlUserDefinedType)
+        is_user_source = isinstance(source.data_type, (SqlEnumType, SqlUserDefinedType))
+        is_user_target = isinstance(target.data_type, (SqlEnumType, SqlUserDefinedType))
 
         if is_user_source and is_user_target:
             raise ColumnFormationError(
-                "operation not permitted; cannot migrate data between two different user-defined types",
+                "operation not permitted; cannot migrate data between two different user-defined or enumeration types",
                 source.name,
             )
         elif is_user_source and not is_user_target:
             return True
         elif not is_user_source and is_user_target:
             raise ColumnFormationError(
-                "operation not permitted; cannot migrate data to a user-defined type",
+                "operation not permitted; cannot migrate data to a user-defined or enumeration type",
                 source.name,
             )
         return False

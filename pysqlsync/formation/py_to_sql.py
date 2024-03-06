@@ -115,7 +115,8 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
         raise TypeError(
             f"inconsistent enumeration value types for type {enum_type.__name__}: {value_types}"
         )
-    return value_types.pop()
+    value_type = value_types.pop()
+    return value_type if value_type is not str else ENUM_LABEL_TYPE
 
 
 def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
