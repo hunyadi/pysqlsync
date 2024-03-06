@@ -41,6 +41,7 @@ class PostgreSQLGenerator(BaseGenerator):
                 enum_mode=options.enum_mode or EnumMode.TYPE,
                 struct_mode=options.struct_mode or StructMode.TYPE,
                 array_mode=options.array_mode or ArrayMode.ARRAY,
+                unique_constraint_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
                 substitutions={

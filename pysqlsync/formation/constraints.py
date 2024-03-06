@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from ..model.id_types import LocalId, SupportsQualifiedId
 from .object_types import ConstraintReference, ForeignConstraint, UniqueConstraint

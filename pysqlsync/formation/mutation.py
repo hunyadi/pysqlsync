@@ -101,21 +101,15 @@ class Mutator:
         if source == target or source.data_type == target.data_type:
             return False
 
-        is_user_source = isinstance(source.data_type, (SqlEnumType, SqlUserDefinedType))
-        is_user_target = isinstance(target.data_type, (SqlEnumType, SqlUserDefinedType))
-
-        if is_user_source and is_user_target:
-            raise ColumnFormationError(
-                "operation not permitted; cannot migrate data between two different user-defined or enumeration types",
-                source.name,
-            )
-        elif is_user_source and not is_user_target:
+        is_user_enum_source = isinstance(
+            source.data_type, (SqlEnumType, SqlUserDefinedType)
+        )
+        is_user_enum_target = isinstance(
+            target.data_type, (SqlEnumType, SqlUserDefinedType)
+        )
+        if is_user_enum_source and not is_user_enum_target:
             return True
-        elif not is_user_source and is_user_target:
-            raise ColumnFormationError(
-                "operation not permitted; cannot migrate data to a user-defined or enumeration type",
-                source.name,
-            )
+
         return False
 
     def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:

@@ -272,8 +272,10 @@ class DataclassConverterOptions:
 
     :param enum_mode: Conversion mode for enumeration types.
     :param struct_mode: Conversion mode for structure types that are not entities.
+    :param array_mode: Conversion mode for array types.
     :param extra_numeric_types: Whether to use extra numeric types like `int1` or `uint4`.
     :param qualified_names: Whether to use fully qualified names (True) or string-prefixed names (False).
+    :param unique_constraint_names: Whether to generate constraint names that are globally unique.
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
     :param substitutions: SQL type to be substituted for a specific Python type.
@@ -286,6 +288,7 @@ class DataclassConverterOptions:
     array_mode: ArrayMode = ArrayMode.ARRAY
     extra_numeric_types: bool = False
     qualified_names: bool = True
+    unique_constraint_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     foreign_constraints: bool = True
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
@@ -316,8 +319,23 @@ class DataclassConverter:
             return PrefixedId(mapped_name, object_name)
 
     def create_qualified_prefix(self, cls: type) -> str:
-        id = self.create_qualified_id(cls.__module__, cls.__name__)
-        return id.compact_id.replace(".", "_")
+        if self.options.unique_constraint_names:
+            id = self.create_qualified_id(cls.__module__, cls.__name__)
+            return id.compact_id.replace(".", "_")
+        else:
+            return cls.__name__
+
+    def create_foreign_key_name(self, cls: type, field: str) -> str:
+        return f"fk_{self.create_qualified_prefix(cls)}_{field}"
+
+    def create_discriminated_key_name(self, cls: type, field: str) -> str:
+        return f"dk_{self.create_qualified_prefix(cls)}_{field}"
+
+    def create_unique_key_name(self, cls: type, field: str) -> str:
+        return f"uq_{self.create_qualified_prefix(cls)}_{field}"
+
+    def create_check_name(self, cls: type, field: str) -> str:
+        return f"ch_{self.create_qualified_prefix(cls)}_{field}"
 
     def simple_type_to_sql_data_type(self, typ: TypeLike) -> SqlDataType:
         substitute = self.options.substitutions.get(typ)
@@ -609,13 +627,11 @@ class DataclassConverter:
         if self.options.foreign_constraints:
             constraints.extend(self.dataclass_to_constraints(cls))
 
-        table_name = self.create_qualified_prefix(cls)
-
         # relationships for extensible enumeration types ignore foreign constraints option and always create a foreign key
         for enum_field in dataclass_extensible_enum_fields(cls):
             constraints.append(
                 ForeignConstraint(
-                    LocalId(f"fk_{table_name}_{enum_field.name}"),
+                    LocalId(self.create_foreign_key_name(cls, enum_field.name)),
                     (LocalId(enum_field.name),),
                     ConstraintReference(
                         self.create_qualified_id(
@@ -631,7 +647,7 @@ class DataclassConverter:
             for enum_field in dataclass_enum_fields(cls):
                 constraints.append(
                     ForeignConstraint(
-                        LocalId(f"fk_{table_name}_{enum_field.name}"),
+                        LocalId(self.create_foreign_key_name(cls, enum_field.name)),
                         (LocalId(enum_field.name),),
                         ConstraintReference(
                             self.create_qualified_id(
@@ -647,7 +663,7 @@ class DataclassConverter:
                 enum_values = ", ".join(constant(e.value) for e in enum_field.type)
                 constraints.append(
                     CheckConstraint(
-                        LocalId(f"ch_{table_name}_{enum_field.name}"),
+                        LocalId(self.create_check_name(cls, enum_field.name)),
                         f"{LocalId(enum_field.name)} IN ({enum_values})",
                     ),
                 )
@@ -667,14 +683,12 @@ class DataclassConverter:
 
         constraints: list[Constraint] = []
 
-        table_name = self.create_qualified_prefix(cls)
-
         for field in dataclass_fields(cls):
             props = get_field_properties(field.type)
             if props.is_unique:
                 constraints.append(
                     UniqueConstraint(
-                        LocalId(f"uq_{table_name}_{field.name}"),
+                        LocalId(self.create_unique_key_name(cls, field.name)),
                         (LocalId(field.name),),
                     )
                 )
@@ -685,7 +699,7 @@ class DataclassConverter:
                     # foreign keys
                     constraints.append(
                         ForeignConstraint(
-                            LocalId(f"fk_{table_name}_{field.name}"),
+                            LocalId(self.create_foreign_key_name(cls, field.name)),
                             (LocalId(field.name),),
                             ConstraintReference(
                                 self.create_qualified_id(
@@ -705,7 +719,9 @@ class DataclassConverter:
                         # discriminated keys
                         constraints.append(
                             DiscriminatedConstraint(
-                                LocalId(f"dk_{table_name}_{field.name}"),
+                                LocalId(
+                                    self.create_discriminated_key_name(cls, field.name)
+                                ),
                                 (LocalId(field.name),),
                                 [
                                     ConstraintReference(
