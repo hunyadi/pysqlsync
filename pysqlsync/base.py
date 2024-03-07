@@ -111,6 +111,7 @@ class GeneratorOptions:
     :param struct_mode: Conversion mode for composite types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
+    :param initialize_tables: Whether to populate special tables (e.g. enumerations) with data.
     :param synchronization: Synchronization options.
     :param skip_annotations: Annotation classes to ignore on table column types.
     """
@@ -122,6 +123,7 @@ class GeneratorOptions:
         default_factory=dict
     )
     foreign_constraints: bool = True
+    initialize_tables: bool = False
     synchronization: MutatorOptions = dataclasses.field(default_factory=MutatorOptions)
     skip_annotations: tuple[type, ...] = ()
 
@@ -157,12 +159,10 @@ class BaseGenerator(abc.ABC):
         self.state = Catalog([])
 
     @overload
-    def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]:
-        ...
+    def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]: ...
 
     @overload
-    def create(self, *, modules: list[types.ModuleType]) -> Optional[str]:
-        ...
+    def create(self, *, modules: list[types.ModuleType]) -> Optional[str]: ...
 
     def create(
         self,
@@ -500,12 +500,10 @@ class BaseConnection(abc.ABC):
         await self.close()
 
     @abc.abstractmethod
-    async def open(self) -> "BaseContext":
-        ...
+    async def open(self) -> "BaseContext": ...
 
     @abc.abstractmethod
-    async def close(self) -> None:
-        ...
+    async def close(self) -> None: ...
 
 
 class BaseContext(abc.ABC):
@@ -628,12 +626,10 @@ class BaseContext(abc.ABC):
         return self.connection.generator.get_qualified_id(ref)
 
     @overload
-    def get_table(self, __ref: ClassRef) -> Table:
-        ...
+    def get_table(self, __ref: ClassRef) -> Table: ...
 
     @overload
-    def get_table(self, __table: type[DataclassInstance]) -> Table:
-        ...
+    def get_table(self, __table: type[DataclassInstance]) -> Table: ...
 
     def get_table(
         self, __table_or_ref: Union[ClassRef, type[DataclassInstance]]
@@ -1049,22 +1045,18 @@ class Explorer(abc.ABC):
         return QualifiedId(namespace, id)
 
     @abc.abstractmethod
-    async def get_table_names(self) -> list[QualifiedId]:
-        ...
+    async def get_table_names(self) -> list[QualifiedId]: ...
 
     @abc.abstractmethod
-    async def has_table(self, table_id: SupportsQualifiedId) -> bool:
-        ...
+    async def has_table(self, table_id: SupportsQualifiedId) -> bool: ...
 
     @abc.abstractmethod
     async def has_column(
         self, table_id: SupportsQualifiedId, column_id: LocalId
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
     @abc.abstractmethod
-    async def get_table(self, table_id: SupportsQualifiedId) -> Table:
-        ...
+    async def get_table(self, table_id: SupportsQualifiedId) -> Table: ...
 
     @abc.abstractmethod
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
@@ -1077,12 +1069,10 @@ class Explorer(abc.ABC):
         ...
 
     @overload
-    async def discover(self, *, module: types.ModuleType) -> None:
-        ...
+    async def discover(self, *, module: types.ModuleType) -> None: ...
 
     @overload
-    async def discover(self, *, modules: list[types.ModuleType]) -> None:
-        ...
+    async def discover(self, *, modules: list[types.ModuleType]) -> None: ...
 
     async def discover(
         self,
@@ -1124,12 +1114,10 @@ class Explorer(abc.ABC):
         LOGGER.debug(f"discovered state:\n{str(generator.state)}")
 
     @overload
-    async def synchronize(self, *, module: types.ModuleType) -> None:
-        ...
+    async def synchronize(self, *, module: types.ModuleType) -> None: ...
 
     @overload
-    async def synchronize(self, *, modules: list[types.ModuleType]) -> None:
-        ...
+    async def synchronize(self, *, modules: list[types.ModuleType]) -> None: ...
 
     async def synchronize(
         self,
@@ -1177,20 +1165,16 @@ class BaseEngine(abc.ABC):
     "Represents a specific database server type."
 
     @abc.abstractproperty
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     @abc.abstractmethod
-    def get_generator_type(self) -> type[BaseGenerator]:
-        ...
+    def get_generator_type(self) -> type[BaseGenerator]: ...
 
     @abc.abstractmethod
-    def get_connection_type(self) -> type[BaseConnection]:
-        ...
+    def get_connection_type(self) -> type[BaseConnection]: ...
 
     @abc.abstractmethod
-    def get_explorer_type(self) -> type[Explorer]:
-        ...
+    def get_explorer_type(self) -> type[Explorer]: ...
 
     def create_connection(
         self, params: ConnectionParameters, options: Optional[GeneratorOptions] = None

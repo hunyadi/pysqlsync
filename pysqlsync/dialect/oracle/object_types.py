@@ -1,6 +1,6 @@
 import re
 
-from pysqlsync.formation.object_types import Column, ObjectFactory, Table
+from pysqlsync.formation.object_types import Column, EnumTable, ObjectFactory, Table
 from pysqlsync.model.data_types import SqlTimestampType
 
 
@@ -43,6 +43,10 @@ class OracleTable(Table):
         )
 
 
+class OracleEnumTable(EnumTable, OracleTable):
+    pass
+
+
 class OracleObjectFactory(ObjectFactory):
     @property
     def column_class(self) -> type[Column]:
@@ -51,3 +55,7 @@ class OracleObjectFactory(ObjectFactory):
     @property
     def table_class(self) -> type[Table]:
         return OracleTable
+
+    @property
+    def enum_table_class(self) -> type[EnumTable]:
+        return OracleEnumTable

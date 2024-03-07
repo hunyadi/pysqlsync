@@ -44,6 +44,7 @@ class PostgreSQLGenerator(BaseGenerator):
                 unique_constraint_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
+                initialize_tables=options.initialize_tables,
                 substitutions={
                     JsonType: PostgreSQLJsonType(),
                 },

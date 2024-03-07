@@ -47,6 +47,10 @@ class Mutator:
         if source.name != target.name:
             raise FormationError(f"object mismatch: {source.name} != {target.name}")
 
+    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> Optional[str]:
+        enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
+        return f'INSERT INTO {table.name} ("value") VALUES {enum_values};'
+
     def mutate_enum_stmt(self, source: EnumType, target: EnumType) -> Optional[str]:
         self.check_identity(source, target)
 
@@ -282,10 +286,7 @@ class Mutator:
                 if enum_type.name != table.name:
                     continue
 
-                enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
-                statements.append(
-                    f'INSERT INTO {table.name} ("value") VALUES {enum_values};'
-                )
+                statements.append(self.migrate_enum_stmt(enum_type, table))
 
         # mutate existing object
         enum_mutate = list(source.enums.intersection(target.enums))

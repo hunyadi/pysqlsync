@@ -54,6 +54,7 @@ class RedshiftGenerator(BaseGenerator):
                 array_mode=options.array_mode or ArrayMode.JSON,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=False,
+                initialize_tables=options.initialize_tables,
                 substitutions={
                     uuid.UUID: RedshiftVariableBinaryType(16),
                     JsonType: SqlVariableCharacterType(),

@@ -56,6 +56,7 @@ class MySQLGenerator(BaseGenerator):
                 qualified_names=False,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
+                initialize_tables=options.initialize_tables,
                 substitutions={
                     bool: SqlIntegerType(1),
                     datetime.datetime: MySQLDateTimeType(),

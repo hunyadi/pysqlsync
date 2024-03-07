@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import decimal
 import enum
+import inspect
 import ipaddress
 import sys
 import types
@@ -278,6 +279,7 @@ class DataclassConverterOptions:
     :param unique_constraint_names: Whether to generate constraint names that are globally unique.
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
+    :param initialize_tables: Whether to populate special tables (e.g. enumerations) with data.
     :param substitutions: SQL type to be substituted for a specific Python type.
     :param factory: Creates new column, table, struct and namespace instances.
     :param skip_annotations: Annotation classes to ignore on table column types.
@@ -291,6 +293,7 @@ class DataclassConverterOptions:
     unique_constraint_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     foreign_constraints: bool = True
+    initialize_tables: bool = False
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     factory: ObjectFactory = dataclasses.field(default_factory=ObjectFactory)
     skip_annotations: tuple[type, ...] = ()
@@ -408,6 +411,8 @@ class DataclassConverter:
             substitute = self.options.substitutions.get(unadorned_type)
             if substitute is not None:
                 sql_type = copy.copy(substitute)
+            elif unadorned_type is int:
+                sql_type = SqlIntegerType(8)
             elif unadorned_type is str:
                 sql_type = SqlVariableCharacterType()
             elif unadorned_type is float:
@@ -668,6 +673,16 @@ class DataclassConverter:
                     ),
                 )
 
+        for column in columns:
+            check_constraint = self.create_check_constraint(column)
+            if check_constraint:
+                constraints.append(
+                    CheckConstraint(
+                        LocalId(self.create_check_name(cls, column.name.id)),
+                        check_constraint,
+                    ),
+                )
+
         return self.options.factory.table_class(
             name=self.create_qualified_id(cls.__module__, cls.__name__),
             columns=columns,
@@ -675,6 +690,19 @@ class DataclassConverter:
             constraints=constraints or None,
             description=doc.full_description,
         )
+
+    def create_check_constraint(self, column: Column) -> Optional[str]:
+        conditions: list[str] = []
+        data_type = column.data_type
+        if isinstance(data_type, SqlIntegerType):
+            if data_type.minimum is not None:
+                conditions.append(f"{column.name} >= {data_type.minimum}")
+            if data_type.maximum is not None:
+                conditions.append(f"{column.name} <= {data_type.maximum}")
+        if conditions:
+            return " AND ".join(f"({c})" for c in conditions)
+        else:
+            return None
 
     def dataclass_to_constraints(
         self, cls: type[DataclassInstance]
@@ -776,34 +804,50 @@ class DataclassConverter:
 
     def _enum_table(self, enum_type: type[enum.Enum]) -> Table:
         enum_table_name = enum_type.__name__
-        return self.options.factory.table_class(
-            self.create_qualified_id(enum_type.__module__, enum_table_name),
-            [
-                self.options.factory.column_class(
-                    LocalId("id"),
-                    self._enumeration_key_type(),
-                    False,
-                    identity=True,
-                ),
-                self.options.factory.column_class(
-                    LocalId("value"),
-                    self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
-                    False,
-                ),
-            ],
-            primary_key=(LocalId("id"),),
-            constraints=[
-                UniqueConstraint(
-                    LocalId(f"uq_{enum_table_name}"),
-                    (LocalId("value"),),
-                )
-            ],
-        )
+        id = self.create_qualified_id(enum_type.__module__, enum_table_name)
+        columns = [
+            self.options.factory.column_class(
+                LocalId("id"),
+                self._enumeration_key_type(),
+                False,
+                identity=True,
+            ),
+            self.options.factory.column_class(
+                LocalId("value"),
+                self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
+                False,
+            ),
+        ]
+        primary_key = (LocalId("id"),)
+        constraints: list[Constraint] = [
+            UniqueConstraint(
+                LocalId(f"uq_{enum_table_name}"),
+                (LocalId("value"),),
+            )
+        ]
+        if self.options.initialize_tables:
+            return self.options.factory.enum_table_class(
+                id,
+                columns,
+                values=[str(e.value) for e in enum_type],
+                primary_key=primary_key,
+                constraints=constraints,
+            )
+        else:
+            return self.options.factory.table_class(
+                id,
+                columns,
+                primary_key=primary_key,
+                constraints=constraints,
+            )
 
     def dataclasses_to_catalog(
         self, entity_types: list[type[DataclassInstance]]
     ) -> Catalog:
         "Converts a list of Python data-class types into a database object catalog."
+
+        # omit abstract base classes
+        entity_types = [t for t in entity_types if not inspect.isabstract(t)]
 
         # collect all dependent types
         referenced_types: set[type] = set(entity_types)

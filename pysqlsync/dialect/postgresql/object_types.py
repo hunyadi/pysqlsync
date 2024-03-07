@@ -1,7 +1,13 @@
 import re
 from typing import Optional
 
-from pysqlsync.formation.object_types import Namespace, ObjectFactory, StructType, Table
+from pysqlsync.formation.object_types import (
+    EnumTable,
+    Namespace,
+    ObjectFactory,
+    StructType,
+    Table,
+)
 from pysqlsync.model.id_types import LocalId
 
 _sql_quoted_str_table = str.maketrans(
@@ -48,6 +54,10 @@ class PostgreSQLTable(Table):
         return LocalId(f"pk_{self.name.local_id.replace('.', '_')}")
 
 
+class PostgreSQLEnumTable(EnumTable, PostgreSQLTable):
+    pass
+
+
 class PostgreSQLStructType(StructType):
     def create_stmt(self) -> str:
         statements: list[str] = []
@@ -83,6 +93,10 @@ class PostgreSQLObjectFactory(ObjectFactory):
     @property
     def table_class(self) -> type[Table]:
         return PostgreSQLTable
+
+    @property
+    def enum_table_class(self) -> type[EnumTable]:
+        return PostgreSQLEnumTable
 
     @property
     def struct_class(self) -> type[StructType]:

@@ -3,18 +3,24 @@ from typing import Optional
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import (
     Column,
+    EnumType,
     StatementList,
     StructType,
     Table,
     deleted,
     join_or_none,
 )
+from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId
 
 from .object_types import sql_quoted_string
 
 
 class PostgreSQLMutator(Mutator):
+    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> Optional[str]:
+        enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
+        return f'INSERT INTO {table.name} ("value") VALUES {enum_values} ON CONFLICT ("value") DO NOTHING;'
+
     def migrate_column_stmt(
         self, source_table: Table, source: Column, target_table: Table, target: Column
     ) -> Optional[str]:

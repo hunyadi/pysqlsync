@@ -3,6 +3,7 @@ from typing import Optional
 
 from pysqlsync.formation.object_types import (
     Column,
+    EnumTable,
     FormationError,
     ObjectFactory,
     Table,
@@ -36,6 +37,10 @@ class MySQLTable(Table):
             else ""
         )
         return f"CREATE TABLE {self.name} (\n{definition}\n){comment};"
+
+
+class MySQLEnumTable(EnumTable, MySQLTable):
+    pass
 
 
 @dataclass(eq=True)
@@ -80,3 +85,7 @@ class MySQLObjectFactory(ObjectFactory):
     @property
     def table_class(self) -> type[Table]:
         return MySQLTable
+
+    @property
+    def enum_table_class(self) -> type[EnumTable]:
+        return MySQLEnumTable

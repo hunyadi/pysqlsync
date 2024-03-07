@@ -5,7 +5,7 @@ from typing import Iterable, Optional, overload
 
 from strong_typing.topological import topological_sort
 
-from ..model.data_types import SqlDataType, SqlUserDefinedType, constant
+from ..model.data_types import SqlDataType, SqlUserDefinedType, constant, quote
 from ..model.id_types import LocalId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
@@ -550,6 +550,36 @@ class Table(DatabaseObject, QualifiedObject):
         return [c for c in self.constraints.values() if c.is_alter_table()]
 
 
+class EnumTable(Table):
+    values: list[str]
+
+    def __init__(
+        self,
+        name: SupportsQualifiedId,
+        columns: list[Column],
+        *,
+        values: list[str],
+        primary_key: tuple[LocalId, ...],
+        constraints: Optional[list[Constraint]] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            name,
+            columns,
+            primary_key=primary_key,
+            constraints=constraints,
+            description=description,
+        )
+        self.values = values
+
+    def create_stmt(self) -> str:
+        statements: list[str] = []
+        statements.append(super().create_stmt())
+        value_list = ", ".join(f"({quote(value)})" for value in self.values)
+        statements.append(f'INSERT INTO {self.name} ("value") VALUES {value_list};')
+        return "\n".join(statements)
+
+
 @dataclass
 class Namespace(DatabaseObject):
     "A namespace that multiple objects can share. Typically corresponds to a database schema."
@@ -791,6 +821,12 @@ class ObjectFactory:
         "The object type instantiated for tables."
 
         return Table
+
+    @property
+    def enum_table_class(self) -> type[EnumTable]:
+        "The object type instantiated for tables that store enumeration values."
+
+        return EnumTable
 
     @property
     def struct_class(self) -> type[StructType]:

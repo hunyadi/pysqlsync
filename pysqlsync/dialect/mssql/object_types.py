@@ -2,6 +2,7 @@ from typing import Optional
 
 from pysqlsync.formation.object_types import (
     Column,
+    EnumTable,
     Namespace,
     ObjectFactory,
     Table,
@@ -70,6 +71,10 @@ class MSSQLTable(Table):
         return join_or_none(statements)
 
 
+class MSSQLEnumTable(EnumTable, MSSQLTable):
+    pass
+
+
 class MSSQLNamespace(Namespace):
     def create_schema_stmt(self) -> Optional[str]:
         if self.name.local_id:
@@ -87,6 +92,10 @@ class MSSQLObjectFactory(ObjectFactory):
     @property
     def table_class(self) -> type[Table]:
         return MSSQLTable
+
+    @property
+    def enum_table_class(self) -> type[EnumTable]:
+        return MSSQLEnumTable
 
     @property
     def namespace_class(self) -> type[Namespace]:

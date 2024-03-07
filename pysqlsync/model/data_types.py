@@ -3,7 +3,14 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Optional
 
-from strong_typing.auxiliary import MaxLength, Precision, Storage, TimePrecision
+from strong_typing.auxiliary import (
+    IntegerRange,
+    MaxLength,
+    Precision,
+    Signed,
+    Storage,
+    TimePrecision,
+)
 
 from .id_types import SupportsQualifiedId
 
@@ -72,6 +79,9 @@ class SqlBooleanType(SqlDataType):
 @dataclass
 class SqlIntegerType(SqlDataType):
     width: int
+    signed: bool = True
+    minimum: Optional[int] = None
+    maximum: Optional[int] = None
 
     def __str__(self) -> str:
         if self.width == 1:
@@ -84,6 +94,17 @@ class SqlIntegerType(SqlDataType):
             return "bigint"
 
         raise TypeError(f"invalid integer width: {self.width}")
+
+    def parse_meta(self, meta: Any) -> None:
+        if isinstance(meta, IntegerRange):
+            self.minimum = meta.minimum
+            self.maximum = meta.maximum
+        elif isinstance(meta, Signed):
+            self.signed = meta.is_signed
+        elif isinstance(meta, Storage):
+            self.width = meta.bytes
+        else:
+            super().parse_meta(meta)
 
 
 @dataclass

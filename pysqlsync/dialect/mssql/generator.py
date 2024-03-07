@@ -56,6 +56,7 @@ class MSSQLGenerator(BaseGenerator):
                 array_mode=options.array_mode or ArrayMode.JSON,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
+                initialize_tables=options.initialize_tables,
                 substitutions={
                     bool: MSSQLBooleanType(),
                     datetime.datetime: MSSQLDateTimeType(),

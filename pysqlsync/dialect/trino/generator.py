@@ -20,6 +20,7 @@ class TrinoGenerator(BaseGenerator):
                 array_mode=options.array_mode or ArrayMode.JSON,
                 namespaces=NamespaceMapping(options.namespaces),
                 foreign_constraints=options.foreign_constraints,
+                initialize_tables=options.initialize_tables,
                 skip_annotations=options.skip_annotations,
             )
         )
