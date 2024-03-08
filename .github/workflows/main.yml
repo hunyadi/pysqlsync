@@ -55,7 +55,7 @@ jobs:
         env:
           POSTGRES_PORT: 5432
           POSTGRES_USER: levente.hunyadi
-          POSTGRES_PASSWORD: "<YourStrong@Passw0rd>"
+          POSTGRES_PASSWORD: "<?YourStrong@Passw0rd>"
           POSTGRES_DB: levente.hunyadi
         ports:
           - 5432:5432
@@ -94,7 +94,7 @@ jobs:
       oracle:
         image: container-registry.oracle.com/database/free:latest
         env:
-          ORACLE_PWD: "<YourStrong@Passw0rd>"
+          ORACLE_PWD: "<?YourStrong@Passw0rd>"
         ports:
           - 1521:1521
         # set health checks to wait until Oracle has started
@@ -131,7 +131,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: "<YourStrong@Passw0rd>"
+          MYSQL_ROOT_PASSWORD: "<?YourStrong@Passw0rd>"
           MYSQL_DATABASE: levente_hunyadi
         ports:
           - 3306:3306
@@ -171,8 +171,8 @@ jobs:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: "<YourStrong@Passw0rd>"
-          SQLCMDPASSWORD: "<YourStrong@Passw0rd>"
+          MSSQL_SA_PASSWORD: "<?YourStrong@Passw0rd>"
+          SQLCMDPASSWORD: "<?YourStrong@Passw0rd>"
         ports:
           - 1433:1433
         # set health checks to wait until Microsoft SQL Server has started

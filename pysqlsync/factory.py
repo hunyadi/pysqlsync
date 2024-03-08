@@ -11,7 +11,7 @@ import importlib.resources
 import logging
 import re
 import typing
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from strong_typing.inspection import get_module_classes
 
@@ -66,12 +66,30 @@ def get_dialect(engine_name: str) -> BaseEngine:
 
 
 def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
-    parts = urlparse(url)
+    """
+    Extracts dialect and connection parameters from a connection string URL.
+
+    The connection string URL has the following structure:
+    ```
+    dialect://username:password@hostname:port/database
+    ```
+
+    For example,
+    ```
+    postgresql://root:%3C%3FYour%3AStrong%40Pass%2Fw0rd%3E@server.example.com:5432/public
+    ```
+
+    In the example above, dialect is `postgresql`, username is `root`, password is `<?Your:Strong@Pass/w0rd>`,
+    hostname is `server.example.com`, port is `5432` and the database name is `public`. Note how components are
+    URL-encoded (a.k.a. percent-encoded) to comply with RFC 3986.
+    """
+
+    parts = urlparse(url, allow_fragments=False)
     return parts.scheme, ConnectionParameters(
         host=parts.hostname,
         port=parts.port,
-        username=parts.username,
-        password=parts.password,
+        username=unquote(parts.username) if parts.username else None,
+        password=unquote(parts.password) if parts.password else None,
         database=parts.path.lstrip("/") if parts.path else None,
     )
 

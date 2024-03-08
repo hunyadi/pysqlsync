@@ -14,6 +14,7 @@ import logging
 import types
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union, overload
+from urllib.parse import quote
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -469,8 +470,8 @@ class ConnectionParameters:
     def __str__(self) -> str:
         host = self.host or "localhost"
         port = f":{self.port}" if self.port else ""
-        username = f"{self.username}@" if self.username else ""
-        database = f"/{self.database}" if self.database else ""
+        username = f"{quote(self.username, safe='')}@" if self.username else ""
+        database = f"/{quote(self.database, safe='')}" if self.database else ""
         return f"{username}{host}{port}{database}"
 
 

@@ -9,12 +9,10 @@ from pysqlsync.factory import get_dialect
 
 class TestEngineBase(abc.ABC):
     @abc.abstractproperty
-    def engine(self) -> BaseEngine:
-        ...
+    def engine(self) -> BaseEngine: ...
 
     @abc.abstractproperty
-    def parameters(self) -> ConnectionParameters:
-        ...
+    def parameters(self) -> ConnectionParameters: ...
 
 
 class OracleBase(TestEngineBase):
@@ -30,7 +28,7 @@ class OracleBase(TestEngineBase):
             host="localhost",
             port=1521,
             username="system",
-            password="<YourStrong@Passw0rd>",
+            password="<?YourStrong@Passw0rd>",
             database="FREEPDB1",
         )
 
@@ -48,7 +46,7 @@ class PostgreSQLBase(TestEngineBase):
             host="localhost",
             port=5432,
             username="levente.hunyadi",
-            password="<YourStrong@Passw0rd>",
+            password="<?YourStrong@Passw0rd>",
             database="levente.hunyadi",
         )
 
@@ -66,7 +64,7 @@ class MSSQLBase(TestEngineBase):
             host="127.0.0.1",
             port=None,
             username="SA",
-            password="<YourStrong@Passw0rd>",
+            password="<?YourStrong@Passw0rd>",
             database=None,
         )
 
@@ -84,7 +82,7 @@ class MySQLBase(TestEngineBase):
             host="localhost",
             port=3306,
             username="root",
-            password="<YourStrong@Passw0rd>",
+            password="<?YourStrong@Passw0rd>",
             database="levente_hunyadi",
         )
 
