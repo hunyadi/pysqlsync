@@ -9,7 +9,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Annotated, Iterable, Optional, TypeVar
+from typing import Annotated, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.auxiliary import (
     MaxLength,
@@ -120,6 +120,14 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
     return value_type if value_type is not str else ENUM_LABEL_TYPE
 
 
+def is_type_enum_list(typ: TypeLike) -> bool:
+    if not is_generic_list(typ):
+        return False
+
+    elem_type = unwrap_generic_list(typ)
+    return is_type_enum(elem_type)
+
+
 def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
     """
     True if the type represents an extensible enumeration type.
@@ -153,12 +161,13 @@ def unwrap_extensible_enum_type(typ: TypeLike, cls: type) -> type[enum.Enum]:
 
 
 def dataclass_fields_as_required(
-    cls: type[DataclassInstance],
+    cls: type[DataclassInstance], pred: Optional[Callable[[TypeLike], bool]] = None
 ) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
         props = get_field_properties(field.type)
         ref = evaluate_member_type(props.field_type, cls)
-        yield DataclassField(field.name, ref, field.default)
+        if pred is None or pred(ref):
+            yield DataclassField(field.name, ref, field.default)
 
 
 def _topological_sort(class_types: list[type]) -> list[type]:
@@ -178,22 +187,6 @@ def _topological_sort(class_types: list[type]) -> list[type]:
 class DataclassEnumField:
     name: str
     type: type[enum.Enum]
-
-
-def dataclass_enum_fields(cls: type[DataclassInstance]) -> Iterable[DataclassEnumField]:
-    for field in dataclass_fields_as_required(cls):
-        if is_type_enum(field.type):
-            yield DataclassEnumField(field.name, field.type)
-
-
-def dataclass_extensible_enum_fields(
-    cls: type[DataclassInstance],
-) -> Iterable[DataclassEnumField]:
-    for field in dataclass_fields_as_required(cls):
-        if is_extensible_enum_type(field.type, cls):
-            yield DataclassEnumField(
-                field.name, unwrap_extensible_enum_type(field.type, cls)
-            )
 
 
 class NamespaceMapping:
@@ -633,14 +626,17 @@ class DataclassConverter:
             constraints.extend(self.dataclass_to_constraints(cls))
 
         # relationships for extensible enumeration types ignore foreign constraints option and always create a foreign key
-        for enum_field in dataclass_extensible_enum_fields(cls):
+        for enum_field in dataclass_fields_as_required(
+            cls, lambda t: is_extensible_enum_type(t, cls)
+        ):
+            enum_type = unwrap_extensible_enum_type(enum_field.type, cls)
             constraints.append(
                 ForeignConstraint(
                     LocalId(self.create_foreign_key_name(cls, enum_field.name)),
                     (LocalId(enum_field.name),),
                     ConstraintReference(
                         self.create_qualified_id(
-                            enum_field.type.__module__, enum_field.type.__name__
+                            enum_type.__module__, enum_type.__name__
                         ),
                         (LocalId("id"),),
                     ),
@@ -649,7 +645,7 @@ class DataclassConverter:
 
         # relationships for enumeration types ignore foreign constraints option and always create a foreign key
         if self.options.enum_mode is EnumMode.RELATION:
-            for enum_field in dataclass_enum_fields(cls):
+            for enum_field in dataclass_fields_as_required(cls, is_type_enum):
                 constraints.append(
                     ForeignConstraint(
                         LocalId(self.create_foreign_key_name(cls, enum_field.name)),
@@ -664,7 +660,7 @@ class DataclassConverter:
                 )
 
         if self.options.enum_mode is EnumMode.CHECK:
-            for enum_field in dataclass_enum_fields(cls):
+            for enum_field in dataclass_fields_as_required(cls, is_type_enum):
                 enum_values = ", ".join(constant(e.value) for e in enum_field.type)
                 constraints.append(
                     CheckConstraint(
@@ -899,8 +895,12 @@ class DataclassConverter:
         regular_enum_types: set[type[enum.Enum]] = set()
         if self.options.enum_mode is EnumMode.RELATION:
             for entity in table_types:
-                for enum_field in dataclass_enum_fields(entity):
+                for enum_field in dataclass_fields_as_required(entity, is_type_enum):
                     regular_enum_types.add(enum_field.type)
+                for enum_field in dataclass_fields_as_required(
+                    entity, is_type_enum_list
+                ):
+                    regular_enum_types.add(unwrap_generic_list(enum_field.type))
         for enum_type in sorted(list(regular_enum_types), key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))
@@ -908,8 +908,11 @@ class DataclassConverter:
         # discover extensible enumerations
         extensible_enum_types: set[type[enum.Enum]] = set()
         for entity in table_types:
-            for enum_field in dataclass_extensible_enum_fields(entity):
-                extensible_enum_types.add(enum_field.type)
+            for enum_field in dataclass_fields_as_required(
+                entity, lambda t: is_extensible_enum_type(t, entity)
+            ):
+                enum_type = unwrap_extensible_enum_type(enum_field.type, entity)
+                extensible_enum_types.add(enum_type)
         for enum_type in sorted(list(extensible_enum_types), key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))

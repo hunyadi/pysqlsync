@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from strong_typing.inspection import DataclassInstance
 
 from pysqlsync.base import GeneratorOptions
+from pysqlsync.formation.py_to_sql import EnumMode
 from tests import tables
 from tests.params import (
     MSSQLBase,
@@ -341,6 +342,47 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'CONSTRAINT "fk_EnumTable_optional_state" FOREIGN KEY ("optional_state") REFERENCES "WorkflowState" ("id");\n'
             'ALTER TABLE "WorkflowState" ADD\n'
             'CONSTRAINT "uq_WorkflowState" UNIQUE ("value");',
+        )
+
+    def test_create_enum_array_table(self) -> None:
+        self.maxDiff = None
+        self.assertMatchSQLCreate(
+            "postgresql",
+            tables.EnumArrayTable,
+            """CREATE TYPE "WorkflowState" AS ENUM ('active', 'inactive', 'deleted');\n"""
+            'CREATE TABLE "EnumArrayTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"states" "WorkflowState" ARRAY NOT NULL,\n'
+            'CONSTRAINT "pk_EnumArrayTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        options = GeneratorOptions(
+            enum_mode=EnumMode.RELATION, namespaces={tables: None}
+        )
+        self.assertMatchSQLCreateOptions(
+            options,
+            "mysql",
+            tables.EnumArrayTable,
+            'CREATE TABLE "EnumArrayTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            'CONSTRAINT "pk_EnumArrayTable" PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "WorkflowState" (\n'
+            '"id" integer NOT NULL AUTO_INCREMENT,\n'
+            '"value" varchar(64) NOT NULL,\n'
+            'CONSTRAINT "pk_WorkflowState" PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "EnumArrayTable_states_WorkflowState" (\n'
+            '"uuid" binary(16) NOT NULL,\n'
+            '"EnumArrayTable_states" bigint NOT NULL,\n'
+            '"WorkflowState_id" integer NOT NULL,\n'
+            'CONSTRAINT "pk_EnumArrayTable_states_WorkflowState" PRIMARY KEY ("uuid")\n'
+            ");\n"
+            'ALTER TABLE "WorkflowState"\n'
+            'ADD CONSTRAINT "uq_WorkflowState" UNIQUE ("value");\n'
+            'ALTER TABLE "EnumArrayTable_states_WorkflowState"\n'
+            'ADD CONSTRAINT "jk_EnumArrayTable_states" FOREIGN KEY ("EnumArrayTable_states") REFERENCES "EnumArrayTable" ("id"),\n'
+            'ADD CONSTRAINT "jk_WorkflowState_id" FOREIGN KEY ("WorkflowState_id") REFERENCES "WorkflowState" ("id");',
         )
 
     def test_create_extensible_enum_table(self) -> None:
