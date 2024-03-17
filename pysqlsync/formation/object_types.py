@@ -1,8 +1,9 @@
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Iterable, Optional, overload
+from typing import Any, Iterable, Optional, overload
 
+from strong_typing.inspection import is_dataclass_instance
 from strong_typing.topological import topological_sort
 
 from ..model.data_types import SqlDataType, SqlUserDefinedType, constant, quote
@@ -551,14 +552,14 @@ class Table(DatabaseObject, QualifiedObject):
 
 
 class EnumTable(Table):
-    values: list[str]
+    values: list[Any]
 
     def __init__(
         self,
         name: SupportsQualifiedId,
         columns: list[Column],
         *,
-        values: list[str],
+        values: list[Any],
         primary_key: tuple[LocalId, ...],
         constraints: Optional[list[Constraint]] = None,
         description: Optional[str] = None,
@@ -575,8 +576,18 @@ class EnumTable(Table):
     def create_stmt(self) -> str:
         statements: list[str] = []
         statements.append(super().create_stmt())
-        value_list = ", ".join(f"({quote(value)})" for value in self.values)
-        statements.append(f'INSERT INTO {self.name} ("value") VALUES {value_list};')
+        column_list = ", ".join(str(col.name) for col in self.get_value_columns())
+        values: list[str] = []
+        for value in self.values:
+            if isinstance(value, tuple) or is_dataclass_instance(value):
+                values.append(constant(value))
+            else:
+                values.append(f"({constant(value)})")
+        value_list = ", ".join(values)
+
+        statements.append(
+            f"INSERT INTO {self.name} ({column_list}) VALUES {value_list};"
+        )
         return "\n".join(statements)
 
 

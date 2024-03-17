@@ -434,17 +434,28 @@ class DataclassConverter:
 
         if is_type_enum(typ):
             value_type = enum_value_type(typ)
+            unadorned_value_type = unwrap_annotated_type(value_type)
 
-            if self.options.enum_mode is EnumMode.TYPE:
-                return SqlUserDefinedType(
-                    self.create_qualified_id(typ.__module__, typ.__name__)
-                )
-            elif self.options.enum_mode is EnumMode.INLINE:
-                return SqlEnumType([str(e.value) for e in typ])
-            elif self.options.enum_mode is EnumMode.RELATION:
-                return self._enumeration_key_type()
-            elif self.options.enum_mode is EnumMode.CHECK:
-                return self.simple_type_to_sql_data_type(value_type)
+            if unadorned_value_type is int or unadorned_value_type is str:
+                if self.options.enum_mode is EnumMode.TYPE:
+                    return SqlUserDefinedType(
+                        self.create_qualified_id(typ.__module__, typ.__name__)
+                    )
+                elif self.options.enum_mode is EnumMode.INLINE:
+                    return SqlEnumType([str(e.value) for e in typ])
+                elif self.options.enum_mode is EnumMode.RELATION:
+                    return self._enumeration_key_type()
+                elif self.options.enum_mode is EnumMode.CHECK:
+                    return self.simple_type_to_sql_data_type(value_type)
+                else:
+                    raise NotImplementedError(f"match not exhaustive: {EnumMode}")
+            else:
+                if self.options.enum_mode is EnumMode.RELATION:
+                    return self._enumeration_key_type()
+                else:
+                    raise TypeError(
+                        f"enumeration mode {self.options.enum_mode} not valid for complex member types in enumeration `{typ.__name__}`"
+                    )
 
         raise TypeError(f"not a simple type: {typ}")
 
@@ -807,25 +818,50 @@ class DataclassConverter:
                 self._enumeration_key_type(),
                 False,
                 identity=True,
-            ),
-            self.options.factory.column_class(
-                LocalId("value"),
-                self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
-                False,
-            ),
-        ]
-        primary_key = (LocalId("id"),)
-        constraints: list[Constraint] = [
-            UniqueConstraint(
-                LocalId(f"uq_{enum_table_name}"),
-                (LocalId("value"),),
             )
         ]
+        primary_key = (LocalId("id"),)
+        constraints: list[Constraint] = []
+
+        enum_member_types: set[type] = set(type(e.value) for e in enum_type)
+        if len(enum_member_types) > 1:
+            raise TypeError(
+                f"inconsistent member types in enumeration `{enum_type.__name__}`: {sorted(list(e.__name__ for e in enum_member_types))}"
+            )
+        enum_member_type = enum_member_types.pop()
+        unadorned_member_type = unwrap_annotated_type(enum_member_type)
+
+        if unadorned_member_type is int or unadorned_member_type is str:
+            columns.append(
+                self.options.factory.column_class(
+                    LocalId("value"),
+                    self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
+                    False,
+                )
+            )
+            constraints.append(
+                UniqueConstraint(
+                    LocalId(f"uq_{enum_table_name}"),
+                    (LocalId("value"),),
+                )
+            )
+        elif is_dataclass_type(unadorned_member_type):
+            columns.extend(
+                self.member_to_column(
+                    field, enum_member_type, parse_type(unadorned_member_type)
+                )
+                for field in dataclass_fields(unadorned_member_type)
+            )
+        else:
+            raise TypeError(
+                f"unsupported member type in enumeration `{enum_type.__name__}`: {enum_member_type}"
+            )
+
         if self.options.initialize_tables:
             return self.options.factory.enum_table_class(
                 id,
                 columns,
-                values=[str(e.value) for e in enum_type],
+                values=[e.value for e in enum_type],
                 primary_key=primary_key,
                 constraints=constraints,
             )

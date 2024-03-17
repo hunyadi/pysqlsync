@@ -34,7 +34,7 @@ from pysqlsync.model.data_types import (
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.python_types import dataclass_to_code, module_to_code
 from tests import tables
-from tests.model import user
+from tests.model import country, user
 
 
 class TestConverter(unittest.TestCase):
@@ -252,6 +252,67 @@ class TestConverter(unittest.TestCase):
                 ForeignConstraint(
                     name=LocalId(id=f"fk_{table_name}_optional_state"),
                     foreign_columns=(LocalId(id="optional_state"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
+                ),
+            ],
+        )
+
+    def test_dataclass_enum_relation(self) -> None:
+        options = DataclassConverterOptions(
+            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({country: None})
+        )
+        converter = DataclassConverter(options=options)
+        catalog = converter.dataclasses_to_catalog([country.DataclassEnumTable])
+        table_name = country.DataclassEnumTable.__name__
+        table_def = catalog.get_table(QualifiedId(None, table_name))
+        self.assertListEqual(
+            list(table_def.columns.values()),
+            [
+                Column(LocalId("id"), SqlIntegerType(8), False),
+                Column(LocalId("country"), SqlIntegerType(4), False),
+                Column(LocalId("optional_country"), SqlIntegerType(4), True),
+            ],
+        )
+        enum_name = country.CountryEnum.__name__
+        enum_def = catalog.get_table(QualifiedId(None, enum_name))
+        self.assertListEqual(
+            list(enum_def.columns.values()),
+            [
+                Column(
+                    LocalId("id"),
+                    SqlIntegerType(4),
+                    False,
+                    identity=True,
+                ),
+                Column(
+                    LocalId("iso_code"),
+                    SqlVariableCharacterType(),
+                    False,
+                ),
+                Column(
+                    LocalId("name"),
+                    SqlVariableCharacterType(),
+                    False,
+                ),
+            ],
+        )
+        self.assertListEqual(
+            list(table_def.constraints.values()),
+            [
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_country"),
+                    foreign_columns=(LocalId(id="country"),),
+                    reference=ConstraintReference(
+                        table=QualifiedId(namespace=None, id=enum_name),
+                        columns=(LocalId(id="id"),),
+                    ),
+                ),
+                ForeignConstraint(
+                    name=LocalId(id=f"fk_{table_name}_optional_country"),
+                    foreign_columns=(LocalId(id="optional_country"),),
                     reference=ConstraintReference(
                         table=QualifiedId(namespace=None, id=enum_name),
                         columns=(LocalId(id="id"),),

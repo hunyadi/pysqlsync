@@ -11,6 +11,7 @@ from strong_typing.auxiliary import (
     Storage,
     TimePrecision,
 )
+from strong_typing.inspection import dataclass_fields, is_dataclass_instance
 
 from .id_types import SupportsQualifiedId
 
@@ -33,6 +34,14 @@ def constant(v: Any) -> str:
     elif isinstance(v, datetime.datetime):
         timestamp = v.astimezone(tz=datetime.timezone.utc).replace(tzinfo=None)
         return quote(timestamp.isoformat(sep=" "))
+    elif isinstance(v, tuple):
+        values = ", ".join(constant(value) for value in v)
+        return f"({values})"
+    elif is_dataclass_instance(v):
+        values = ", ".join(
+            constant(getattr(v, field.name)) for field in dataclass_fields(type(v))
+        )
+        return f"({values})"
     else:
         raise NotImplementedError(f"unknown constant representation for value: {v}")
 
