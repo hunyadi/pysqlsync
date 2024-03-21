@@ -7,6 +7,7 @@ from pysqlsync.formation.object_types import (
     FormationError,
     ObjectFactory,
     Table,
+    identifier,
 )
 from pysqlsync.model.data_types import SqlEnumType, quote
 
@@ -75,6 +76,9 @@ class MySQLColumn(Column):
             return quote(description)
         else:
             return None
+
+    def rename_stmt(self, name: str) -> str:
+        return f"CHANGE {self.name} {identifier(name)} {self.data_spec}"
 
 
 class MySQLObjectFactory(ObjectFactory):
