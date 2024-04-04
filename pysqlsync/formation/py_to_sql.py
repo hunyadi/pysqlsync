@@ -893,7 +893,7 @@ class DataclassConverter:
             enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
             enum_types.sort(key=lambda e: e.__name__)
             for enum_type in enum_types:
-                enum_values = [str(e.value) for e in enum_type]
+                enum_values = [str(e.value) for e in enum_type]  # type: ignore
                 if len(enum_values) < 2:
                     # enumerations with too few members expand into extensible enumeration tables
                     continue

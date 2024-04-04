@@ -6,7 +6,7 @@ from typing import Any, Iterable, Optional, overload
 from strong_typing.inspection import is_dataclass_instance
 from strong_typing.topological import topological_sort
 
-from ..model.data_types import SqlDataType, SqlUserDefinedType, constant, quote
+from ..model.data_types import SqlDataType, SqlUserDefinedType, constant
 from ..model.id_types import LocalId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
