@@ -928,7 +928,7 @@ class BaseContext(abc.ABC):
                     values.discard(None)  # do not insert NULL into referenced table
                     enum_dict = await self._merge_lookup_table(relation, values)
                     return generator.get_enum_transformer(enum_dict)
-                elif field_type is list:
+                elif field_type is list or field_type is set:
                     # a list of enumeration values represented as a list of strings
                     values = set()
                     for record in records:

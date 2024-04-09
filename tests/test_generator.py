@@ -382,7 +382,49 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'ADD CONSTRAINT "uq_WorkflowState" UNIQUE ("value");\n'
             'ALTER TABLE "EnumArrayTable_states_WorkflowState"\n'
             'ADD CONSTRAINT "jk_EnumArrayTable_states" FOREIGN KEY ("EnumArrayTable_states") REFERENCES "EnumArrayTable" ("id"),\n'
-            'ADD CONSTRAINT "jk_WorkflowState_id" FOREIGN KEY ("WorkflowState_id") REFERENCES "WorkflowState" ("id");',
+            'ADD CONSTRAINT "jk_EnumArrayTable_states_WorkflowState" FOREIGN KEY ("WorkflowState_id") REFERENCES "WorkflowState" ("id");',
+        )
+
+    def test_create_enum_set_table(self) -> None:
+        self.maxDiff = None
+        self.assertMatchSQLCreate(
+            "postgresql",
+            tables.EnumSetTable,
+            """CREATE TYPE "WorkflowState" AS ENUM ('active', 'inactive', 'deleted');\n"""
+            'CREATE TABLE "EnumSetTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"states" "WorkflowState" ARRAY NOT NULL,\n'
+            'CONSTRAINT "pk_EnumSetTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        options = GeneratorOptions(
+            enum_mode=EnumMode.RELATION, namespaces={tables: None}
+        )
+        self.assertMatchSQLCreateOptions(
+            options,
+            "mysql",
+            tables.EnumSetTable,
+            'CREATE TABLE "EnumSetTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            'CONSTRAINT "pk_EnumSetTable" PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "WorkflowState" (\n'
+            '"id" integer NOT NULL AUTO_INCREMENT,\n'
+            '"value" varchar(64) NOT NULL,\n'
+            'CONSTRAINT "pk_WorkflowState" PRIMARY KEY ("id")\n'
+            ");\n"
+            'CREATE TABLE "EnumSetTable_states_WorkflowState" (\n'
+            '"uuid" binary(16) NOT NULL,\n'
+            '"EnumSetTable_states" bigint NOT NULL,\n'
+            '"WorkflowState_id" integer NOT NULL,\n'
+            'CONSTRAINT "pk_EnumSetTable_states_WorkflowState" PRIMARY KEY ("uuid")\n'
+            ");\n"
+            'ALTER TABLE "WorkflowState"\n'
+            'ADD CONSTRAINT "uq_WorkflowState" UNIQUE ("value");\n'
+            'ALTER TABLE "EnumSetTable_states_WorkflowState"\n'
+            'ADD CONSTRAINT "jk_EnumSetTable_states" FOREIGN KEY ("EnumSetTable_states") REFERENCES "EnumSetTable" ("id"),\n'
+            'ADD CONSTRAINT "jk_EnumSetTable_states_WorkflowState" FOREIGN KEY ("WorkflowState_id") REFERENCES "WorkflowState" ("id"),\n'
+            'ADD CONSTRAINT "uq_EnumSetTable_states_WorkflowState" UNIQUE ("WorkflowState_id");',
         )
 
     def test_create_extensible_enum_table(self) -> None:

@@ -230,10 +230,8 @@ class RandomGenerator:
 
         if value_properties.nullable:
             optional_generator = self.create(field_type, cls)
-            return (
-                lambda k: optional_generator(k)
-                if random.uniform(0.0, 1.0) > 0.1
-                else None
+            return lambda k: (
+                optional_generator(k) if random.uniform(0.0, 1.0) > 0.1 else None
             )
         elif plain_type is bool:
             return lambda _: random_bool()
@@ -297,7 +295,7 @@ class RandomGenerator:
             return lambda k: object_to_json(json_generator(k))
 
         origin_type = typing.get_origin(plain_type)
-        if origin_type is list:
+        if origin_type is list or origin_type is set:
             (element_type,) = typing.get_args(plain_type)
             if is_type_enum(element_type):
                 enum_generator = random_enum_generator(element_type, max_count=5)

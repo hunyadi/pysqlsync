@@ -36,11 +36,13 @@ from strong_typing.inspection import (
     get_referenced_types,
     is_dataclass_type,
     is_generic_list,
+    is_generic_set,
     is_type_enum,
     is_type_literal,
     is_type_union,
     unwrap_annotated_type,
     unwrap_generic_list,
+    unwrap_generic_set,
     unwrap_literal_types,
     unwrap_literal_values,
     unwrap_union_types,
@@ -125,6 +127,14 @@ def is_type_enum_list(typ: TypeLike) -> bool:
         return False
 
     elem_type = unwrap_generic_list(typ)
+    return is_type_enum(elem_type)
+
+
+def is_type_enum_set(typ: TypeLike) -> bool:
+    if not is_generic_set(typ):
+        return False
+
+    elem_type = unwrap_generic_set(typ)
     return is_type_enum(elem_type)
 
 
@@ -464,25 +474,38 @@ class DataclassConverter:
 
         return self.simple_type_to_sql_data_type(int32)
 
-    def _is_relationship(self, field_type: TypeLike) -> bool:
+    def _get_relationship(
+        self, field_type: TypeLike
+    ) -> Optional[tuple[type, TypeLike]]:
         """
-        True if the field expands into a separate relation (table).
+        Returns relationship type and field type if the field expands into a separate relation (table).
 
         :param typ: A type to check.
         :param cls: Context in which to evaluate the type (e.g. a class).
+        :returns: A tuple of host relationship type (e.g. list) and host field type.
         """
 
         field_type = unwrap_annotated_type(field_type)
 
         # relations must be one-to-many
-        if not is_generic_list(field_type):
-            return False
-
         # related type must be an entity, or (depending on options) an enumeration type
-        elem_type = unwrap_generic_list(field_type)
-        return (
+        relation_type: type
+        elem_type: TypeLike
+        if is_generic_list(field_type):
+            relation_type = list
+            elem_type = unwrap_generic_list(field_type)
+        elif is_generic_set(field_type):
+            relation_type = set
+            elem_type = unwrap_generic_set(field_type)
+        else:
+            return None
+
+        if (
             self.options.enum_mode is EnumMode.RELATION and is_type_enum(elem_type)
-        ) or is_entity_type(elem_type)
+        ) or is_entity_type(elem_type):
+            return relation_type, elem_type
+        else:
+            return None
 
     def member_to_sql_data_type(self, typ: TypeLike, cls: type) -> SqlDataType:
         """
@@ -524,8 +547,13 @@ class DataclassConverter:
                     SqlFixedCharacterType(limit=len(v)) for v in literal_values
                 ]
             return compatible_type(sql_literal_types)
-        if is_generic_list(typ):
-            item_type = unwrap_generic_list(typ)
+        if is_generic_list(typ) or is_generic_set(typ):
+            if is_generic_set(typ):
+                item_type = unwrap_generic_set(typ)
+            elif is_generic_list(typ):
+                item_type = unwrap_generic_list(typ)
+            else:
+                raise NotImplementedError()
             if is_simple_type(item_type):
                 if self.options.array_mode is ArrayMode.ARRAY:
                     if self.options.enum_mode is EnumMode.RELATION and is_type_enum(
@@ -626,7 +654,7 @@ class DataclassConverter:
             columns = [
                 self.member_to_column(field, cls, doc)
                 for field in dataclass_fields(cls)
-                if not self._is_relationship(field.type)
+                if self._get_relationship(field.type) is None
             ]
         except TypeError as e:
             raise TypeError(f"error processing data-class: {cls}") from e
@@ -931,12 +959,22 @@ class DataclassConverter:
         regular_enum_types: set[type[enum.Enum]] = set()
         if self.options.enum_mode is EnumMode.RELATION:
             for entity in table_types:
+                # field of type E
                 for enum_field in dataclass_fields_as_required(entity, is_type_enum):
                     regular_enum_types.add(enum_field.type)
+
+                # field of type list[E]
                 for enum_field in dataclass_fields_as_required(
                     entity, is_type_enum_list
                 ):
                     regular_enum_types.add(unwrap_generic_list(enum_field.type))
+
+                # field of type set[E]
+                for enum_field in dataclass_fields_as_required(
+                    entity, is_type_enum_set
+                ):
+                    regular_enum_types.add(unwrap_generic_set(enum_field.type))
+
         for enum_type in sorted(list(regular_enum_types), key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))
@@ -956,12 +994,14 @@ class DataclassConverter:
         # create join tables for one-to-many relationships
         for entity in table_types:
             for field in dataclass_fields(entity):
-                if not self._is_relationship(field.type):
+                relationship = self._get_relationship(field.type)
+                if relationship is None:
                     continue
+
+                relationship_type, item_type = relationship
 
                 # "primary" refers to the primary key name/type of the tables participating in the one-to-many relationship
                 # "join" refers to the join table column names
-                item_type = unwrap_generic_list(field.type)
                 primary_left_name = LocalId(dataclass_primary_key_name(entity))
                 if is_entity_type(item_type):
                     primary_right_name = LocalId(dataclass_primary_key_name(item_type))
@@ -975,17 +1015,50 @@ class DataclassConverter:
                 else:
                     raise TypeError(f"unrecognized join relation type: {item_type}")
 
-                join_left_id = self.create_qualified_prefix(entity)
-                join_right_id = self.create_qualified_prefix(item_type)
+                column_left_name = f"{entity.__name__}_{field.name}"
+                column_right_name = f"{item_type.__name__}_{primary_right_name.id}"
+                table_name = f"{column_left_name}_{item_type.__name__}"
+                join_left_name = f"{self.create_qualified_prefix(entity)}_{field.name}"
+                join_right_name = f"{join_left_name}_{item_type.__name__}"
 
-                join_left_name = f"{join_left_id}_{field.name}"
-                join_right_name = f"{join_right_id}_{primary_right_name.id}"
+                constraints: list[Constraint] = [
+                    ForeignConstraint(
+                        LocalId(f"jk_{join_left_name}"),
+                        (LocalId(column_left_name),),
+                        ConstraintReference(
+                            self.create_qualified_id(
+                                entity.__module__,
+                                entity.__name__,
+                            ),
+                            (primary_left_name,),
+                        ),
+                    ),
+                    ForeignConstraint(
+                        LocalId(f"jk_{join_right_name}"),
+                        (LocalId(column_right_name),),
+                        ConstraintReference(
+                            self.create_qualified_id(
+                                item_type.__module__,
+                                item_type.__name__,
+                            ),
+                            (primary_right_name,),
+                        ),
+                    ),
+                ]
+                if relationship_type is set:
+                    constraints.append(
+                        UniqueConstraint(
+                            LocalId(f"uq_{join_right_name}"),
+                            (LocalId(column_right_name),),
+                        )
+                    )
+
                 table_defs = tables.setdefault(entity.__module__, [])
                 table_defs.append(
                     self.options.factory.table_class(
                         self.create_qualified_id(
                             entity.__module__,
-                            f"{join_left_name}_{item_type.__name__}",
+                            table_name,
                         ),
                         [
                             self.options.factory.column_class(
@@ -994,43 +1067,20 @@ class DataclassConverter:
                                 False,
                             ),
                             self.options.factory.column_class(
-                                LocalId(join_left_name),
+                                LocalId(column_left_name),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
                                 ),
                                 False,
                             ),
                             self.options.factory.column_class(
-                                LocalId(join_right_name),
+                                LocalId(column_right_name),
                                 primary_right_type,
                                 False,
                             ),
                         ],
                         primary_key=(LocalId("uuid"),),
-                        constraints=[
-                            ForeignConstraint(
-                                LocalId(f"jk_{join_left_name}"),
-                                (LocalId(join_left_name),),
-                                ConstraintReference(
-                                    self.create_qualified_id(
-                                        entity.__module__,
-                                        entity.__name__,
-                                    ),
-                                    (primary_left_name,),
-                                ),
-                            ),
-                            ForeignConstraint(
-                                LocalId(f"jk_{join_right_name}"),
-                                (LocalId(join_right_name),),
-                                ConstraintReference(
-                                    self.create_qualified_id(
-                                        item_type.__module__,
-                                        item_type.__name__,
-                                    ),
-                                    (primary_right_name,),
-                                ),
-                            ),
-                        ],
+                        constraints=constraints,
                     )
                 )
 

@@ -122,6 +122,8 @@ def tsv_type(plain_type: TypeLike) -> type:
     origin_type = typing.get_origin(plain_type)
     if origin_type is list:  # JSON
         return list
+    elif origin_type is set:  # JSON
+        return set
     elif origin_type is dict:  # JSON
         return dict
 

@@ -131,6 +131,12 @@ class EnumArrayTable:
 
 
 @dataclass
+class EnumSetTable:
+    id: PrimaryKey[int]
+    states: set[WorkflowState]
+
+
+@dataclass
 class ExtensibleEnumTable:
     id: PrimaryKey[int]
     state: Union[ExtensibleEnum, Annotated[str, MaxLength(64)]]
@@ -153,7 +159,7 @@ class LiteralTable:
     single: Literal["value"]
     multiple: Literal["one", "of", "many"]
     union: Union[Literal["unknown"], Annotated[str, MaxLength(255)]]
-    unbounded: Union[Literal["unkown"], str]
+    unbounded: Union[Literal["unknown"], str]
 
 
 @dataclass
