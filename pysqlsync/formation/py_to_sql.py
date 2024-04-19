@@ -851,6 +851,7 @@ class DataclassConverter:
         primary_key = (LocalId("id"),)
         constraints: list[Constraint] = []
 
+        enum_type = unwrap_annotated_type(enum_type)
         enum_member_types: set[type] = set(type(e.value) for e in enum_type)
         if len(enum_member_types) > 1:
             raise TypeError(
