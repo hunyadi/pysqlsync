@@ -244,7 +244,7 @@ class EnumMode(enum.Enum):
     "Enumeration types are converted into foreign/primary key relations (reference constraint) with a lookup table."
 
     CHECK = "check"
-    "Enumeration types are converted into their value type, with a CHECK constraint on the column."
+    "Enumeration types are converted into their value type, with a possible CHECK constraint on the column."
 
 
 @enum.unique
@@ -282,6 +282,7 @@ class DataclassConverterOptions:
     :param unique_constraint_names: Whether to generate constraint names that are globally unique.
     :param namespaces: Maps Python modules to SQL namespaces (schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
+    :param check_constraints: Whether to create check constraints for table columns with a restricted set of values.
     :param initialize_tables: Whether to populate special tables (e.g. enumerations) with data.
     :param substitutions: SQL type to be substituted for a specific Python type.
     :param factory: Creates new column, table, struct and namespace instances.
@@ -296,6 +297,7 @@ class DataclassConverterOptions:
     unique_constraint_names: bool = True
     namespaces: NamespaceMapping = dataclasses.field(default_factory=NamespaceMapping)
     foreign_constraints: bool = True
+    check_constraints: bool = True
     initialize_tables: bool = False
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     factory: ObjectFactory = dataclasses.field(default_factory=ObjectFactory)
@@ -698,7 +700,7 @@ class DataclassConverter:
                     ),
                 )
 
-        if self.options.enum_mode is EnumMode.CHECK:
+        if self.options.check_constraints and self.options.enum_mode is EnumMode.CHECK:
             for enum_field in dataclass_fields_as_required(cls, is_type_enum):
                 enum_values = ", ".join(constant(e.value) for e in enum_field.type)
                 constraints.append(
