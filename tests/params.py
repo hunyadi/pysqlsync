@@ -8,10 +8,12 @@ from pysqlsync.factory import get_dialect
 
 
 class TestEngineBase(abc.ABC):
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def engine(self) -> BaseEngine: ...
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def parameters(self) -> ConnectionParameters: ...
 
 

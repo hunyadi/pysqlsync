@@ -11,10 +11,6 @@ from ..model.id_types import LocalId, SupportsQualifiedId
 from .object_dict import ObjectDict
 
 
-def identifier(name: str) -> str:
-    return '"' + name.replace('"', '""') + '"'
-
-
 def deleted(name: str) -> str:
     "Name for a soft-deleted object."
 
@@ -119,7 +115,7 @@ class EnumType(DatabaseObject, QualifiedObject):
         return f"DROP TYPE {self.name.rename(deleted(self.name.local_id))};"
 
     def rename_stmt(self, name: str) -> str:
-        return f"ALTER TYPE {self.name} RENAME TO {identifier(name)};"
+        return f"ALTER TYPE {self.name} RENAME TO {LocalId(name)};"
 
     def __str__(self) -> str:
         return self.create_stmt()
@@ -223,7 +219,7 @@ class Column(DatabaseObject):
         return f"DROP COLUMN {LocalId(deleted(self.name.local_id))}"
 
     def rename_stmt(self, name: str) -> str:
-        return f"RENAME COLUMN {self.name} TO {identifier(name)}"
+        return f"RENAME COLUMN {self.name} TO {LocalId(name)}"
 
 
 @dataclass
@@ -249,7 +245,8 @@ class Constraint(abc.ABC):
 
     name: LocalId
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def spec(self) -> str: ...
 
     def is_alter_table(self) -> bool:
@@ -509,11 +506,14 @@ class Table(DatabaseObject, QualifiedObject):
                 items.update(r.table for r in c.references)
         return items
 
+    def create_keys(self) -> str:
+        keys = ", ".join(str(key) for key in self.primary_key)
+        return f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({keys})"
+
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
-        keys = ", ".join(str(key) for key in self.primary_key)
-        defs.append(f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({keys})")
+        defs.append(self.create_keys())
         definition = ",\n".join(defs)
         return f"CREATE TABLE {self.name} (\n{definition}\n);"
 

@@ -2,13 +2,14 @@ import re
 from typing import Optional
 
 from pysqlsync.formation.object_types import Column, ObjectFactory, Table
-from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId
 
 _sql_quoted_str_table = str.maketrans(
     {
         "\\": "\\\\",
         "'": "\\'",
+        '"': '\\"',
+        "\0": "\\0",
         "\b": "\\b",
         "\f": "\\f",
         "\n": "\\n",
@@ -19,7 +20,7 @@ _sql_quoted_str_table = str.maketrans(
 
 
 def sql_quoted_string(text: str) -> str:
-    if re.search(r"[\\'\b\f\n\r\t]", text):
+    if re.search(r"[\\'\"\0\b\f\n\r\t]", text):
         text = text.translate(_sql_quoted_str_table)
     return f"'{text}'"
 
@@ -53,12 +54,7 @@ class SnowflakeColumn(Column):
     @property
     def comment(self) -> Optional[str]:
         if self.description is not None:
-            description = (
-                self.description
-                if "\n" not in self.description
-                else self.description[: self.description.index("\n")]
-            )
-            return quote(description)
+            return sql_quoted_string(self.description)
         else:
             return None
 

@@ -64,6 +64,8 @@ from ..model.data_types import (
     SqlIntervalType,
     SqlJsonType,
     SqlRealType,
+    SqlStructMember,
+    SqlStructType,
     SqlTimestampType,
     SqlTimeType,
     SqlUserDefinedType,
@@ -253,6 +255,9 @@ class StructMode(enum.Enum):
 
     TYPE = "type"
     "Dataclass types are converted into SQL types with CREATE TYPE ... AS ( ... )."
+
+    INLINE = "inline"
+    "Dataclass types are converted into embedded nested type with STRUCT < ... >."
 
     JSON = "json"
     "Dataclass types are converted into SQL JSON type (or text)."
@@ -533,6 +538,19 @@ class DataclassConverter:
                 return SqlUserDefinedType(
                     self.create_qualified_id(typ.__module__, typ.__name__)
                 )
+            elif self.options.struct_mode is StructMode.INLINE:
+                inline_types: list[SqlStructMember] = []
+                for field in dataclass_fields(typ):
+                    inline_props = get_field_properties(field.type)
+                    inline_type = self.member_to_sql_data_type(
+                        inline_props.field_type, typ
+                    )
+                    inline_types.append(
+                        SqlStructMember(
+                            LocalId(field.name), inline_type, inline_props.nullable
+                        )
+                    )
+                return SqlStructType(inline_types)
             elif self.options.struct_mode is StructMode.JSON:
                 return self.member_to_sql_data_type(JsonType, cls)
         if isinstance(typ, typing.ForwardRef):

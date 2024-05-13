@@ -1165,7 +1165,8 @@ class Explorer(abc.ABC):
 class BaseEngine(abc.ABC):
     "Represents a specific database server type."
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def name(self) -> str: ...
 
     @abc.abstractmethod

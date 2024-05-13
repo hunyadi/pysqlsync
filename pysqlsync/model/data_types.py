@@ -13,7 +13,7 @@ from strong_typing.auxiliary import (
 )
 from strong_typing.inspection import dataclass_fields, is_dataclass_instance
 
-from .id_types import SupportsQualifiedId
+from .id_types import LocalId, SupportsQualifiedId
 
 
 def quote(s: str) -> str:
@@ -304,6 +304,26 @@ class SqlEnumType(SqlDataType):
     def __str__(self) -> str:
         values = ", ".join(quote(val) for val in self.values)
         return f"ENUM ({values})"
+
+
+@dataclass
+class SqlStructMember:
+    name: LocalId
+    data_type: SqlDataType
+    nullable: bool
+
+    def __str__(self) -> str:
+        nullable = " NOT NULL" if not self.nullable else ""
+        return f"{self.name} {self.data_type}{nullable}"
+
+
+@dataclass
+class SqlStructType(SqlDataType):
+    fields: list[SqlStructMember]
+
+    def __str__(self) -> str:
+        field_list = ", ".join(str(f) for f in self.fields)
+        return f"STRUCT <{field_list}>"
 
 
 @dataclass

@@ -17,6 +17,10 @@ T = TypeVar("T")
 LOGGER = logging.getLogger("pysqlsync.mysql")
 
 
+def quoted_id(identifier: str) -> str:
+    return "`" + identifier.replace("`", "``") + "`"
+
+
 class MySQLConnection(BaseConnection):
     native: aiomysql.Connection
 
@@ -95,5 +99,5 @@ class MySQLContext(BaseContext):
             f"WHERE table_schema = DATABASE() AND table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~';",
         )
         if tables:
-            table_list = ", ".join(str(LocalId(table)) for table in tables)
+            table_list = ", ".join(quoted_id(table) for table in tables)
             await self.execute(f"DROP TABLE IF EXISTS {table_list};")
