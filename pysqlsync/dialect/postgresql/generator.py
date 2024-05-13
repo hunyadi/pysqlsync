@@ -3,7 +3,7 @@ from typing import Optional
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
-from pysqlsync.formation.object_types import FormationError, Table
+from pysqlsync.formation.object_types import Table
 from pysqlsync.formation.py_to_sql import (
     ArrayMode,
     DataclassConverter,
@@ -31,10 +31,8 @@ class PostgreSQLGenerator(BaseGenerator):
             PostgreSQLMutator(options.synchronization),
         )
 
-        if options.enum_mode is EnumMode.INLINE:
-            raise FormationError(
-                f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
-            )
+        self.check_enum_mode(exclude=[EnumMode.INLINE])
+        self.check_struct_mode(exclude=[StructMode.INLINE])
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(

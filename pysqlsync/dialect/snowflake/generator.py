@@ -6,7 +6,6 @@ from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import FormationError
 from pysqlsync.formation.py_to_sql import (
     ArrayMode,
     DataclassConverter,
@@ -34,22 +33,10 @@ class SnowflakeGenerator(BaseGenerator):
             Mutator(options.synchronization),
         )
 
-        if (
-            options.enum_mode is EnumMode.INLINE
-            or options.enum_mode is EnumMode.RELATION
-            or options.enum_mode is EnumMode.TYPE
-        ):
-            raise FormationError(
-                f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
-            )
-        if options.struct_mode is StructMode.TYPE:
-            raise FormationError(
-                f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
-            )
-        if options.array_mode is ArrayMode.ARRAY:
-            raise FormationError(
-                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
-            )
+        self.check_enum_mode(matches=EnumMode.CHECK)
+        self.check_struct_mode(matches=StructMode.JSON)
+        self.check_array_mode(matches=ArrayMode.JSON)
+
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
                 enum_mode=options.enum_mode or EnumMode.CHECK,

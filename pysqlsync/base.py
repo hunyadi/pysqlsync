@@ -9,6 +9,7 @@ schema and data.
 
 import abc
 import dataclasses
+import enum
 import json
 import logging
 import types
@@ -19,16 +20,23 @@ from urllib.parse import quote
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
 
-from pysqlsync.python_types import dataclass_to_code, module_to_code
-
 from .formation.inspection import get_entity_types
 from .formation.mutation import Mutator, MutatorOptions
-from .formation.object_types import Catalog, Column, Namespace, ObjectFactory, Table
+from .formation.object_types import (
+    Catalog,
+    Column,
+    FormationError,
+    Namespace,
+    ObjectFactory,
+    Table,
+)
 from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
+from .python_types import dataclass_to_code, module_to_code
 
 D = TypeVar("D", bound=DataclassInstance)
+E = TypeVar("E", bound=enum.Enum)
 T = TypeVar("T")
 
 LOGGER = logging.getLogger("pysqlsync")
@@ -158,6 +166,52 @@ class BaseGenerator(abc.ABC):
 
     def reset(self) -> None:
         self.state = Catalog([])
+
+    def _check_mode(
+        self,
+        mode: Optional[E],
+        *,
+        matches: Optional[E] = None,
+        exclude: Optional[list[E]],
+    ) -> None:
+        if mode is None:
+            return
+
+        fail: bool = False
+        if matches is not None:
+            if mode is not matches:
+                fail = True
+        if exclude is not None:
+            if mode in exclude:
+                fail = True
+        if fail:
+            raise FormationError(
+                f"unsupported {mode.__class__.__name__} for {self.__class__.__name__}: {mode}"
+            )
+
+    def check_enum_mode(
+        self,
+        *,
+        matches: Optional[EnumMode] = None,
+        exclude: Optional[list[EnumMode]] = None,
+    ) -> None:
+        self._check_mode(self.options.enum_mode, matches=matches, exclude=exclude)
+
+    def check_struct_mode(
+        self,
+        *,
+        matches: Optional[StructMode] = None,
+        exclude: Optional[list[StructMode]] = None,
+    ) -> None:
+        self._check_mode(self.options.struct_mode, matches=matches, exclude=exclude)
+
+    def check_array_mode(
+        self,
+        *,
+        matches: Optional[ArrayMode] = None,
+        exclude: Optional[list[ArrayMode]] = None,
+    ) -> None:
+        self._check_mode(self.options.array_mode, matches=matches, exclude=exclude)
 
     @overload
     def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]: ...

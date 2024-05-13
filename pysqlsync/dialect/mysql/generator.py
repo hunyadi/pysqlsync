@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.inspection import is_ip_address_type
-from pysqlsync.formation.object_types import Column, FormationError, Table
+from pysqlsync.formation.object_types import Column, Table
 from pysqlsync.formation.py_to_sql import (
     ArrayMode,
     DataclassConverter,
@@ -35,18 +35,9 @@ class MySQLGenerator(BaseGenerator):
             options, MySQLObjectFactory(), MySQLMutator(options.synchronization)
         )
 
-        if options.enum_mode is EnumMode.TYPE:
-            raise FormationError(
-                f"unsupported enum conversion mode for {self.__class__.__name__}: {options.enum_mode}"
-            )
-        if options.struct_mode is StructMode.TYPE:
-            raise FormationError(
-                f"unsupported struct conversion mode for {self.__class__.__name__}: {options.struct_mode}"
-            )
-        if options.array_mode is ArrayMode.ARRAY:
-            raise FormationError(
-                f"unsupported array conversion mode for {self.__class__.__name__}: {options.array_mode}"
-            )
+        self.check_enum_mode(exclude=[EnumMode.TYPE])
+        self.check_struct_mode(matches=StructMode.JSON)
+        self.check_array_mode(matches=ArrayMode.JSON)
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(
