@@ -1,4 +1,14 @@
-from typing import Any, BinaryIO, Callable, Generic, Optional, Protocol, TypeVar
+from typing import (
+    Any,
+    AsyncIterator,
+    BinaryIO,
+    Callable,
+    Generic,
+    Iterable,
+    Optional,
+    Protocol,
+    TypeVar,
+)
 
 from strong_typing.inspection import DataclassInstance, dataclass_fields
 from tsv.helper import AutoDetectParser, Generator
@@ -120,6 +130,8 @@ class TextReader:
         return self.parser.columns
 
     def read_records(self) -> list[tuple]:
+        "Reads all records from the file-like object."
+
         rows: list[tuple] = []
         while True:
             line = self.stream.readline().rstrip(b"\n")
@@ -128,10 +140,18 @@ class TextReader:
             rows.append(self.parser.parse_line(line))
         return rows
 
+    def records(self) -> Iterable[tuple]:
+        "An iterator to records in a file-like object."
+
+        while True:
+            line = self.stream.readline().rstrip(b"\n")
+            if not line:
+                break
+            yield self.parser.parse_line(line)
+
 
 class AsyncBinaryIO(Protocol):
-    async def readline(self, limit: int = -1) -> bytes:
-        ...
+    async def readline(self, limit: int = -1) -> bytes: ...
 
 
 class AsyncTextReader:
@@ -166,6 +186,8 @@ class AsyncTextReader:
         return self.parser.columns
 
     async def read_records(self) -> list[tuple]:
+        "Reads all records from the file-like object."
+
         rows: list[tuple] = []
         while True:
             line = await self.stream.readline()
@@ -174,3 +196,13 @@ class AsyncTextReader:
                 break
             rows.append(self.parser.parse_line(record))
         return rows
+
+    async def records(self) -> AsyncIterator[tuple]:
+        "An asynchronous iterator to records in a file-like object."
+
+        while True:
+            line = await self.stream.readline()
+            record = line.rstrip(b"\n")
+            if not record:
+                break
+            yield self.parser.parse_line(record)
