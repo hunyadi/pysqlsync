@@ -242,9 +242,10 @@ class BaseGenerator(abc.ABC):
             if not tables:
                 LOGGER.warning("no tables to create")
 
-            for table in tables:
-                code = dataclass_to_code(table)
-                LOGGER.debug(f"analyzing dataclass `{table.__name__}`:\n{code}")
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                for table in tables:
+                    code = dataclass_to_code(table)
+                    LOGGER.debug("analyzing dataclass `%s`:\n%s", table.__name__, code)
 
             target = self.converter.dataclasses_to_catalog(tables)
             statement = self.get_mutate_stmt(target)
@@ -254,9 +255,10 @@ class BaseGenerator(abc.ABC):
             if not modules:
                 LOGGER.warning("no schemas to create")
 
-            for module in modules:
-                code = module_to_code(module)
-                LOGGER.debug(f"analyzing module `{module.__name__}`:\n{code}")
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                for module in modules:
+                    code = module_to_code(module)
+                    LOGGER.debug("analyzing module `%s`:\n%s", module.__name__, code)
 
             target = self.converter.modules_to_catalog(modules)
             statement = self.get_mutate_stmt(target)
@@ -577,7 +579,7 @@ class BaseContext(abc.ABC):
         if not statement.strip():
             raise ValueError("blank statement")
 
-        LOGGER.debug(f"execute SQL:\n{statement}")
+        LOGGER.debug("execute SQL:\n%s", statement)
         try:
             await self._execute(statement)
         except QueryException:
@@ -602,12 +604,12 @@ class BaseContext(abc.ABC):
             raise ValueError("blank statement")
 
         if isinstance(args, Sized):
-            LOGGER.debug(f"execute SQL with {len(args)} rows:\n{statement}")
+            LOGGER.debug("execute SQL with %d rows:\n%s", len(args), statement)
             if not len(args):
                 LOGGER.warning("no data to execute statement with")
                 return
         else:
-            LOGGER.debug(f"execute SQL:\n{statement}")
+            LOGGER.debug("execute SQL:\n%s", statement)
         try:
             await self._execute_all(statement, args)
         except QueryException:
@@ -643,9 +645,10 @@ class BaseContext(abc.ABC):
     async def query_all(self, signature: type[T], statement: str) -> list[T]:
         "Runs a query to produce a result-set of one or more columns, and multiple rows."
 
-        LOGGER.debug(
-            f"query SQL with into {python_type_to_str(signature)}:\n{statement}"
-        )
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(
+                "query SQL with into %s:\n%s", python_type_to_str(signature), statement
+            )
         try:
             return await self._query_all(signature, statement)
         except QueryException:
@@ -664,14 +667,14 @@ class BaseContext(abc.ABC):
         return await self.query_one(str, f"SELECT {func};")
 
     async def create_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"create schema: {namespace}")
+        LOGGER.debug("create schema: %s", namespace)
         factory = self.connection.generator.factory
         stmt = factory.namespace_class(namespace).create_schema_stmt()
         if stmt:
             await self.execute(stmt)
 
     async def drop_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"drop schema: {namespace}")
+        LOGGER.debug("drop schema: %s", namespace)
         factory = self.connection.generator.factory
         stmt = factory.namespace_class(namespace).drop_schema_stmt()
         if stmt:
@@ -699,7 +702,7 @@ class BaseContext(abc.ABC):
         return self.connection.generator.state.get_table(table_id)
 
     async def drop_table_if_exists(self, table: SupportsQualifiedId) -> None:
-        LOGGER.debug(f"drop table if exists: {table}")
+        LOGGER.debug("drop table if exists: %s", table)
         factory = self.connection.generator.factory
         # column list and primary key are ignored
         stmt = factory.table_class(table, [], primary_key=()).drop_if_exists_stmt()
@@ -777,19 +780,19 @@ class BaseContext(abc.ABC):
         """
 
         if isinstance(records, Sized):
-            LOGGER.debug(f"insert {len(records)} rows into {table.name}")
+            LOGGER.debug("insert %d rows into %s", len(records), table.name)
             if not len(records):
                 LOGGER.warning("no rows to insert")
                 return
         else:
-            LOGGER.debug(f"insert into {table.name}")
+            LOGGER.debug("insert into %s", table.name)
 
         await self._insert_rows(
             table, records, field_types=field_types, field_names=field_names
         )
 
         if isinstance(records, Sized):
-            LOGGER.info(f"{len(records)} rows have been inserted into {table.name}")
+            LOGGER.info("%d rows have been inserted into %s", len(records), table.name)
 
     async def _insert_rows(
         self,
@@ -830,12 +833,12 @@ class BaseContext(abc.ABC):
         """
 
         if isinstance(records, Sized):
-            LOGGER.debug(f"upsert {len(records)} rows into {table.name}")
+            LOGGER.debug("upsert %d rows into %s", len(records), table.name)
             if not len(records):
                 LOGGER.warning("no rows to upsert")
                 return
         else:
-            LOGGER.debug(f"upsert into {table.name}")
+            LOGGER.debug("upsert into %s", table.name)
 
         await self._upsert_rows(
             table, records, field_types=field_types, field_names=field_names
@@ -843,7 +846,9 @@ class BaseContext(abc.ABC):
 
         if isinstance(records, Sized):
             LOGGER.info(
-                f"{len(records)} rows have been inserted or updated into {table.name}"
+                "%d rows have been inserted or updated into %s",
+                len(records),
+                table.name,
             )
 
     async def _upsert_rows(
@@ -971,7 +976,7 @@ class BaseContext(abc.ABC):
             relation = generator.state.get_referenced_table(table.name, column.name)
             if relation.is_lookup_table():
                 LOGGER.debug(
-                    f"found lookup table column {column.name} in table {table.name}"
+                    "found lookup table column %s in table %s", column.name, table.name
                 )
 
                 enum_dict: dict[str, int]
@@ -1008,7 +1013,7 @@ class BaseContext(abc.ABC):
 
         value_name = table.get_value_columns()[0].name
         index_name = table.get_primary_column().name
-        LOGGER.debug("adding new enumeration values: {}")
+        LOGGER.debug("adding new enumeration values: %s", values)
         results = await self.query_all(
             tuple[str, int],
             f"SELECT {value_name}, {index_name} FROM {table.name}",
@@ -1028,17 +1033,19 @@ class BaseContext(abc.ABC):
         """
 
         if isinstance(key_values, Sized):
-            LOGGER.debug(f"delete {len(key_values)} rows from {table.name}")
+            LOGGER.debug("delete %d rows from %s", len(key_values), table.name)
             if not len(key_values):
                 LOGGER.warning("no rows to delete")
                 return
         else:
-            LOGGER.debug(f"delete from {table.name}")
+            LOGGER.debug("delete from %s", table.name)
 
         await self._delete_rows(table, key_type, key_values)
 
         if isinstance(key_values, Sized):
-            LOGGER.info(f"{len(key_values)} rows have been deleted from {table.name}")
+            LOGGER.info(
+                "%d rows have been deleted from %s", len(key_values), table.name
+            )
 
     async def _delete_rows(
         self, table: Table, key_type: type, key_values: Iterable[Any]
@@ -1161,12 +1168,12 @@ class Explorer(abc.ABC):
                 ns = await self.get_namespace_current()
             generator.state.merge(Catalog([ns]))
 
-        LOGGER.debug(f"found {len(generator.state.namespaces)} namespaces")
+        LOGGER.debug("found %d namespaces", len(generator.state.namespaces))
         for ns in generator.state.namespaces.values():
-            LOGGER.debug(f"found {len(ns.enums)} enum(s) in namespace {ns.name}")
-            LOGGER.debug(f"found {len(ns.structs)} struct(s) in namespace {ns.name}")
-            LOGGER.debug(f"found {len(ns.tables)} table(s) in namespace {ns.name}")
-        LOGGER.debug(f"discovered state:\n{str(generator.state)}")
+            LOGGER.debug("found %d enum(s) in namespace %s", len(ns.enums), ns.name)
+            LOGGER.debug("found %d struct(s) in namespace %s", len(ns.structs), ns.name)
+            LOGGER.debug("found %d table(s) in namespace %s", len(ns.tables), ns.name)
+        LOGGER.debug("discovered state:\n%s", generator.state)
 
     @overload
     async def synchronize(self, *, module: types.ModuleType) -> None: ...
@@ -1203,7 +1210,7 @@ class Explorer(abc.ABC):
         generator.reset()
         generator.create(tables=get_entity_types(entity_modules))
         target_state = generator.state
-        LOGGER.debug(f"desired state:\n{str(generator.state)}")
+        LOGGER.debug("desired state:\n%s", generator.state)
 
         # acquire current database schema
         await self.discover(modules=entity_modules)
@@ -1211,7 +1218,7 @@ class Explorer(abc.ABC):
         # mutate current state into desired state
         stmt = generator.get_mutate_stmt(target_state)
         if stmt is not None:
-            LOGGER.info(f"synchronize schema with SQL:\n{stmt}")
+            LOGGER.info("synchronize schema with SQL:\n%s", stmt)
             await self.conn.execute(stmt)
             generator.state = target_state
 

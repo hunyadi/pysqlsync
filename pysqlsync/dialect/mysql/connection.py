@@ -26,7 +26,7 @@ class MySQLConnection(BaseConnection):
 
     @override
     async def open(self) -> BaseContext:
-        LOGGER.info(f"connecting to {self.params} (with aiomysql)")
+        LOGGER.info("connecting to %s (with aiomysql)", self.params)
         sql_mode = ",".join(
             [
                 "ANSI_QUOTES",
@@ -90,7 +90,7 @@ class MySQLContext(BaseContext):
 
     @override
     async def drop_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"drop schema: {namespace}")
+        LOGGER.debug("drop schema: %s", namespace)
 
         tables = await self.query_all(
             str,

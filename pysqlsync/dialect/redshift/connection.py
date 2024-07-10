@@ -30,7 +30,7 @@ class RedshiftConnection(BaseConnection):
     @override
     @thread_dispatch
     def open(self) -> BaseContext:
-        LOGGER.info(f"connecting to {self.params}")
+        LOGGER.info("connecting to %s", self.params)
         conn = redshift_connector.connect(
             iam=True,
             host=self.params.host,

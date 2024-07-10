@@ -23,7 +23,7 @@ class PostgreSQLConnection(BaseConnection):
 
     @override
     async def open(self) -> BaseContext:
-        LOGGER.info(f"connecting to {self.params}")
+        LOGGER.info("connecting to %s", self.params)
         conn = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
@@ -34,7 +34,11 @@ class PostgreSQLConnection(BaseConnection):
 
         ver = conn.get_server_version()
         LOGGER.info(
-            f"PostgreSQL version {ver.major}.{ver.minor}.{ver.micro} {ver.releaselevel}"
+            "PostgreSQL version %d.%d.%d %s",
+            ver.major,
+            ver.minor,
+            ver.micro,
+            ver.releaselevel,
         )
 
         self.native = conn

@@ -28,7 +28,7 @@ class OracleConnection(BaseConnection):
     @override
     @thread_dispatch
     def open(self) -> BaseContext:
-        LOGGER.info(f"connecting to {self.params}")
+        LOGGER.info("connecting to %s", self.params)
 
         host = self.params.host or "localhost"
         port = self.params.port or 1521
@@ -121,7 +121,7 @@ class OracleContext(BaseContext):
 
     @override
     async def drop_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"drop schema: {namespace}")
+        LOGGER.debug("drop schema: %s", namespace)
         condition = (
             f"table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~'"
         )

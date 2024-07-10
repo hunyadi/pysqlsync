@@ -30,12 +30,14 @@ class MSSQLConnection(BaseConnection):
     @override
     @thread_dispatch
     def open(self) -> BaseContext:
-        LOGGER.info(f"connecting to {self.params}")
+        LOGGER.info("connecting to %s", self.params)
         params = {
             "DRIVER": "{ODBC Driver 18 for SQL Server}",
-            "SERVER": f"{self.params.host},{self.params.port}"
-            if self.params.port is not None
-            else self.params.host,
+            "SERVER": (
+                f"{self.params.host},{self.params.port}"
+                if self.params.port is not None
+                else self.params.host
+            ),
             "UID": self.params.username,
             "PWD": self.params.password,
             "TrustServerCertificate": "yes",
@@ -111,7 +113,7 @@ class MSSQLContext(BaseContext):
 
     @override
     async def drop_schema(self, namespace: LocalId) -> None:
-        LOGGER.debug(f"drop schema: {namespace}")
+        LOGGER.debug("drop schema: %s", namespace)
 
         constraints = await self.query_all(
             tuple[str, str],

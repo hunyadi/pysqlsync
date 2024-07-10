@@ -137,8 +137,11 @@ def discover_dialects() -> None:
             )
         except ModuleNotFoundError as e:
             LOGGER.debug(
-                f"skipping dialect `{resource.name}`: missing dependency: `{e.name}`; "
-                f"you may need to run `pip install pysqlsync[{resource.name}]`"
+                "skipping dialect `%s`: missing dependency: `%s`; "
+                "you may need to run `pip install pysqlsync[%s]`",
+                resource.name,
+                e.name,
+                resource.name,
             )
             register_dialect(
                 resource.name, UnavailableEngine(resource.name, e.name or "")
@@ -157,7 +160,9 @@ def discover_dialects() -> None:
         engine_type = typing.cast(type[BaseEngine], classes.pop())
         engine_factory = engine_type()
         LOGGER.info(
-            f"found dialect `{engine_factory.name}` defined by `{engine_type.__name__}`"
+            "found dialect `%s` defined by `%s`",
+            engine_factory.name,
+            engine_type.__name__,
         )
         register_dialect(engine_factory.name, engine_factory)
 
