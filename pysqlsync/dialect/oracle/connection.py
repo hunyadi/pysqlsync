@@ -1,18 +1,25 @@
 import logging
 import re
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import AsyncIterable, Iterable, Optional, TypeVar
 
 import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext, QueryException
+from pysqlsync.base import (
+    BaseConnection,
+    BaseContext,
+    QueryException,
+    RecordIterable,
+    RecordType,
+)
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.resultset import resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
+from pysqlsync.util.unsync import unsync
 
 from .data_types import sql_to_oracle_type
 
@@ -75,18 +82,44 @@ class OracleContext(BaseContext):
                         raise QueryException(s) from e
 
     @override
+    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
+        if isinstance(records, Iterable):
+            await self._internal_execute_all(statement, records)
+        elif isinstance(records, AsyncIterable):
+            await self._internal_execute_all(statement, await unsync(records))
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+
+    @override
+    async def _execute_typed(
+        self,
+        statement: str,
+        records: RecordIterable,
+        table: Table,
+        order: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        if isinstance(records, Iterable):
+            await self._internal_execute_typed(statement, records, table, order)
+        elif isinstance(records, AsyncIterable):
+            await self._internal_execute_typed(
+                statement, await unsync(records), table, order
+            )
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+
     @thread_dispatch
-    def _execute_all(self, statement: str, records: Iterable[tuple[Any, ...]]) -> None:
+    def _internal_execute_all(
+        self, statement: str, records: Iterable[RecordType]
+    ) -> None:
         statement = statement.rstrip("\r\n\t\v ;")
         with self.native_connection.cursor() as cur:
             cur.executemany(statement, list(records))
 
-    @override
     @thread_dispatch
-    def _execute_typed(
+    def _internal_execute_typed(
         self,
         statement: str,
-        records: Iterable[tuple[Any, ...]],
+        records: Iterable[RecordType],
         table: Table,
         order: Optional[tuple[str, ...]] = None,
     ) -> None:

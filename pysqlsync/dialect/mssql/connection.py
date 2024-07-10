@@ -1,17 +1,18 @@
 import logging
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import AsyncIterable, Iterable, Optional, TypeVar
 
 import pyodbc
 from strong_typing.inspection import is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.base import BaseConnection, BaseContext, RecordIterable, RecordType
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, QualifiedId
 from pysqlsync.resultset import resultset_unwrap_object, resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
+from pysqlsync.util.unsync import unsync
 
 from .data_types import sql_to_odbc_type
 
@@ -75,18 +76,44 @@ class MSSQLContext(BaseContext):
             cur.execute(statement)
 
     @override
-    @thread_dispatch
-    def _execute_all(self, statement: str, args: Iterable[tuple[Any, ...]]) -> None:
-        with self.native_connection.cursor() as cur:
-            cur.fast_executemany = True
-            cur.executemany(statement, args)
+    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
+        if isinstance(records, Iterable):
+            await self._internal_execute_all(statement, records)
+        elif isinstance(records, AsyncIterable):
+            await self._internal_execute_all(statement, await unsync(records))
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
 
     @override
-    @thread_dispatch
-    def _execute_typed(
+    async def _execute_typed(
         self,
         statement: str,
-        records: Iterable[tuple[Any, ...]],
+        records: RecordIterable,
+        table: Table,
+        order: Optional[tuple[str, ...]] = None,
+    ) -> None:
+        if isinstance(records, Iterable):
+            await self._internal_execute_typed(statement, records, table, order)
+        elif isinstance(records, AsyncIterable):
+            await self._internal_execute_typed(
+                statement, await unsync(records), table, order
+            )
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+
+    @thread_dispatch
+    def _internal_execute_all(
+        self, statement: str, records: Iterable[RecordType]
+    ) -> None:
+        with self.native_connection.cursor() as cur:
+            cur.fast_executemany = True
+            cur.executemany(statement, records)
+
+    @thread_dispatch
+    def _internal_execute_typed(
+        self,
+        statement: str,
+        records: Iterable[RecordType],
         table: Table,
         order: Optional[tuple[str, ...]] = None,
     ) -> None:

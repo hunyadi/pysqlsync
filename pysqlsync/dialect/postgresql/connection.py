@@ -1,16 +1,17 @@
 import dataclasses
 import logging
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import AsyncIterable, Iterable, Optional, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext, ClassRef
+from pysqlsync.base import BaseConnection, BaseContext, ClassRef, RecordIterable
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.properties import is_identity_type
 from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
 from pysqlsync.util.typing import override
+from pysqlsync.util.unsync import unsync
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -62,10 +63,13 @@ class PostgreSQLContext(BaseContext):
         await self.native_connection.execute(statement)
 
     @override
-    async def _execute_all(
-        self, statement: str, args: Iterable[tuple[Any, ...]]
-    ) -> None:
-        await self.native_connection.executemany(statement, args)
+    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
+        if isinstance(records, Iterable):
+            await self.native_connection.executemany(statement, records)
+        elif isinstance(records, AsyncIterable):
+            await self.native_connection.executemany(statement, await unsync(records))
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
 
     @override
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
@@ -98,7 +102,7 @@ class PostgreSQLContext(BaseContext):
     async def _insert_rows(
         self,
         table: Table,
-        records: Iterable[tuple[Any, ...]],
+        records: RecordIterable,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,

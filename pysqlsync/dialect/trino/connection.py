@@ -1,10 +1,10 @@
 import typing
-from typing import Any, Iterable, Optional, TypeVar
+from typing import Iterable, Optional, TypeVar
 
 import aiotrino
 from strong_typing.inspection import is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext
+from pysqlsync.base import BaseConnection, BaseContext, RecordIterable
 from pysqlsync.formation.object_types import Table
 from pysqlsync.resultset import resultset_unwrap_tuple
 from pysqlsync.util.typing import override
@@ -48,9 +48,7 @@ class TrinoContext(BaseContext):
         await cur.execute(statement)
 
     @override
-    async def _execute_all(
-        self, statement: str, args: Iterable[tuple[Any, ...]]
-    ) -> None:
+    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
         raise NotImplementedError("operation not supported for Trino")
 
     @override
@@ -71,7 +69,7 @@ class TrinoContext(BaseContext):
     async def _insert_rows(
         self,
         table: Table,
-        records: Iterable[tuple[Any, ...]],
+        records: RecordIterable,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
@@ -82,7 +80,7 @@ class TrinoContext(BaseContext):
     async def _upsert_rows(
         self,
         table: Table,
-        records: Iterable[tuple[Any, ...]],
+        records: RecordIterable,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,

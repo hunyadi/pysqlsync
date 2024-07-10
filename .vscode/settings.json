@@ -17,5 +17,8 @@
     "python.analysis.typeCheckingMode": "off",
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+    },
+    "cSpell.words": [
+        "unsync"
+    ]
 }
