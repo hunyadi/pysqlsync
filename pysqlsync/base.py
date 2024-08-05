@@ -1111,41 +1111,72 @@ class BaseContext(abc.ABC):
             "found lookup table column %s in table %s", column.name, table.name
         )
 
-        enum_dict: dict[str, int]
-        values: set[Optional[str]] = set()
-
         if field_type is str:
-            # a single enumeration value represented as a string
-            if isinstance(records, Iterable):
-                for record in records:
-                    values.add(record[index])
-            elif isinstance(records, AsyncIterable):
-                async for record in records:
-                    values.add(record[index])
-            else:
-                raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-            values.discard(None)  # do not insert NULL into referenced table
-            enum_dict = await self._merge_lookup_table(
-                relation, typing.cast(set[str], values)
+            return await self._get_enum_transformer(
+                relation,
+                records,
+                generator,
+                index,
             )
-            return generator.get_enum_transformer(enum_dict)
         elif field_type is list or field_type is set:
-            # a list of enumeration values represented as a list of strings
-            if isinstance(records, Iterable):
-                for record in records:
-                    values.update(record[index])
-            elif isinstance(records, AsyncIterable):
-                async for record in records:
-                    values.update(record[index])
-            else:
-                raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-            values.discard(None)  # do not insert NULL into referenced table
-            enum_dict = await self._merge_lookup_table(
-                relation, typing.cast(set[str], values)
+            return await self._get_enum_list_transformer(
+                relation,
+                records,
+                generator,
+                index,
             )
-            return generator.get_enum_list_transformer(enum_dict)
         else:
             return transformer
+
+    async def _get_enum_transformer(
+        self,
+        relation: Table,
+        records: RecordIterable,
+        generator: BaseGenerator,
+        index: int,
+    ) -> Optional[Callable[[Any], Any]]:
+        "Returns a callable function object that looks up an assigned integer value based on the enumeration string value."
+
+        # a single enumeration value represented as a string
+        values: set[Optional[str]] = set()
+        if isinstance(records, Iterable):
+            for record in records:
+                values.add(record[index])
+        elif isinstance(records, AsyncIterable):
+            async for record in records:
+                values.add(record[index])
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+        values.discard(None)  # do not insert NULL into referenced table
+        enum_dict = await self._merge_lookup_table(
+            relation, typing.cast(set[str], values)
+        )
+        return generator.get_enum_transformer(enum_dict)
+
+    async def _get_enum_list_transformer(
+        self,
+        relation: Table,
+        records: RecordIterable,
+        generator: BaseGenerator,
+        index: int,
+    ) -> Optional[Callable[[Any], Any]]:
+        "Returns a callable function object that looks up assigned integer values based on a list of enumeration string values."
+
+        # a list of enumeration values represented as a list of strings
+        values: set[Optional[str]] = set()
+        if isinstance(records, Iterable):
+            for record in records:
+                values.update(record[index])
+        elif isinstance(records, AsyncIterable):
+            async for record in records:
+                values.update(record[index])
+        else:
+            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+        values.discard(None)  # do not insert NULL into referenced table
+        enum_list_dict = await self._merge_lookup_table(
+            relation, typing.cast(set[str], values)
+        )
+        return generator.get_enum_list_transformer(enum_list_dict)
 
     async def _merge_lookup_table(
         self, table: Table, values: set[str]
