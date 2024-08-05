@@ -151,7 +151,7 @@ class MSSQLContext(BaseContext):
         if constraints:
             stmts: list[str] = []
             for constraint in constraints:
-                table_name, constraint_name = typing.cast(tuple[str, str], constraint)
+                table_name, constraint_name = constraint
                 stmts.append(
                     f"ALTER TABLE {QualifiedId(namespace.id, table_name)} DROP CONSTRAINT {LocalId(constraint_name)};"
                 )

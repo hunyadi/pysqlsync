@@ -1,5 +1,4 @@
 import logging
-import typing
 from dataclasses import dataclass
 from typing import Optional
 
@@ -181,10 +180,7 @@ class AnsiExplorer(Explorer):
 
         columns: list[Column] = []
         for col in column_meta:
-            column_name, data_type, nullable = typing.cast(
-                tuple[str, str, bool],
-                col,
-            )
+            column_name, data_type, nullable = col
             columns.append(
                 self.factory.column_class(
                     LocalId(column_name),
