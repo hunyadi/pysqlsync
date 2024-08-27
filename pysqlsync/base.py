@@ -63,6 +63,9 @@ _JSON_ENCODER = json.JSONEncoder(
     separators=(",", ":"),
 )
 
+# number of records consumed from an asynchronous iterator before a batch is dispatched to a database
+ASYNC_BATCH_SIZE = 100000
+
 
 class ClassRef:
     "Represents a reference to a Python class in a Python module."
@@ -577,6 +580,110 @@ class BaseConnection(abc.ABC):
     async def close(self) -> None: ...
 
 
+class RecordTransformer:
+    @abc.abstractmethod
+    async def get(
+        self, records: Iterable[RecordType]
+    ) -> Optional[Callable[[Any], Any]]:
+        """
+        Returns a callable function object that performs a transformation on a value.
+
+        :param records: Records in a batch to insert/update. Used for context.
+        """
+
+        ...
+
+
+class ScalarTransformer(RecordTransformer):
+    "A context-free transformer that mutates a scalar value into another."
+
+    fn: Optional[Callable[[Any], Any]]
+
+    def __init__(
+        self,
+        fn: Optional[Callable[[Any], Any]],
+    ) -> None:
+        self.fn = fn
+
+    async def get(
+        self, records: Iterable[RecordType]
+    ) -> Optional[Callable[[Any], Any]]:
+        return self.fn
+
+
+class BaseEnumTransformer(RecordTransformer):
+    context: "BaseContext"
+    table: Table
+    generator: BaseGenerator
+    index: int
+
+    def __init__(
+        self,
+        context: "BaseContext",
+        table: Table,
+        generator: BaseGenerator,
+        index: int,
+    ) -> None:
+        self.context = context
+        self.table = table
+        self.generator = generator
+        self.index = index
+
+    async def _merge_lookup_table(self, values: set[str]) -> dict[str, int]:
+        "Merges new values into a lookup table and returns the entire updated table."
+
+        if not values:
+            return dict()
+
+        await self.context.execute_all(
+            self.context.connection.generator.get_table_merge_stmt(self.table),
+            list((value,) for value in values),
+        )
+
+        value_name = self.table.get_value_columns()[0].name
+        index_name = self.table.get_primary_column().name
+        LOGGER.debug("adding new enumeration values: %s", values)
+        results = await self.context.query_all(
+            tuple[str, int],
+            f"SELECT {value_name}, {index_name} FROM {self.table.name}",
+        )
+        return dict(results)  # type: ignore
+
+
+class EnumTransformer(BaseEnumTransformer):
+    "A transformer that looks up an assigned integer value based on the enumeration string value."
+
+    async def get(
+        self, records: Iterable[RecordType]
+    ) -> Optional[Callable[[Any], Any]]:
+        "Returns a callable function object that looks up an assigned integer value based on the enumeration string value."
+
+        # a single enumeration value represented as a string
+        values: set[Optional[str]] = set()
+        for record in records:
+            values.add(record[self.index])
+        values.discard(None)  # do not insert NULL into referenced table
+        enum_dict = await self._merge_lookup_table(typing.cast(set[str], values))
+        return self.generator.get_enum_transformer(enum_dict)
+
+
+class EnumListTransformer(BaseEnumTransformer):
+    "A transformer that looks up assigned integer values based on a list of enumeration string values."
+
+    async def get(
+        self, records: Iterable[RecordType]
+    ) -> Optional[Callable[[Any], Any]]:
+        "Returns a callable function object that looks up assigned integer values based on a list of enumeration string values."
+
+        # a list of enumeration values represented as a list of strings
+        values: set[Optional[str]] = set()
+        for record in records:
+            values.update(record[self.index])
+        values.discard(None)  # do not insert NULL into referenced table
+        enum_list_dict = await self._merge_lookup_table(typing.cast(set[str], values))
+        return self.generator.get_enum_list_transformer(enum_list_dict)
+
+
 class BaseContext(abc.ABC):
     "Context object returned by a connection object."
 
@@ -930,7 +1037,7 @@ class BaseContext(abc.ABC):
             field_names = tuple(name for name in table.columns.keys())
 
         indices: list[int] = []
-        transformers: list[Optional[Callable[[Any], Any]]] = []
+        transformers: list[RecordTransformer] = []
         for index, field_type, field_name in zip(
             range(len(field_types)), field_types, field_names
         ):
@@ -938,8 +1045,8 @@ class BaseContext(abc.ABC):
                 continue
 
             indices.append(index)
-            transformer = await self._get_transformer(
-                table, records, generator, index, field_type, field_name
+            transformer = self._get_transformer(
+                table, generator, index, field_type, field_name
             )
             transformers.append(transformer)
 
@@ -950,9 +1057,11 @@ class BaseContext(abc.ABC):
                 return self._select_columns(indices, records)
         else:
             if len(indices) == len(field_types):
-                return self._transform_columns(transformers, records)
+                return await self._transform_columns(transformers, records)
             else:
-                return self._select_transform_columns(indices, transformers, records)
+                return await self._select_transform_columns(
+                    indices, transformers, records
+                )
 
     @overload
     @staticmethod
@@ -976,112 +1085,167 @@ class BaseContext(abc.ABC):
             raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
 
     @overload
-    @staticmethod
-    def _transform_columns(
-        transformers: list[Optional[Callable[[Any], Any]]],
+    @classmethod
+    async def _transform_columns(
+        cls,
+        transformers: list[RecordTransformer],
         records: Iterable[RecordType],
     ) -> Iterable[RecordType]: ...
 
     @overload
-    @staticmethod
-    def _transform_columns(
-        transformers: list[Optional[Callable[[Any], Any]]],
+    @classmethod
+    async def _transform_columns(
+        cls,
+        transformers: list[RecordTransformer],
         records: AsyncIterable[RecordType],
     ) -> AsyncIterable[RecordType]: ...
 
-    @staticmethod
-    def _transform_columns(
-        transformers: list[Optional[Callable[[Any], Any]]], records: RecordIterable
+    @classmethod
+    async def _transform_columns(
+        cls, transformers: list[RecordTransformer], records: RecordIterable
     ) -> RecordIterable:
         if isinstance(records, Iterable):
-            return (
-                tuple(
-                    (
-                        (transformer(field) if field is not None else None)
-                        if transformer is not None
-                        else field
-                    )
-                    for transformer, field in zip(transformers, record)
-                )
-                for record in records
-            )
+            return await cls._sync_transform_columns(transformers, records)
         elif isinstance(records, AsyncIterable):
             return (
-                tuple(
-                    (
-                        (transformer(field) if field is not None else None)
-                        if transformer is not None
-                        else field
-                    )
-                    for transformer, field in zip(transformers, record)
-                )
-                async for record in records
+                row async for row in cls._async_transform_columns(transformers, records)
             )
         else:
             raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
 
+    @classmethod
+    async def _sync_transform_columns(
+        cls,
+        transformers: list[RecordTransformer],
+        records: Iterable[tuple[Any, ...]],
+    ) -> Iterable[tuple[Any, ...]]:
+        fns: list[Optional[Callable[[Any], Any]]] = []
+        for transformer in transformers:
+            fns.append(await transformer.get(records))
+        return (
+            tuple(
+                (
+                    (fn(field) if field is not None else None)
+                    if fn is not None
+                    else field
+                )
+                for fn, field in zip(fns, record)
+            )
+            for record in records
+        )
+
+    @classmethod
+    async def _async_transform_columns(
+        cls,
+        transformers: list[RecordTransformer],
+        records: AsyncIterable[tuple[Any, ...]],
+    ) -> AsyncIterable[tuple[Any, ...]]:
+        rows: list[tuple[Any, ...]] = []
+        async for record in records:
+            rows.append(record)
+            if len(rows) >= ASYNC_BATCH_SIZE:
+                items = await cls._sync_transform_columns(transformers, rows)
+                for item in items:
+                    yield item
+                rows.clear()
+        if rows:
+            items = await cls._sync_transform_columns(transformers, rows)
+            for item in items:
+                yield item
+
     @overload
-    @staticmethod
-    def _select_transform_columns(
+    @classmethod
+    async def _select_transform_columns(
+        cls,
         indices: list[int],
-        transformers: list[Optional[Callable[[Any], Any]]],
+        transformers: list[RecordTransformer],
         records: Iterable[RecordType],
     ) -> Iterable[RecordType]: ...
 
     @overload
-    @staticmethod
-    def _select_transform_columns(
+    @classmethod
+    async def _select_transform_columns(
+        cls,
         indices: list[int],
-        transformers: list[Optional[Callable[[Any], Any]]],
+        transformers: list[RecordTransformer],
         records: AsyncIterable[RecordType],
     ) -> AsyncIterable[RecordType]: ...
 
-    @staticmethod
-    def _select_transform_columns(
+    @classmethod
+    async def _select_transform_columns(
+        cls,
         indices: list[int],
-        transformers: list[Optional[Callable[[Any], Any]]],
+        transformers: list[RecordTransformer],
         records: RecordIterable,
     ) -> RecordIterable:
         if isinstance(records, Iterable):
-            return (
-                tuple(
-                    (
-                        (transformer(field) if field is not None else None)
-                        if transformer is not None
-                        else field
-                    )
-                    for transformer, field in zip(
-                        transformers, (record[i] for i in indices)
-                    )
-                )
-                for record in records
+            return await cls._sync_select_transform_columns(
+                indices, transformers, records
             )
         elif isinstance(records, AsyncIterable):
             return (
-                tuple(
-                    (
-                        (transformer(field) if field is not None else None)
-                        if transformer is not None
-                        else field
-                    )
-                    for transformer, field in zip(
-                        transformers, (record[i] for i in indices)
-                    )
+                row
+                async for row in cls._async_select_transform_columns(
+                    indices, transformers, records
                 )
-                async for record in records
             )
         else:
             raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
 
-    async def _get_transformer(
+    @classmethod
+    async def _sync_select_transform_columns(
+        cls,
+        indices: list[int],
+        transformers: list[RecordTransformer],
+        records: Iterable[tuple[Any, ...]],
+    ) -> Iterable[tuple[Any, ...]]:
+        fns: list[Optional[Callable[[Any], Any]]] = []
+        for transformer in transformers:
+            fns.append(await transformer.get(records))
+        return (
+            tuple(
+                (
+                    (fn(field) if field is not None else None)
+                    if fn is not None
+                    else field
+                )
+                for fn, field in zip(fns, (record[i] for i in indices))
+            )
+            for record in records
+        )
+
+    @classmethod
+    async def _async_select_transform_columns(
+        cls,
+        indices: list[int],
+        transformers: list[RecordTransformer],
+        records: AsyncIterable[tuple[Any, ...]],
+    ) -> AsyncIterable[tuple[Any, ...]]:
+        rows: list[tuple[Any, ...]] = []
+        async for record in records:
+            rows.append(record)
+            if len(rows) >= ASYNC_BATCH_SIZE:
+                items = await cls._sync_select_transform_columns(
+                    indices, transformers, rows
+                )
+                for item in items:
+                    yield item
+                rows.clear()
+        if rows:
+            items = await cls._sync_select_transform_columns(
+                indices, transformers, rows
+            )
+            for item in items:
+                yield item
+
+    def _get_transformer(
         self,
         table: Table,
-        records: RecordIterable,
         generator: BaseGenerator,
         index: int,
         field_type: type,
         field_name: str,
-    ) -> Optional[Callable[[Any], Any]]:
+    ) -> RecordTransformer:
         """
         Creates a transformer for a record field.
 
@@ -1102,103 +1266,31 @@ class BaseContext(abc.ABC):
         transformer = generator.get_value_transformer(column, field_type)
 
         if not table.is_relation(column):
-            return transformer
+            return ScalarTransformer(transformer)
         relation = generator.state.get_referenced_table(table.name, column.name)
         if not relation.is_lookup_table():
-            return transformer
+            return ScalarTransformer(transformer)
 
         LOGGER.debug(
             "found lookup table column %s in table %s", column.name, table.name
         )
 
         if field_type is str:
-            return await self._get_enum_transformer(
+            return EnumTransformer(
+                self,
                 relation,
-                records,
                 generator,
                 index,
             )
         elif field_type is list or field_type is set:
-            return await self._get_enum_list_transformer(
+            return EnumListTransformer(
+                self,
                 relation,
-                records,
                 generator,
                 index,
             )
         else:
-            return transformer
-
-    async def _get_enum_transformer(
-        self,
-        relation: Table,
-        records: RecordIterable,
-        generator: BaseGenerator,
-        index: int,
-    ) -> Optional[Callable[[Any], Any]]:
-        "Returns a callable function object that looks up an assigned integer value based on the enumeration string value."
-
-        # a single enumeration value represented as a string
-        values: set[Optional[str]] = set()
-        if isinstance(records, Iterable):
-            for record in records:
-                values.add(record[index])
-        elif isinstance(records, AsyncIterable):
-            async for record in records:
-                values.add(record[index])
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-        values.discard(None)  # do not insert NULL into referenced table
-        enum_dict = await self._merge_lookup_table(
-            relation, typing.cast(set[str], values)
-        )
-        return generator.get_enum_transformer(enum_dict)
-
-    async def _get_enum_list_transformer(
-        self,
-        relation: Table,
-        records: RecordIterable,
-        generator: BaseGenerator,
-        index: int,
-    ) -> Optional[Callable[[Any], Any]]:
-        "Returns a callable function object that looks up assigned integer values based on a list of enumeration string values."
-
-        # a list of enumeration values represented as a list of strings
-        values: set[Optional[str]] = set()
-        if isinstance(records, Iterable):
-            for record in records:
-                values.update(record[index])
-        elif isinstance(records, AsyncIterable):
-            async for record in records:
-                values.update(record[index])
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-        values.discard(None)  # do not insert NULL into referenced table
-        enum_list_dict = await self._merge_lookup_table(
-            relation, typing.cast(set[str], values)
-        )
-        return generator.get_enum_list_transformer(enum_list_dict)
-
-    async def _merge_lookup_table(
-        self, table: Table, values: set[str]
-    ) -> dict[str, int]:
-        "Merges new values into a lookup table and returns the entire updated table."
-
-        if not values:
-            return dict()
-
-        await self.execute_all(
-            self.connection.generator.get_table_merge_stmt(table),
-            list((value,) for value in values),
-        )
-
-        value_name = table.get_value_columns()[0].name
-        index_name = table.get_primary_column().name
-        LOGGER.debug("adding new enumeration values: %s", values)
-        results = await self.query_all(
-            tuple[str, int],
-            f"SELECT {value_name}, {index_name} FROM {table.name}",
-        )
-        return dict(results)  # type: ignore
+            return ScalarTransformer(transformer)
 
     async def delete_rows(
         self, table: Table, key_type: type, key_values: Iterable[Any]
