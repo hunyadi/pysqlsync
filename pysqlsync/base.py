@@ -692,7 +692,7 @@ class DataSource:
         "Produces a batch of records."
 
         # yield required for mypy to properly identify return type signature in derived classes
-        yield list()
+        yield []
 
 
 class IterableDataSource(DataSource):
@@ -829,6 +829,17 @@ class SelectorTransformerDataSource(CompositeDataSource):
             ]
 
 
+def to_data_source(records: RecordSource) -> DataSource:
+    "Converts a synchronous or asynchronous iterable of records into a data source."
+
+    if isinstance(records, Iterable):
+        return IterableDataSource(records)
+    elif isinstance(records, AsyncIterable):
+        return AsyncIterableDataSource(records)
+    else:
+        raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+
+
 class BaseContext(abc.ABC):
     "Context object returned by a connection object."
 
@@ -875,18 +886,7 @@ class BaseContext(abc.ABC):
         else:
             LOGGER.debug("execute SQL:\n%s", statement)
 
-        source: DataSource
-        if isinstance(records, DataSource):
-            source = records
-        elif isinstance(records, Iterable):
-            source = IterableDataSource(records)
-        elif isinstance(records, AsyncIterable):
-            source = AsyncIterableDataSource(records)
-        else:
-            raise TypeError(
-                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
-            )
-
+        source = to_data_source(records)
         try:
             await self._execute_all(statement, source)
         except QueryException:
@@ -1054,18 +1054,6 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into the database table.
         """
 
-        source: DataSource
-        if isinstance(records, DataSource):
-            source = records
-        elif isinstance(records, Iterable):
-            source = IterableDataSource(records)
-        elif isinstance(records, AsyncIterable):
-            source = AsyncIterableDataSource(records)
-        else:
-            raise TypeError(
-                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
-            )
-
         if isinstance(records, Sized):
             LOGGER.debug("insert %d rows into %s", len(records), table.name)
             if not len(records):
@@ -1074,6 +1062,7 @@ class BaseContext(abc.ABC):
         else:
             LOGGER.debug("insert into %s", table.name)
 
+        source = to_data_source(records)
         await self._insert_rows(
             table, source, field_types=field_types, field_names=field_names
         )
@@ -1119,18 +1108,6 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into or updated in the database table.
         """
 
-        source: DataSource
-        if isinstance(records, DataSource):
-            source = records
-        elif isinstance(records, Iterable):
-            source = IterableDataSource(records)
-        elif isinstance(records, AsyncIterable):
-            source = AsyncIterableDataSource(records)
-        else:
-            raise TypeError(
-                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
-            )
-
         if isinstance(records, Sized):
             LOGGER.debug("upsert %d rows into %s", len(records), table.name)
             if not len(records):
@@ -1139,6 +1116,7 @@ class BaseContext(abc.ABC):
         else:
             LOGGER.debug("upsert into %s", table.name)
 
+        source = to_data_source(records)
         await self._upsert_rows(
             table, source, field_types=field_types, field_names=field_names
         )
