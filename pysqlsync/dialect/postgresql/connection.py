@@ -1,17 +1,16 @@
 import dataclasses
 import logging
 import typing
-from typing import AsyncIterable, Iterable, Optional, TypeVar
+from typing import Iterable, Optional, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext, ClassRef, RecordIterable
+from pysqlsync.base import BaseConnection, BaseContext, ClassRef, DataSource
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.properties import is_identity_type
 from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
 from pysqlsync.util.typing import override
-from pysqlsync.util.unsync import unsync
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -63,13 +62,9 @@ class PostgreSQLContext(BaseContext):
         await self.native_connection.execute(statement)
 
     @override
-    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
-        if isinstance(records, Iterable):
-            await self.native_connection.executemany(statement, records)
-        elif isinstance(records, AsyncIterable):
-            await self.native_connection.executemany(statement, await unsync(records))
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+    async def _execute_all(self, statement: str, source: DataSource) -> None:
+        async for batch in source.batches():
+            await self.native_connection.executemany(statement, batch)
 
     @override
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:
@@ -102,19 +97,20 @@ class PostgreSQLContext(BaseContext):
     async def _insert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        source: DataSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
         record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
         order = tuple(name for name in field_names if name) if field_names else None
-        result = await self.native_connection.copy_records_to_table(
-            schema_name=table.name.scope_id,
-            table_name=table.name.local_id,
-            columns=[str(col.name.local_id) for col in table.get_columns(order)],
-            records=record_generator,
-        )
-        LOGGER.debug(result)
+        async for batch in record_generator.batches():
+            result = await self.native_connection.copy_records_to_table(
+                schema_name=table.name.scope_id,
+                table_name=table.name.local_id,
+                columns=[str(col.name.local_id) for col in table.get_columns(order)],
+                records=batch,
+            )
+            LOGGER.debug(result)

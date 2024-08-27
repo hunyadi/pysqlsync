@@ -3,7 +3,7 @@ import logging
 import re
 import typing
 from io import BytesIO
-from typing import AsyncIterable, Iterable, Optional, TypeVar
+from typing import Iterable, Optional, TypeVar
 
 import redshift_connector
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -12,8 +12,8 @@ from pysqlsync.base import (
     BaseConnection,
     BaseContext,
     ClassRef,
+    DataSource,
     QueryException,
-    RecordIterable,
     RecordType,
 )
 from pysqlsync.formation.object_types import Table
@@ -22,7 +22,6 @@ from pysqlsync.model.properties import is_identity_type
 from pysqlsync.resultset import resultset_unwrap_object, resultset_unwrap_tuple
 from pysqlsync.util.dispatch import thread_dispatch
 from pysqlsync.util.typing import override
-from pysqlsync.util.unsync import unsync
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -80,16 +79,14 @@ class RedshiftContext(BaseContext):
                     raise QueryException(s) from e
 
     @override
-    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
-        if isinstance(records, Iterable):
-            await self._internal_execute_all(statement, records)
-        elif isinstance(records, AsyncIterable):
-            await self._internal_execute_all(statement, await unsync(records))
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+    async def _execute_all(self, statement: str, source: DataSource) -> None:
+        async for batch in source.batches():
+            await self._internal_execute_all(statement, batch)
 
     @thread_dispatch
-    def _internal_execute_all(self, statement: str, records: RecordIterable) -> None:
+    def _internal_execute_all(
+        self, statement: str, records: Iterable[RecordType]
+    ) -> None:
         with self.native_connection.cursor() as cursor:
             cursor.executemany(statement, records)
 
@@ -123,20 +120,18 @@ class RedshiftContext(BaseContext):
     async def _insert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        source: DataSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
-        if not isinstance(records, Iterable):
-            raise TypeError("expected: `Iterable` of records")
-
         order = tuple(name for name in field_names if name) if field_names else None
         columns = [col.name for col in table.get_columns(order)]
         record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
-        await self._insert_copy_stream_async(table.name, columns, record_generator)
+        async for batch in record_generator.batches():
+            await self._insert_copy_stream_async(table.name, columns, batch)
 
     @thread_dispatch
     def _insert_copy_stream_async(

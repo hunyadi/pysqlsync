@@ -1,16 +1,15 @@
 import logging
 import typing
-from typing import AsyncIterable, Iterable, Optional, TypeVar
+from typing import Optional, TypeVar
 
 import aiomysql
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import BaseConnection, BaseContext, RecordIterable
+from pysqlsync.base import BaseConnection, BaseContext, DataSource
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
 from pysqlsync.util.typing import override
-from pysqlsync.util.unsync import unsync
 
 D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
@@ -66,15 +65,10 @@ class MySQLContext(BaseContext):
             await cur.execute(statement)
 
     @override
-    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
-        if isinstance(records, Iterable):
+    async def _execute_all(self, statement: str, source: DataSource) -> None:
+        async for batch in source.batches():
             async with self.native_connection.cursor() as cur:
-                await cur.executemany(statement, records)
-        elif isinstance(records, AsyncIterable):
-            async with self.native_connection.cursor() as cur:
-                await cur.executemany(statement, await unsync(records))
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
+                await cur.executemany(statement, batch)
 
     @override
     async def _query_all(self, signature: type[T], statement: str) -> list[T]:

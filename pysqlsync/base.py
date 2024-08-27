@@ -51,7 +51,7 @@ E = TypeVar("E", bound=enum.Enum)
 T = TypeVar("T")
 
 RecordType = tuple[Any, ...]
-RecordIterable = Union[Iterable[RecordType], AsyncIterable[RecordType]]
+RecordSource = Union[Iterable[RecordType], AsyncIterable[RecordType]]
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -64,7 +64,7 @@ _JSON_ENCODER = json.JSONEncoder(
 )
 
 # number of records consumed from an asynchronous iterator before a batch is dispatched to a database
-ASYNC_BATCH_SIZE = 100000
+BATCH_SIZE = 100000
 
 
 class ClassRef:
@@ -647,7 +647,7 @@ class BaseEnumTransformer(RecordTransformer):
             tuple[str, int],
             f"SELECT {value_name}, {index_name} FROM {self.table.name}",
         )
-        return dict(results)  # type: ignore
+        return dict(results)
 
 
 class EnumTransformer(BaseEnumTransformer):
@@ -684,6 +684,151 @@ class EnumListTransformer(BaseEnumTransformer):
         return self.generator.get_enum_list_transformer(enum_list_dict)
 
 
+class DataSource:
+    "A data source from which records can be retrieved in batches."
+
+    @abc.abstractmethod
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        "Produces a batch of records."
+
+        # yield required for mypy to properly identify return type signature in derived classes
+        yield list()
+
+
+class IterableDataSource(DataSource):
+    """
+    A data source created from a synchronous iterable of records.
+
+    Each element in the iterator is accessed only once.
+    """
+
+    records: Iterable[RecordType]
+
+    def __init__(self, records: Iterable[RecordType]) -> None:
+        self.records = records
+
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        rows: list[RecordType] = []
+        for record in self.records:
+            rows.append(record)
+            if len(rows) >= BATCH_SIZE:
+                yield rows
+                rows = []
+        if rows:
+            yield rows
+
+
+class AsyncIterableDataSource(DataSource):
+    """
+    A data source created from an asynchronous iterable of records.
+
+    Each element in the iterator is accessed only once.
+    """
+
+    records: AsyncIterable[RecordType]
+
+    def __init__(self, records: AsyncIterable[RecordType]) -> None:
+        self.records = records
+
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        rows: list[RecordType] = []
+        async for record in self.records:
+            rows.append(record)
+            if len(rows) >= BATCH_SIZE:
+                yield rows
+                rows = []
+        if rows:
+            yield rows
+
+
+class CompositeDataSource(DataSource):
+    "A data source created by transforming the output of another source."
+
+    source: DataSource
+
+    def __init__(self, source: DataSource) -> None:
+        self.source = source
+
+
+class SelectorDataSource(CompositeDataSource):
+    "A data source derived from another by selecting specific columns."
+
+    indices: list[int]
+
+    def __init__(self, source: DataSource, indices: list[int]) -> None:
+        super().__init__(source)
+        self.indices = indices
+
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        indices = self.indices
+        async for batch in self.source.batches():
+            yield [tuple(record[i] for i in indices) for record in batch]
+
+
+class TransformerDataSource(CompositeDataSource):
+    "A data source derived from another by transforming specific columns."
+
+    transformers: list[RecordTransformer]
+
+    def __init__(
+        self, source: DataSource, transformers: list[RecordTransformer]
+    ) -> None:
+        super().__init__(source)
+        self.transformers = transformers
+
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        async for batch in self.source.batches():
+            fns: list[Optional[Callable[[Any], Any]]] = []
+            for transformer in self.transformers:
+                fns.append(await transformer.get(batch))
+            yield [
+                tuple(
+                    (
+                        (fn(field) if field is not None else None)
+                        if fn is not None
+                        else field
+                    )
+                    for fn, field in zip(fns, record)
+                )
+                for record in batch
+            ]
+
+
+class SelectorTransformerDataSource(CompositeDataSource):
+    "A data source derived from another by selecting and/or transforming specific columns."
+
+    indices: list[int]
+    transformers: list[RecordTransformer]
+
+    def __init__(
+        self,
+        source: DataSource,
+        indices: list[int],
+        transformers: list[RecordTransformer],
+    ) -> None:
+        super().__init__(source)
+        self.indices = indices
+        self.transformers = transformers
+
+    async def batches(self) -> AsyncIterable[list[RecordType]]:
+        indices = self.indices
+        async for batch in self.source.batches():
+            fns: list[Optional[Callable[[Any], Any]]] = []
+            for transformer in self.transformers:
+                fns.append(await transformer.get(batch))
+            yield [
+                tuple(
+                    (
+                        (fn(field) if field is not None else None)
+                        if fn is not None
+                        else field
+                    )
+                    for fn, field in zip(fns, (record[i] for i in indices))
+                )
+                for record in batch
+            ]
+
+
 class BaseContext(abc.ABC):
     "Context object returned by a connection object."
 
@@ -714,7 +859,7 @@ class BaseContext(abc.ABC):
 
         ...
 
-    async def execute_all(self, statement: str, args: Iterable[RecordType]) -> None:
+    async def execute_all(self, statement: str, records: RecordSource) -> None:
         "Executes a SQL statement with several records of data."
 
         if not statement:
@@ -722,22 +867,35 @@ class BaseContext(abc.ABC):
         if not statement.strip():
             raise ValueError("blank statement")
 
-        if isinstance(args, Sized):
-            LOGGER.debug("execute SQL with %d rows:\n%s", len(args), statement)
-            if not len(args):
+        if isinstance(records, Sized):
+            LOGGER.debug("execute SQL with %d rows:\n%s", len(records), statement)
+            if not len(records):
                 LOGGER.warning("no data to execute statement with")
                 return
         else:
             LOGGER.debug("execute SQL:\n%s", statement)
+
+        source: DataSource
+        if isinstance(records, DataSource):
+            source = records
+        elif isinstance(records, Iterable):
+            source = IterableDataSource(records)
+        elif isinstance(records, AsyncIterable):
+            source = AsyncIterableDataSource(records)
+        else:
+            raise TypeError(
+                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
+            )
+
         try:
-            await self._execute_all(statement, args)
+            await self._execute_all(statement, source)
         except QueryException:
             raise
         except Exception as e:
             raise QueryException(statement) from e
 
     @abc.abstractmethod
-    async def _execute_all(self, statement: str, records: RecordIterable) -> None:
+    async def _execute_all(self, statement: str, source: DataSource) -> None:
         "Executes a SQL statement with several records of data."
 
         ...
@@ -745,13 +903,13 @@ class BaseContext(abc.ABC):
     async def _execute_typed(
         self,
         statement: str,
-        records: RecordIterable,
+        source: DataSource,
         table: Table,
         order: Optional[tuple[str, ...]] = None,
     ) -> None:
         "Executes a SQL statement with several records of data, passing type information."
 
-        await self._execute_all(statement, records)
+        await self._execute_all(statement, source)
 
     async def query_one(self, signature: type[T], statement: str) -> T:
         "Runs a query to produce a result-set of one or more columns, and a single row."
@@ -882,7 +1040,7 @@ class BaseContext(abc.ABC):
     async def insert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        records: RecordSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
@@ -896,6 +1054,18 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into the database table.
         """
 
+        source: DataSource
+        if isinstance(records, DataSource):
+            source = records
+        elif isinstance(records, Iterable):
+            source = IterableDataSource(records)
+        elif isinstance(records, AsyncIterable):
+            source = AsyncIterableDataSource(records)
+        else:
+            raise TypeError(
+                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
+            )
+
         if isinstance(records, Sized):
             LOGGER.debug("insert %d rows into %s", len(records), table.name)
             if not len(records):
@@ -905,7 +1075,7 @@ class BaseContext(abc.ABC):
             LOGGER.debug("insert into %s", table.name)
 
         await self._insert_rows(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
 
         if isinstance(records, Sized):
@@ -914,7 +1084,7 @@ class BaseContext(abc.ABC):
     async def _insert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        source: DataSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
@@ -926,17 +1096,16 @@ class BaseContext(abc.ABC):
         """
 
         record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
         order = tuple(name for name in field_names if name) if field_names else None
         statement = self.connection.generator.get_table_insert_stmt(table, order)
-
         await self._execute_typed(statement, record_generator, table, order)
 
     async def upsert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        records: RecordSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
@@ -950,6 +1119,18 @@ class BaseContext(abc.ABC):
         :param records: The rows to be inserted into or updated in the database table.
         """
 
+        source: DataSource
+        if isinstance(records, DataSource):
+            source = records
+        elif isinstance(records, Iterable):
+            source = IterableDataSource(records)
+        elif isinstance(records, AsyncIterable):
+            source = AsyncIterableDataSource(records)
+        else:
+            raise TypeError(
+                "expected: `Iterable` or `AsyncIterable` of records, or `DataSource`"
+            )
+
         if isinstance(records, Sized):
             LOGGER.debug("upsert %d rows into %s", len(records), table.name)
             if not len(records):
@@ -959,7 +1140,7 @@ class BaseContext(abc.ABC):
             LOGGER.debug("upsert into %s", table.name)
 
         await self._upsert_rows(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
 
         if isinstance(records, Sized):
@@ -972,7 +1153,7 @@ class BaseContext(abc.ABC):
     async def _upsert_rows(
         self,
         table: Table,
-        records: RecordIterable,
+        source: DataSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
@@ -984,41 +1165,21 @@ class BaseContext(abc.ABC):
         """
 
         record_generator = await self._generate_records(
-            table, records, field_types=field_types, field_names=field_names
+            table, source, field_types=field_types, field_names=field_names
         )
         order = tuple(name for name in field_names if name) if field_names else None
         statement = self.connection.generator.get_table_upsert_stmt(table, order)
 
         await self._execute_typed(statement, record_generator, table, order)
 
-    @overload
     async def _generate_records(
         self,
         table: Table,
-        records: Iterable[RecordType],
+        source: DataSource,
         *,
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
-    ) -> Iterable[RecordType]: ...
-
-    @overload
-    async def _generate_records(
-        self,
-        table: Table,
-        records: AsyncIterable[RecordType],
-        *,
-        field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
-    ) -> AsyncIterable[RecordType]: ...
-
-    async def _generate_records(
-        self,
-        table: Table,
-        records: RecordIterable,
-        *,
-        field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
-    ) -> RecordIterable:
+    ) -> DataSource:
         """
         Creates a record generator for a database table.
 
@@ -1026,7 +1187,7 @@ class BaseContext(abc.ABC):
         in the target table.
 
         :param table: The database table descriptor.
-        :param records: The records to insert or update.
+        :param source: The records to insert or update.
         :param field_types: Type of each record field. Use `types.NoneType` to omit a field.
         :param field_names: Label for each record field. Use an empty string for an omitted field.
         """
@@ -1052,191 +1213,14 @@ class BaseContext(abc.ABC):
 
         if all(transformer is None for transformer in transformers):
             if len(indices) == len(field_types):
-                return records
+                return source
             else:
-                return self._select_columns(indices, records)
+                return SelectorDataSource(source, indices)
         else:
             if len(indices) == len(field_types):
-                return await self._transform_columns(transformers, records)
+                return TransformerDataSource(source, transformers)
             else:
-                return await self._select_transform_columns(
-                    indices, transformers, records
-                )
-
-    @overload
-    @staticmethod
-    def _select_columns(
-        indices: list[int], records: Iterable[RecordType]
-    ) -> Iterable[RecordType]: ...
-
-    @overload
-    @staticmethod
-    def _select_columns(
-        indices: list[int], records: AsyncIterable[RecordType]
-    ) -> AsyncIterable[RecordType]: ...
-
-    @staticmethod
-    def _select_columns(indices: list[int], records: RecordIterable) -> RecordIterable:
-        if isinstance(records, Iterable):
-            return (tuple(record[i] for i in indices) for record in records)
-        elif isinstance(records, AsyncIterable):
-            return (tuple(record[i] for i in indices) async for record in records)
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-
-    @overload
-    @classmethod
-    async def _transform_columns(
-        cls,
-        transformers: list[RecordTransformer],
-        records: Iterable[RecordType],
-    ) -> Iterable[RecordType]: ...
-
-    @overload
-    @classmethod
-    async def _transform_columns(
-        cls,
-        transformers: list[RecordTransformer],
-        records: AsyncIterable[RecordType],
-    ) -> AsyncIterable[RecordType]: ...
-
-    @classmethod
-    async def _transform_columns(
-        cls, transformers: list[RecordTransformer], records: RecordIterable
-    ) -> RecordIterable:
-        if isinstance(records, Iterable):
-            return await cls._sync_transform_columns(transformers, records)
-        elif isinstance(records, AsyncIterable):
-            return (
-                row async for row in cls._async_transform_columns(transformers, records)
-            )
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-
-    @classmethod
-    async def _sync_transform_columns(
-        cls,
-        transformers: list[RecordTransformer],
-        records: Iterable[tuple[Any, ...]],
-    ) -> Iterable[tuple[Any, ...]]:
-        fns: list[Optional[Callable[[Any], Any]]] = []
-        for transformer in transformers:
-            fns.append(await transformer.get(records))
-        return (
-            tuple(
-                (
-                    (fn(field) if field is not None else None)
-                    if fn is not None
-                    else field
-                )
-                for fn, field in zip(fns, record)
-            )
-            for record in records
-        )
-
-    @classmethod
-    async def _async_transform_columns(
-        cls,
-        transformers: list[RecordTransformer],
-        records: AsyncIterable[tuple[Any, ...]],
-    ) -> AsyncIterable[tuple[Any, ...]]:
-        rows: list[tuple[Any, ...]] = []
-        async for record in records:
-            rows.append(record)
-            if len(rows) >= ASYNC_BATCH_SIZE:
-                items = await cls._sync_transform_columns(transformers, rows)
-                for item in items:
-                    yield item
-                rows.clear()
-        if rows:
-            items = await cls._sync_transform_columns(transformers, rows)
-            for item in items:
-                yield item
-
-    @overload
-    @classmethod
-    async def _select_transform_columns(
-        cls,
-        indices: list[int],
-        transformers: list[RecordTransformer],
-        records: Iterable[RecordType],
-    ) -> Iterable[RecordType]: ...
-
-    @overload
-    @classmethod
-    async def _select_transform_columns(
-        cls,
-        indices: list[int],
-        transformers: list[RecordTransformer],
-        records: AsyncIterable[RecordType],
-    ) -> AsyncIterable[RecordType]: ...
-
-    @classmethod
-    async def _select_transform_columns(
-        cls,
-        indices: list[int],
-        transformers: list[RecordTransformer],
-        records: RecordIterable,
-    ) -> RecordIterable:
-        if isinstance(records, Iterable):
-            return await cls._sync_select_transform_columns(
-                indices, transformers, records
-            )
-        elif isinstance(records, AsyncIterable):
-            return (
-                row
-                async for row in cls._async_select_transform_columns(
-                    indices, transformers, records
-                )
-            )
-        else:
-            raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
-
-    @classmethod
-    async def _sync_select_transform_columns(
-        cls,
-        indices: list[int],
-        transformers: list[RecordTransformer],
-        records: Iterable[tuple[Any, ...]],
-    ) -> Iterable[tuple[Any, ...]]:
-        fns: list[Optional[Callable[[Any], Any]]] = []
-        for transformer in transformers:
-            fns.append(await transformer.get(records))
-        return (
-            tuple(
-                (
-                    (fn(field) if field is not None else None)
-                    if fn is not None
-                    else field
-                )
-                for fn, field in zip(fns, (record[i] for i in indices))
-            )
-            for record in records
-        )
-
-    @classmethod
-    async def _async_select_transform_columns(
-        cls,
-        indices: list[int],
-        transformers: list[RecordTransformer],
-        records: AsyncIterable[tuple[Any, ...]],
-    ) -> AsyncIterable[tuple[Any, ...]]:
-        rows: list[tuple[Any, ...]] = []
-        async for record in records:
-            rows.append(record)
-            if len(rows) >= ASYNC_BATCH_SIZE:
-                items = await cls._sync_select_transform_columns(
-                    indices, transformers, rows
-                )
-                for item in items:
-                    yield item
-                rows.clear()
-        if rows:
-            items = await cls._sync_select_transform_columns(
-                indices, transformers, rows
-            )
-            for item in items:
-                yield item
+                return SelectorTransformerDataSource(source, indices, transformers)
 
     def _get_transformer(
         self,
@@ -1333,13 +1317,13 @@ class BaseContext(abc.ABC):
             table.get_primary_column(), key_type
         )
         if transformer is not None:
-            records = ((transformer(key),) for key in key_values)
+            source = IterableDataSource((transformer(key),) for key in key_values)
         else:
-            records = ((key,) for key in key_values)
+            source = IterableDataSource((key,) for key in key_values)
 
         statement = generator.get_table_delete_stmt(table)
         order = (table.get_primary_column().name.local_id,)
-        await self._execute_typed(statement, records, table, order)
+        await self._execute_typed(statement, source, table, order)
 
 
 def _module_or_list(
