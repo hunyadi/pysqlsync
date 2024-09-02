@@ -15,10 +15,10 @@
         "black"
     ],
     "python.analysis.typeCheckingMode": "off",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportInvalidTypeForm": "none"
+    },
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
-    },
-    "cSpell.words": [
-        "unsync"
-    ]
+    }
 }

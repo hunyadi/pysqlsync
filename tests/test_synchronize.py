@@ -27,6 +27,7 @@ from tests.params import (
     configure,
     has_env_var,
 )
+from tests.util import reuse_guard
 
 if __name__ == "__main__":
     configure()
@@ -206,7 +207,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                         table,
                         field_names=field_labels,
                         field_types=field_types,
-                        records=rows,
+                        records=reuse_guard(row for row in rows),
                     )
                     self.assertEqual(await self.get_rows(conn, table), len(entities))
 
@@ -222,7 +223,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                         table,
                         field_names=field_labels,
                         field_types=field_types,
-                        records=rows,
+                        records=reuse_guard(row for row in rows),
                     )
                     self.assertEqual(await self.get_rows(conn, table), len(entities))
 

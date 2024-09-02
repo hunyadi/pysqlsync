@@ -1,7 +1,9 @@
 set -e
 
+PYTHON=python3
+
 # PostgreSQL and MySQL
-TEST_INTEGRATION=1 TEST_POSTGRESQL=1 TEST_MYSQL=1 python3 -m unittest discover
+TEST_INTEGRATION=1 TEST_POSTGRESQL=1 TEST_MYSQL=1 $PYTHON -m unittest discover
 
 # MySQL
 # CONTAINER=mysql-db
@@ -9,7 +11,7 @@ TEST_INTEGRATION=1 TEST_POSTGRESQL=1 TEST_MYSQL=1 python3 -m unittest discover
 # docker ps -aq --filter "name=$CONTAINER" | xargs -r docker rm
 # docker run -d --name $CONTAINER -p 3306:3306 -e "MYSQL_ROOT_PASSWORD=<?YourStrong@Passw0rd>" -e MYSQL_DATABASE=levente_hunyadi mysql:8.0
 # sleep 30
-# TEST_INTEGRATION=1 TEST_MYSQL=1 python3 -m unittest discover
+# TEST_INTEGRATION=1 TEST_MYSQL=1 $PYTHON -m unittest discover
 # docker stop $CONTAINER && docker rm $CONTAINER
 
 # Oracle
@@ -21,7 +23,7 @@ docker run -d \
     -p 1521:1521 \
     --name $CONTAINER container-registry.oracle.com/database/free:latest
 sleep 30
-TEST_INTEGRATION=1 TEST_ORACLE=1 python3 -m unittest discover
+TEST_INTEGRATION=1 TEST_ORACLE=1 $PYTHON -m unittest discover
 docker stop $CONTAINER && docker rm $CONTAINER
 
 # Microsoft SQL Server
@@ -33,5 +35,5 @@ docker run -d \
     --hostname sql1 -p 1433:1433 \
     --name $CONTAINER mcr.microsoft.com/mssql/server:2022-latest
 sleep 30
-TEST_INTEGRATION=1 TEST_MSSQL=1 python3 -m unittest discover
+TEST_INTEGRATION=1 TEST_MSSQL=1 $PYTHON -m unittest discover
 docker stop $CONTAINER && docker rm $CONTAINER
