@@ -1,11 +1,14 @@
 import logging
+import ssl
 import typing
 from typing import Optional, TypeVar
 
 import aiomysql
+import pymysql
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext, DataSource
+from pysqlsync.connection import ConnectionSSLMode, create_context
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
@@ -27,6 +30,30 @@ class MySQLConnection(BaseConnection):
     @override
     async def open(self) -> BaseContext:
         LOGGER.info("connecting to %s (with aiomysql)", self.params)
+
+        ssl_mode = self.params.ssl
+        if ssl_mode is None or ssl_mode is ConnectionSSLMode.disable:
+            return await self._open()
+        elif ssl_mode is ConnectionSSLMode.prefer:
+            try:
+                return await self._open(create_context(ssl_mode))
+            except pymysql.err.OperationalError:
+                return await self._open()
+        elif ssl_mode is ConnectionSSLMode.allow:
+            try:
+                return await self._open()
+            except pymysql.err.OperationalError:
+                return await self._open(create_context(ssl_mode))
+        elif (
+            ssl_mode is ConnectionSSLMode.require
+            or ssl_mode is ConnectionSSLMode.verify_ca
+            or ssl_mode is ConnectionSSLMode.verify_full
+        ):
+            return await self._open(create_context(ssl_mode))
+        else:
+            raise ValueError(f"unsupported SSL mode: {ssl_mode}")
+
+    async def _open(self, ctx: Optional[ssl.SSLContext] = None) -> BaseContext:
         sql_mode = ",".join(
             [
                 "ANSI_QUOTES",
@@ -43,6 +70,7 @@ class MySQLConnection(BaseConnection):
             sql_mode=f"'{sql_mode}'",
             init_command='SET @@session.time_zone = "+00:00";',
             autocommit=True,
+            ssl=ctx,
         )
         return MySQLContext(self)
 

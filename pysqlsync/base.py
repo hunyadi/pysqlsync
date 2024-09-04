@@ -31,6 +31,7 @@ from urllib.parse import quote
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
 
+from .connection import ConnectionSSLMode
 from .formation.inspection import get_entity_types
 from .formation.mutation import Mutator, MutatorOptions
 from .formation.object_types import (
@@ -539,13 +540,15 @@ class ConnectionParameters:
     username: Optional[str] = None
     password: Optional[str] = None
     database: Optional[str] = None
+    ssl: Optional[ConnectionSSLMode] = None
 
     def __str__(self) -> str:
         host = self.host or "localhost"
         port = f":{self.port}" if self.port else ""
         username = f"{quote(self.username, safe='')}@" if self.username else ""
         database = f"/{quote(self.database, safe='')}" if self.database else ""
-        return f"{username}{host}{port}{database}"
+        ssl = f"?ssl={self.ssl}" if self.ssl else ""
+        return f"{username}{host}{port}{database}{ssl}"
 
 
 class BaseConnection(abc.ABC):

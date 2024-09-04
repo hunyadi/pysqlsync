@@ -3,7 +3,7 @@ import logging
 import os
 import os.path
 
-from pysqlsync.base import BaseEngine, ConnectionParameters
+from pysqlsync.base import BaseEngine, ConnectionParameters, ConnectionSSLMode
 from pysqlsync.factory import get_dialect
 
 
@@ -50,6 +50,7 @@ class PostgreSQLBase(TestEngineBase):
             username="levente.hunyadi",
             password="<?YourStrong@Passw0rd>",
             database="levente.hunyadi",
+            ssl=ConnectionSSLMode.prefer,
         )
 
 
@@ -86,6 +87,7 @@ class MySQLBase(TestEngineBase):
             username="root",
             password="<?YourStrong@Passw0rd>",
             database="levente_hunyadi",
+            ssl=ConnectionSSLMode.require,
         )
 
 

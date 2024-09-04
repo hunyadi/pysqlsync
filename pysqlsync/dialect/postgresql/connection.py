@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import ssl
 import typing
 from typing import Iterable, Optional, TypeVar
 
@@ -7,6 +8,7 @@ import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext, ClassRef, DataSource
+from pysqlsync.connection import ConnectionSSLMode, create_context
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.properties import is_identity_type
 from pysqlsync.resultset import resultset_unwrap_dict, resultset_unwrap_tuple
@@ -24,12 +26,37 @@ class PostgreSQLConnection(BaseConnection):
     @override
     async def open(self) -> BaseContext:
         LOGGER.info("connecting to %s", self.params)
+
+        ssl_mode = self.params.ssl
+        if ssl_mode is None or ssl_mode is ConnectionSSLMode.disable:
+            return await self._open()
+        elif ssl_mode is ConnectionSSLMode.prefer:
+            try:
+                return await self._open(create_context(ssl_mode))
+            except ConnectionError:
+                return await self._open()
+        elif ssl_mode is ConnectionSSLMode.allow:
+            try:
+                return await self._open()
+            except ConnectionError:
+                return await self._open(create_context(ssl_mode))
+        elif (
+            ssl_mode is ConnectionSSLMode.require
+            or ssl_mode is ConnectionSSLMode.verify_ca
+            or ssl_mode is ConnectionSSLMode.verify_full
+        ):
+            return await self._open(create_context(ssl_mode))
+        else:
+            raise ValueError(f"unsupported SSL mode: {ssl_mode}")
+
+    async def _open(self, ctx: Optional[ssl.SSLContext] = None) -> BaseContext:
         conn = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
             user=self.params.username,
             password=self.params.password,
             database=self.params.database,
+            ssl=ctx,
         )
 
         ver = conn.get_server_version()

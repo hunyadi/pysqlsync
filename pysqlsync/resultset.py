@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+This module helps convert between data-class, dictionary and tuple representation of result-sets.
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 import typing
 from collections.abc import Sequence
 from typing import Any, Iterable, TypeVar

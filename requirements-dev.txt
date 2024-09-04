@@ -17,6 +17,7 @@ oracledb >= 1.4
 # MySQL
 aiomysql >= 0.2
 PyMySQL[rsa]
+types-PyMySQL
 
 # Microsoft SQL Server
 pyodbc >= 5.0
