@@ -26,12 +26,11 @@ from typing import (
     Union,
     overload,
 )
-from urllib.parse import quote
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
 
-from .connection import ConnectionSSLMode
+from .connection import ConnectionParameters
 from .formation.inspection import get_entity_types
 from .formation.mutation import Mutator, MutatorOptions
 from .formation.object_types import (
@@ -529,26 +528,6 @@ class QueryException(RuntimeError):
     def __str__(self) -> str:
         query = f"{self.query[:1000]}..." if len(self.query) > 1000 else self.query
         return f"error executing query:\n{query}"
-
-
-@dataclass
-class ConnectionParameters:
-    "Database connection parameters that would typically be encapsulated in a connection string."
-
-    host: Optional[str] = None
-    port: Optional[int] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-    database: Optional[str] = None
-    ssl: Optional[ConnectionSSLMode] = None
-
-    def __str__(self) -> str:
-        host = self.host or "localhost"
-        port = f":{self.port}" if self.port else ""
-        username = f"{quote(self.username, safe='')}@" if self.username else ""
-        database = f"/{quote(self.database, safe='')}" if self.database else ""
-        ssl = f"?ssl={self.ssl}" if self.ssl else ""
-        return f"{username}{host}{port}{database}{ssl}"
 
 
 class BaseConnection(abc.ABC):

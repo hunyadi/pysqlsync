@@ -9,7 +9,9 @@ This module helps create a secure sockets layer (SSL) context.
 import enum
 import ssl
 import sys
+from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import quote
 
 if sys.version_info >= (3, 10):
     import truststore
@@ -41,6 +43,8 @@ class ConnectionSSLMode(enum.Enum):
 
 
 def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
+    "Creates an SSL context to pass to a database connection object."
+
     if ssl_mode is None or ssl_mode is ConnectionSSLMode.disable:
         return None
     elif (
@@ -74,3 +78,23 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
         return ctx
     else:
         raise ValueError(f"unsupported SSL mode: {ssl_mode}")
+
+
+@dataclass
+class ConnectionParameters:
+    "Database connection parameters that would typically be encapsulated in a connection string."
+
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    database: Optional[str] = None
+    ssl: Optional[ConnectionSSLMode] = None
+
+    def __str__(self) -> str:
+        host = self.host or "localhost"
+        port = f":{self.port}" if self.port else ""
+        username = f"{quote(self.username, safe='')}@" if self.username else ""
+        database = f"/{quote(self.database, safe='')}" if self.database else ""
+        ssl = f"?ssl={self.ssl}" if self.ssl else ""
+        return f"{username}{host}{port}{database}{ssl}"

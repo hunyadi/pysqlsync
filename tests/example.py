@@ -10,7 +10,8 @@ from typing import Optional
 
 from strong_typing.auxiliary import Annotated, MaxLength
 
-from pysqlsync.base import ConnectionParameters, GeneratorOptions
+from pysqlsync.base import GeneratorOptions
+from pysqlsync.connection import ConnectionParameters
 from pysqlsync.factory import get_dialect
 from pysqlsync.formation.py_to_sql import EnumMode
 from pysqlsync.model.id_types import LocalId

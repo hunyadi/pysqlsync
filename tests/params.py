@@ -3,7 +3,8 @@ import logging
 import os
 import os.path
 
-from pysqlsync.base import BaseEngine, ConnectionParameters, ConnectionSSLMode
+from pysqlsync.base import BaseEngine
+from pysqlsync.connection import ConnectionParameters, ConnectionSSLMode
 from pysqlsync.factory import get_dialect
 
 

@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import quote
 
-from pysqlsync.base import ConnectionParameters
+from pysqlsync.connection import ConnectionParameters
 from pysqlsync.factory import get_dialect, get_parameters
 
 

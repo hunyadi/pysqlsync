@@ -15,13 +15,8 @@ from urllib.parse import unquote, urlparse
 
 from strong_typing.inspection import get_module_classes
 
-from .base import (
-    BaseConnection,
-    BaseEngine,
-    BaseGenerator,
-    ConnectionParameters,
-    Explorer,
-)
+from .base import BaseConnection, BaseEngine, BaseGenerator, Explorer
+from .connection import ConnectionParameters
 
 LOGGER = logging.getLogger("pysqlsync")
 
