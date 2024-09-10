@@ -130,18 +130,13 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             tables.DefaultNumericTable,
             'CREATE TABLE "DefaultNumericTable" (\n'
             '"id" bigint NOT NULL,\n'
-            '"integer_8" smallint NOT NULL,\n'
-            '"integer_16" smallint NOT NULL,\n'
-            '"integer_32" integer NOT NULL,\n'
-            '"integer_64" bigint NOT NULL,\n'
-            '"integer" bigint NOT NULL,\n'
+            '"integer_8" smallint NOT NULL CONSTRAINT "df_integer_8" DEFAULT 127,\n'
+            '"integer_16" smallint NOT NULL CONSTRAINT "df_integer_16" DEFAULT 32767,\n'
+            '"integer_32" integer NOT NULL CONSTRAINT "df_integer_32" DEFAULT 2147483647,\n'
+            '"integer_64" bigint NOT NULL CONSTRAINT "df_integer_64" DEFAULT 0,\n'
+            '"integer" bigint NOT NULL CONSTRAINT "df_integer" DEFAULT 23,\n'
             'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
-            ");\n"
-            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_8" DEFAULT 127 FOR "integer_8";\n'
-            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_16" DEFAULT 32767 FOR "integer_16";\n'
-            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_32" DEFAULT 2147483647 FOR "integer_32";\n'
-            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer_64" DEFAULT 0 FOR "integer_64";\n'
-            'ALTER TABLE "DefaultNumericTable" ADD CONSTRAINT "df_integer" DEFAULT 23 FOR "integer";',
+            ");",
         )
 
     def test_create_fixed_precision_float_table(self) -> None:
@@ -291,10 +286,9 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             tables.DefaultDateTimeTable,
             'CREATE TABLE "DefaultDateTimeTable" (\n'
             '"id" bigint NOT NULL,\n'
-            """"iso_date_time" datetime2 NOT NULL,\n"""
+            """"iso_date_time" datetime2 NOT NULL CONSTRAINT "df_iso_date_time" DEFAULT '1989-10-24 23:59:59',\n"""
             'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
-            ");\n"
-            """ALTER TABLE "DefaultDateTimeTable" ADD CONSTRAINT "df_iso_date_time" DEFAULT '1989-10-24 23:59:59' FOR "iso_date_time";""",
+            ");",
         )
 
     def test_create_enum_table(self) -> None:

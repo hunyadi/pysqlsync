@@ -203,9 +203,13 @@ class Column(DatabaseObject):
         return f"{self.data_type}{nullable}{default}{identity}"
 
     def create_stmt(self) -> str:
+        "Creates a column as part of an ALTER TABLE statement."
+
         return f"ADD COLUMN {self.column_spec}"
 
     def drop_stmt(self) -> str:
+        "Removes a column as part of an ALTER TABLE statement."
+
         return f"DROP COLUMN {self.name}"
 
     def soft_drop_stmt(self) -> str:

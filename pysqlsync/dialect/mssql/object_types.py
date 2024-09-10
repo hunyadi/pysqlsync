@@ -1,3 +1,4 @@
+import typing
 from typing import Optional
 
 from pysqlsync.formation.object_types import (
@@ -10,14 +11,38 @@ from pysqlsync.formation.object_types import (
 )
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.util.typing import override
 
 
 class MSSQLColumn(Column):
+    def default_constraint_name(self) -> LocalId:
+        "The name of the constraint for DEFAULT."
+
+        return LocalId(f"df_{self.name.local_id}")
+
     @property
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable else ""
+        name = self.default_constraint_name()
+        default = (
+            f" CONSTRAINT {name} DEFAULT {self.default}"
+            if self.default is not None
+            else ""
+        )
         identity = " IDENTITY" if self.identity else ""
-        return f"{self.data_type}{nullable}{identity}"
+        return f"{self.data_type}{nullable}{default}{identity}"
+
+    @override
+    def create_stmt(self) -> str:
+        return f"ADD {self.column_spec}"
+
+    @override
+    def drop_stmt(self) -> str:
+        if self.default is not None:
+            name = self.default_constraint_name()
+            return f"DROP CONSTRAINT {name}, COLUMN {self.name}"
+        else:
+            return f"DROP COLUMN {self.name}"
 
 
 class MSSQLTable(Table):
@@ -28,39 +53,16 @@ class MSSQLTable(Table):
 
     def add_constraints_stmt(self) -> Optional[str]:
         statements: list[str] = []
-
-        constraints: list[str] = []
-        for column in self.columns.values():
-            if column.default is None:
-                continue
-            name = LocalId(f"df_{column.name.local_id}")
-            constraints.append(
-                f"ADD CONSTRAINT {name} DEFAULT {column.default} FOR {column.name}"
-            )
-        if constraints:
-            statements.append(self.alter_table_stmt(constraints))
-
         if self.table_constraints:
             statements.append(
                 f"ALTER TABLE {self.name} ADD\n"
                 + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints)
                 + ";"
             )
-
         return join_or_none(statements)
 
     def drop_constraints_stmt(self) -> Optional[str]:
         statements: list[str] = []
-
-        constraints: list[str] = []
-        for column in self.columns.values():
-            if column.default is None:
-                continue
-            name = LocalId(f"df_{column.name.local_id}")
-            constraints.append(f"DROP CONSTRAINT {name}")
-        if constraints:
-            statements.append(self.alter_table_stmt(constraints))
-
         if self.table_constraints:
             statements.append(
                 f"ALTER TABLE {self.name} DROP\n"

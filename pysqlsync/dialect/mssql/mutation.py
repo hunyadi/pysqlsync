@@ -1,3 +1,4 @@
+import typing
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
@@ -8,7 +9,8 @@ from pysqlsync.formation.object_types import (
     Table,
     join_or_none,
 )
-from pysqlsync.model.id_types import LocalId
+
+from .object_types import MSSQLColumn
 
 
 class MSSQLMutator(Mutator):
@@ -37,7 +39,7 @@ class MSSQLMutator(Mutator):
             if source_def == target_def:
                 continue
 
-            name = LocalId(f"df_{source_column.name.local_id}")
+            name = typing.cast(MSSQLColumn, source_column).default_constraint_name()
             if source_def is not None:
                 constraints.append(f"DROP CONSTRAINT {name}")
             if target_def is not None:

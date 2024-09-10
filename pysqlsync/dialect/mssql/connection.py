@@ -42,6 +42,8 @@ class MSSQLConnection(BaseConnection):
             "PWD": self.params.password,
             "TrustServerCertificate": "yes",
         }
+        if self.params.database is not None:
+            params["DATABASE"] = self.params.database
         conn_string = ";".join(
             f"{key}={value}" for key, value in params.items() if value is not None
         )
