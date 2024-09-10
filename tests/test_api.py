@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import quote
 
-from pysqlsync.connection import ConnectionParameters
+from pysqlsync.connection import ConnectionParameters, ConnectionSSLMode
 from pysqlsync.factory import get_dialect, get_parameters
 
 
@@ -14,7 +14,7 @@ class TestAPI(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             engine.create_generator()
 
-    def test_connection_parameters(self) -> None:
+    def test_connection_string(self) -> None:
         host = "server.example.com"
         port = 2310
         username = "my+user@example.com"
@@ -28,9 +28,32 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(params.username, username)
         self.assertEqual(params.password, password)
         self.assertEqual(params.database, database)
+        self.assertEqual(params.ssl, None)
         self.assertEqual(
             str(params), r"my%2Buser%40example.com@server.example.com:2310/database"
         )
+
+    def test_connection_query_parameters(self) -> None:
+        host = "server.example.com"
+        port = 2310
+        database = "database"
+        url_prefix = f"postgresql://{host}:{port}/{database}"
+
+        url = f"{url_prefix}?key=value"
+        dialect, params = get_parameters(url)
+        self.assertEqual(dialect, "postgresql")
+        self.assertEqual(params.host, host)
+        self.assertEqual(params.port, port)
+        self.assertEqual(params.database, database)
+        self.assertEqual(params.ssl, None)
+
+        url = f"{url_prefix}?ssl=verify-full"
+        dialect, params = get_parameters(url)
+        self.assertEqual(dialect, "postgresql")
+        self.assertEqual(params.host, host)
+        self.assertEqual(params.port, port)
+        self.assertEqual(params.database, database)
+        self.assertEqual(params.ssl, ConnectionSSLMode.verify_full)
 
 
 if __name__ == "__main__":

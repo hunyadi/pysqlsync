@@ -1,4 +1,3 @@
-import typing
 from typing import Optional
 
 from pysqlsync.formation.object_types import (

@@ -11,12 +11,13 @@ import importlib.resources
 import logging
 import re
 import typing
-from urllib.parse import unquote, urlparse
+from typing import Optional
+from urllib.parse import parse_qs, unquote, urlparse
 
 from strong_typing.inspection import get_module_classes
 
 from .base import BaseConnection, BaseEngine, BaseGenerator, Explorer
-from .connection import ConnectionParameters
+from .connection import ConnectionParameters, ConnectionSSLMode
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -80,12 +81,30 @@ def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
     """
 
     parts = urlparse(url, allow_fragments=False)
+
+    ssl: Optional[ConnectionSSLMode] = None
+    if parts.query:
+        query = parse_qs(parts.query, strict_parsing=True)
+        if "ssl" in query:
+            if len(query["ssl"]) != 1:
+                raise ValueError(
+                    "only a single `ssl` parameter is permitted in a connection string"
+                )
+            ssl_mode = query["ssl"][0]
+            for v in ConnectionSSLMode.__members__.values():
+                if ssl_mode == v.value:
+                    ssl = v
+                    break
+            else:
+                raise ValueError(f"unsupported SSL mode: {ssl_mode}")
+
     return parts.scheme, ConnectionParameters(
         host=parts.hostname,
         port=parts.port,
         username=unquote(parts.username) if parts.username else None,
         password=unquote(parts.password) if parts.password else None,
         database=parts.path.lstrip("/") if parts.path else None,
+        ssl=ssl,
     )
 
 
