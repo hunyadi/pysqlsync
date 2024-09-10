@@ -46,6 +46,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(params.port, port)
         self.assertEqual(params.database, database)
         self.assertEqual(params.ssl, None)
+        self.assertEqual(str(params), r"server.example.com:2310/database")
 
         url = f"{url_prefix}?ssl=verify-full"
         dialect, params = get_parameters(url)
@@ -54,6 +55,9 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(params.port, port)
         self.assertEqual(params.database, database)
         self.assertEqual(params.ssl, ConnectionSSLMode.verify_full)
+        self.assertEqual(
+            str(params), r"server.example.com:2310/database?ssl=verify-full"
+        )
 
 
 if __name__ == "__main__":

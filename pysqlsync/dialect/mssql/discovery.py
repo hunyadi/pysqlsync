@@ -47,9 +47,21 @@ class MSSQLExplorer(AnsiExplorer):
             "    INNER JOIN sys.columns AS c ON c.object_id = t.object_id\n"
             f"WHERE s.name = {quote(table_id.scope_id or 'dbo')} AND t.name = {quote(table_id.local_id)} AND c.is_identity = 1;",
         )
+        default_columns = await self.conn.query_all(
+            tuple[str, str],
+            "SELECT c.name, d.definition\n"
+            "FROM sys.schemas AS s\n"
+            "    INNER JOIN sys.tables AS t ON t.schema_id = s.schema_id\n"
+            "    INNER JOIN sys.columns AS c ON c.object_id = t.object_id\n"
+            "    INNER JOIN sys.default_constraints AS d ON d.object_id = c.default_object_id\n"
+            f"WHERE s.name = {quote(table_id.scope_id or 'dbo')} AND t.name = {quote(table_id.local_id)} AND c.default_object_id != 0;",
+        )
+        default_values = dict(default_columns)
         for c in columns:
             if c.name.id in identity_columns:
                 c.identity = True
+            if c.name.id in default_values:
+                c.default = default_values[c.name.id]
 
         return columns
 

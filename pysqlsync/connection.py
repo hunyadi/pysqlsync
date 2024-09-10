@@ -96,5 +96,5 @@ class ConnectionParameters:
         port = f":{self.port}" if self.port else ""
         username = f"{quote(self.username, safe='')}@" if self.username else ""
         database = f"/{quote(self.database, safe='')}" if self.database else ""
-        ssl = f"?ssl={self.ssl}" if self.ssl else ""
+        ssl = f"?ssl={self.ssl.value}" if self.ssl else ""
         return f"{username}{host}{port}{database}{ssl}"
