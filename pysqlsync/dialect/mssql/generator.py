@@ -59,6 +59,7 @@ class MSSQLGenerator(BaseGenerator):
                 },
                 factory=self.factory,
                 skip_annotations=options.skip_annotations,
+                auto_default=options.auto_default,
             )
         )
 

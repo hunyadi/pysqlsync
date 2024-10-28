@@ -9,7 +9,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Annotated, Callable, Iterable, Optional, TypeVar
+from typing import Annotated, Any, Callable, Iterable, Optional, TypeVar
 
 from strong_typing.auxiliary import (
     MaxLength,
@@ -150,6 +150,7 @@ def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
 
     if not is_type_union(typ):
         return False
+    typ = unwrap_annotated_type(typ)
     member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(typ)]
     for member_type in member_types:
         if member_type is None:
@@ -292,6 +293,7 @@ class DataclassConverterOptions:
     :param substitutions: SQL type to be substituted for a specific Python type.
     :param factory: Creates new column, table, struct and namespace instances.
     :param skip_annotations: Annotation classes to ignore on table column types.
+    :param auto_default: Automatically assign a default value to non-nullable types.
     """
 
     enum_mode: EnumMode = EnumMode.TYPE
@@ -307,6 +309,7 @@ class DataclassConverterOptions:
     substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict)
     factory: ObjectFactory = dataclasses.field(default_factory=ObjectFactory)
     skip_annotations: tuple[type, ...] = ()
+    auto_default: bool = False
 
 
 class DataclassConverter:
@@ -540,7 +543,7 @@ class DataclassConverter:
                 )
             elif self.options.struct_mode is StructMode.INLINE:
                 inline_types: list[SqlStructMember] = []
-                for field in dataclass_fields(typ):
+                for field in dataclass_fields(unwrap_annotated_type(typ)):
                     inline_props = get_field_properties(field.type)
                     inline_type = self.member_to_sql_data_type(
                         inline_props.field_type, typ
@@ -609,7 +612,8 @@ class DataclassConverter:
             return self._enumeration_key_type()
         if is_type_union(typ):
             member_types = [
-                evaluate_member_type(t, cls) for t in unwrap_union_types(typ)
+                evaluate_member_type(t, cls)
+                for t in unwrap_union_types(unwrap_annotated_type(typ))
             ]
             if all(is_entity_type(t) for t in member_types):
                 # discriminated union type
@@ -644,11 +648,30 @@ class DataclassConverter:
 
         props = get_field_properties(field.type)
         data_type = self.member_to_sql_data_type(props.field_type, cls)
-        default_value = (
-            constant(field.default)
-            if field.default is not dataclasses.MISSING and field.default is not None
-            else None
-        )
+        if field.default is not dataclasses.MISSING and field.default is not None:
+            default_value = constant(field.default)
+        elif (
+            not props.nullable
+            and self.options.auto_default
+            and not is_dataclass_type(props.plain_type)
+            and not is_generic_list(props.plain_type)
+            and not is_generic_set(props.plain_type)
+            and not is_type_union(props.plain_type)
+        ):
+            default_expr: Any
+            if props.plain_type is datetime.datetime:
+                default_expr = datetime.datetime.min
+            elif props.plain_type is datetime.date:
+                default_expr = datetime.date.min
+            elif props.plain_type is datetime.time:
+                default_expr = datetime.time.min
+            elif is_type_enum(props.plain_type):
+                default_expr = next(member.value for member in props.plain_type)
+            else:
+                default_expr = props.plain_type()  # type: ignore
+            default_value = constant(default_expr)
+        else:
+            default_value = None
         description = (
             doc.params[field.name].description if field.name in doc.params else None
         )
@@ -796,7 +819,7 @@ class DataclassConverter:
                 if is_type_union(field.type):
                     member_types = [
                         evaluate_member_type(t, cls)
-                        for t in unwrap_union_types(field.type)
+                        for t in unwrap_union_types(unwrap_annotated_type(field.type))
                     ]
                     if all(is_entity_type(t) for t in member_types):
                         # discriminated keys

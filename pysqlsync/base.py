@@ -140,6 +140,7 @@ class GeneratorOptions:
     :param initialize_tables: Whether to populate special tables (e.g. enumerations) with data.
     :param synchronization: Synchronization options.
     :param skip_annotations: Annotation classes to ignore on table column types.
+    :param auto_default: Automatically assign a default value to non-nullable types.
     """
 
     enum_mode: Optional[EnumMode] = None
@@ -152,6 +153,7 @@ class GeneratorOptions:
     initialize_tables: bool = False
     synchronization: MutatorOptions = dataclasses.field(default_factory=MutatorOptions)
     skip_annotations: tuple[type, ...] = ()
+    auto_default: bool = False
 
 
 class BaseGenerator(abc.ABC):

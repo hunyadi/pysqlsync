@@ -53,8 +53,9 @@ class SnowflakeGenerator(BaseGenerator):
                     ipaddress.IPv4Address: SqlFixedBinaryType(4),
                     ipaddress.IPv6Address: SqlFixedBinaryType(16),
                 },
-                skip_annotations=options.skip_annotations,
                 factory=self.factory,
+                skip_annotations=options.skip_annotations,
+                auto_default=options.auto_default,
             )
         )
 

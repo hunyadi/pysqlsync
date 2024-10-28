@@ -92,6 +92,7 @@ def is_ip_address_type(field_type: type) -> bool:
 
 
 def dataclass_has_primary_key(typ: type[DataclassInstance]) -> bool:
+    typ = unwrap_annotated_type(typ)
     for field in dataclass_fields(typ):
         if is_primary_key_type(field.type):
             return True

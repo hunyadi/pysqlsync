@@ -1,4 +1,5 @@
 import datetime
+import decimal
 from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Optional
@@ -31,9 +32,14 @@ def constant(v: Any) -> str:
         return str(v)
     elif isinstance(v, bool):
         return "TRUE" if v else "FALSE"
+    elif isinstance(v, decimal.Decimal):
+        return str(v)
     elif isinstance(v, datetime.datetime):
-        timestamp = v.astimezone(tz=datetime.timezone.utc).replace(tzinfo=None)
-        return quote(timestamp.isoformat(sep=" "))
+        if v.tzinfo is not None:
+            timestamp = v.astimezone(tz=datetime.timezone.utc).replace(tzinfo=None)
+        else:
+            timestamp = v
+        return f"TIMESTAMP {quote(timestamp.isoformat(sep=' '))}"
     elif isinstance(v, tuple):
         values = ", ".join(constant(value) for value in v)
         return f"({values})"
@@ -43,7 +49,9 @@ def constant(v: Any) -> str:
         )
         return f"({values})"
     else:
-        raise NotImplementedError(f"unknown constant representation for value: {v}")
+        raise NotImplementedError(
+            f"unknown constant representation for value (of type): {v} ({type(v)})"
+        )
 
 
 def escape_like(value: str, escape_char: str) -> str:

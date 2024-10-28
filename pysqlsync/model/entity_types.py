@@ -37,7 +37,7 @@ def make_entity(cls: type[DataclassInstance], key: str) -> type[DataclassInstanc
     Transforms a regular data-class type into an entity type.
 
     :param cls: The data-class type to transform.
-    :param key: The field to be come the primary key.
+    :param key: The field to become the primary key.
     """
 
     key_field, value_fields = key_value_fields(cls, key)

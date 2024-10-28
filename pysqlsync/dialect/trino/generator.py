@@ -22,6 +22,7 @@ class TrinoGenerator(BaseGenerator):
                 foreign_constraints=options.foreign_constraints,
                 initialize_tables=options.initialize_tables,
                 skip_annotations=options.skip_annotations,
+                auto_default=options.auto_default,
             )
         )
 
