@@ -1,7 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..model.data_types import SqlEnumType, SqlUserDefinedType, constant, quote
+from ..model.data_types import (
+    SqlEnumType,
+    SqlIntegerType,
+    SqlVariableCharacterType,
+    constant,
+    quote,
+)
 from ..model.id_types import SupportsName
 from .object_types import (
     Catalog,
@@ -101,20 +107,28 @@ class Mutator:
     ) -> Optional[str]:
         return None
 
-    def is_column_migrated(self, source: Column, target: Column) -> bool:
+    def is_column_migrated(self, source: Column, target: Column) -> Optional[bool]:
+        """
+        True if the column requires data migration, false if no migration is needed.
+
+        :param source: The source column to convert data from.
+        :param target: The target column to convert data to.
+        :returns: True/False, or None if subclass method is to decide.
+        """
+
+        # no migration is needed if column data type is unchanged
         if source == target or source.data_type == target.data_type:
             return False
 
-        is_user_enum_source = isinstance(
-            source.data_type, (SqlEnumType, SqlUserDefinedType)
-        )
-        is_user_enum_target = isinstance(
-            target.data_type, (SqlEnumType, SqlUserDefinedType)
-        )
-        if is_user_enum_source and not is_user_enum_target:
-            return True
+        # check if target data type is a primary key type
+        if isinstance(target.data_type, SqlIntegerType):
+            if isinstance(source.data_type, SqlEnumType):
+                return True
+            # some database engines represent enumerations as `varchar`
+            elif isinstance(source.data_type, SqlVariableCharacterType):
+                return True
 
-        return False
+        return None  # undecided (converts to False in a Boolean expression)
 
     def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
         if source == target:

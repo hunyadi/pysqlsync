@@ -476,7 +476,9 @@ class BaseGenerator(abc.ABC):
         "Returns a tuple of callable function objects that extracts each field of a data-class."
 
         return tuple(
-            self.get_field_extractor(table.columns[field.name], field.name, field.type)
+            self.get_field_extractor(
+                table.columns[field.name], field.name, typing.cast(type, field.type)
+            )
             for field in dataclasses.fields(entity_type)
             if not (skip_identity and table.columns[field.name].identity)
         )

@@ -39,7 +39,7 @@ def constant(v: Any) -> str:
             timestamp = v.astimezone(tz=datetime.timezone.utc).replace(tzinfo=None)
         else:
             timestamp = v
-        return f"TIMESTAMP {quote(timestamp.isoformat(sep=' '))}"
+        return quote(timestamp.isoformat(sep=" "))
     elif isinstance(v, tuple):
         values = ", ".join(constant(value) for value in v)
         return f"({values})"

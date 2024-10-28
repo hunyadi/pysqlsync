@@ -10,13 +10,27 @@ from pysqlsync.formation.object_types import (
     deleted,
     join_or_none,
 )
-from pysqlsync.model.data_types import quote
+from pysqlsync.model.data_types import SqlIntegerType, SqlUserDefinedType, quote
 from pysqlsync.model.id_types import LocalId
+from pysqlsync.util.typing import override
 
 from .object_types import sql_quoted_string
 
 
 class PostgreSQLMutator(Mutator):
+    @override
+    def is_column_migrated(self, source: Column, target: Column) -> Optional[bool]:
+        is_migrated = super().is_column_migrated(source, target)
+        if is_migrated is not None:
+            return is_migrated
+
+        if isinstance(target.data_type, SqlIntegerType):
+            # PostgreSQL defines a separate type for each enumeration type
+            if isinstance(source.data_type, SqlUserDefinedType):
+                return True
+
+        return None  # undecided (converts to False in a Boolean expression)
+
     def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> Optional[str]:
         enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
         return f'INSERT INTO {table.name} ("value") VALUES {enum_values} ON CONFLICT ("value") DO NOTHING;'

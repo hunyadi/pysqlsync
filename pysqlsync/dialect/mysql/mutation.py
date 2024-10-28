@@ -9,7 +9,7 @@ from pysqlsync.formation.object_types import (
     deleted,
     join_or_none,
 )
-from pysqlsync.model.data_types import SqlEnumType, quote
+from pysqlsync.model.data_types import SqlEnumType, SqlVariableCharacterType, quote
 from pysqlsync.model.id_types import LocalId
 
 from .object_types import MySQLColumn, MySQLTable
@@ -25,6 +25,11 @@ class MySQLMutator(Mutator):
             enum_values = ", ".join(f"({quote(v)})" for v in source.data_type.values)
             statements.append(
                 f'INSERT INTO {ref.table} ("value") VALUES {enum_values}\n'
+                'ON DUPLICATE KEY UPDATE "value" = "value";'
+            )
+        elif isinstance(source.data_type, SqlVariableCharacterType):
+            statements.append(
+                f'INSERT INTO {ref.table} ("value") SELECT DISTINCT {LocalId(deleted(source.name.id))} FROM {source_table.name}\n'
                 'ON DUPLICATE KEY UPDATE "value" = "value";'
             )
         statements.append(

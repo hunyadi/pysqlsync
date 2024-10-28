@@ -2,6 +2,7 @@ import re
 from typing import Optional
 
 from pysqlsync.formation.object_types import Column, ObjectFactory, Table
+from pysqlsync.model.data_types import SqlTimestampType
 from pysqlsync.model.id_types import LocalId
 
 _sql_quoted_str_table = str.maketrans(
@@ -44,9 +45,24 @@ class SnowflakeTable(Table):
 
 class SnowflakeColumn(Column):
     @property
+    def default_expr(self) -> str:
+        if self.default is None:
+            raise ValueError("default value is NULL")
+
+        if isinstance(self.data_type, SqlTimestampType):
+            m = re.match(
+                r"^'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})'$",
+                self.default,
+            )
+            if m:
+                return f"TIMESTAMP {self.default}"
+
+        return self.default
+
+    @property
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable and not self.identity else ""
-        default = f" DEFAULT {self.default}" if self.default is not None else ""
+        default = f" DEFAULT {self.default_expr}" if self.default is not None else ""
         identity = " IDENTITY" if self.identity else ""
         description = f" COMMENT {self.comment}" if self.description is not None else ""
         return f"{self.data_type}{nullable}{default}{identity}{description}"
