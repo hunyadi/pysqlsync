@@ -28,10 +28,10 @@ def constant(v: Any) -> str:
 
     if isinstance(v, str):
         return quote(v)
-    elif isinstance(v, (int, float)):
-        return str(v)
     elif isinstance(v, bool):
         return "TRUE" if v else "FALSE"
+    elif isinstance(v, (int, float)):
+        return str(v)
     elif isinstance(v, decimal.Decimal):
         return str(v)
     elif isinstance(v, datetime.datetime):

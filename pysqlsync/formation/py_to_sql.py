@@ -652,6 +652,8 @@ class DataclassConverter:
             default_value = constant(field.default)
         elif (
             not props.nullable
+            and not props.is_primary
+            and not props.is_identity
             and self.options.auto_default
             and not is_dataclass_type(props.plain_type)
             and not is_generic_list(props.plain_type)
