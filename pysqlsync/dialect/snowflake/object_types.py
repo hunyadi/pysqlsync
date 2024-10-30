@@ -49,25 +49,24 @@ class SnowflakeTable(Table):
 class SnowflakeColumn(Column):
     @property
     def default_expr(self) -> str:
-        default_expr = " DEFAULT "
-        if self.identity is True:
+    if self.identity is True:
+        return ""
+
+    if self.default is None:
+        if isinstance(self.data_type, SqlIntegerType):
+            return " DEFAULT 0"
+        else:
             return ""
-        if self.default is None:
-            if isinstance(self.data_type,SqlIntegerType):
-                return default_expr + "0"
-            else:
-                return ""
 
+    if isinstance(self.data_type, SqlTimestampType):
+        m = re.match(
+            r"^'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})'$",
+            self.default,
+        )
+        if m:
+            return f" DEFAULT TIMESTAMP {self.default}"
 
-        if isinstance(self.data_type, SqlTimestampType):
-            m = re.match(
-                r"^'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})'$",
-                self.default,
-            )
-            if m:
-                return default_expr + f" TIMESTAMP {self.default}"
-
-        return default_expr + self.default
+    return f" DEFAULT {self.default}"
 
     @property
     def data_spec(self) -> str:
