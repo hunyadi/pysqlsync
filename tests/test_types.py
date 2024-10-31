@@ -1,7 +1,10 @@
+import datetime
 import enum
 import unittest
 from dataclasses import dataclass
 from typing import Annotated, ClassVar, Optional, TypeVar
+
+from strong_typing.inspection import DataclassField
 
 from pysqlsync.formation.inspection import (
     dataclass_primary_key_name,
@@ -9,6 +12,8 @@ from pysqlsync.formation.inspection import (
 )
 from pysqlsync.model.entity_types import make_entity
 from pysqlsync.python_types import dataclass_to_code, enum_class_to_code
+from pysqlsync.util.dataclasses import flatten_dataclass, make_dataclass
+from tests import tables
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,14 @@ class Example:
     var_str: str
     var_def: int = 23
     var_opt: Optional[str] = None
+
+
+@dataclass
+class Nested:
+    "Documentation string for nested data-class."
+
+    id: int
+    example: Example
 
 
 class WorkflowState(enum.Enum):
@@ -102,6 +115,35 @@ class TestTypes(unittest.TestCase):
             "    var_int: Annotated[int, TypeTag()]\n"
             "    var_def: int = 23\n"
             "    var_opt: Optional[str] = None\n",
+        )
+
+    def test_flatten(self) -> None:
+        fields, docstring = flatten_dataclass(Nested)
+        fields.insert(0, DataclassField("account_uuid", str))
+        fields.append(DataclassField("commit_time", Optional[datetime.datetime], None))
+        TransformedNested = make_dataclass(
+            "TransformedNested", fields, docstring=docstring, module=tables
+        )
+        self.assertIsNotNone(getattr(tables, "TransformedNested", None))
+        self.assertMultiLineEqual(
+            dataclass_to_code(TransformedNested),
+            "@dataclasses.dataclass\n"
+            "class TransformedNested:\n"
+            '    """\n'
+            "    Documentation string for nested data-class.\n"
+            "\n"
+            "    :param example__var_int: An integer.\n"
+            "    :param example__var_str: A string.\n"
+            '    """\n'
+            "\n"
+            "    account_uuid: str\n"
+            "    id: int\n"
+            "    example__var_bool: bool\n"
+            "    example__var_int: Annotated[int, TypeTag()]\n"
+            "    example__var_str: str\n"
+            "    example__var_def: int = 23\n"
+            "    example__var_opt: Optional[str] = None\n"
+            "    commit_time: Optional[datetime] = None\n",
         )
 
 
