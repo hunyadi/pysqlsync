@@ -87,8 +87,10 @@ from .inspection import (
     dataclass_primary_key_type,
     get_entity_types,
     is_entity_type,
+    is_reference_type,
     is_simple_type,
     is_struct_type,
+    reference_to_key,
 )
 from .object_types import (
     Catalog,
@@ -648,32 +650,57 @@ class DataclassConverter:
 
         props = get_field_properties(field.type)
         data_type = self.member_to_sql_data_type(props.field_type, cls)
+
         if field.default is not dataclasses.MISSING and field.default is not None:
             default_value = constant(field.default)
         elif (
-            not props.nullable
+            self.options.auto_default
+            and not props.nullable
             and not props.is_primary
             and not props.is_identity
-            and self.options.auto_default
-            and not is_dataclass_type(props.plain_type)
-            and not is_generic_list(props.plain_type)
-            and not is_generic_set(props.plain_type)
-            and not is_type_union(props.plain_type)
         ):
-            default_expr: Any
-            if props.plain_type is datetime.datetime:
-                default_expr = datetime.datetime.min
-            elif props.plain_type is datetime.date:
-                default_expr = datetime.date.min
-            elif props.plain_type is datetime.time:
-                default_expr = datetime.time.min
-            elif is_type_enum(props.plain_type):
-                default_expr = next(member.value for member in props.plain_type)
+            if is_reference_type(props.plain_type, cls):
+                plain_type = reference_to_key(props.plain_type, cls)
+            elif is_type_union(props.plain_type):
+                member_types = [
+                    evaluate_member_type(t, cls)
+                    for t in unwrap_union_types(props.plain_type)
+                ]
+                for member_type in member_types:
+                    if is_simple_type(member_type):
+                        plain_type = member_type
+                        break
+                else:
+                    plain_type = None
+            elif (
+                not is_struct_type(props.plain_type)
+                and not is_generic_list(props.plain_type)
+                and not is_generic_set(props.plain_type)
+                and not is_type_union(props.plain_type)
+            ):
+                plain_type = props.plain_type
             else:
-                default_expr = props.plain_type()  # type: ignore
-            default_value = constant(default_expr)
+                # unable to infer default value for type
+                plain_type = None
+
+            if plain_type is not None:
+                default_expr: Any
+                if plain_type is datetime.datetime:
+                    default_expr = datetime.datetime.min
+                elif plain_type is datetime.date:
+                    default_expr = datetime.date.min
+                elif plain_type is datetime.time:
+                    default_expr = datetime.time.min
+                elif is_type_enum(plain_type):
+                    default_expr = next(member.value for member in plain_type)
+                else:
+                    default_expr = plain_type()  # type: ignore
+                default_value = constant(default_expr)
+            else:
+                default_value = None
         else:
             default_value = None
+
         description = (
             doc.params[field.name].description if field.name in doc.params else None
         )

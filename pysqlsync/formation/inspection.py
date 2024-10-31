@@ -73,6 +73,26 @@ def is_struct_type(typ: Any) -> TypeGuard[type[DataclassInstance]]:
     return not dataclass_has_primary_key(typ)
 
 
+def is_reference_type(typ: Any, cls: type) -> bool:
+    """
+    True for an entity type (foreign key) or a union of entity types (discriminated key).
+
+    :param typ: The type to test.
+    :param cls: The context for evaluating forward references.
+    """
+
+    if is_entity_type(typ):
+        return True
+    elif is_type_union(typ):
+        member_types = [
+            evaluate_member_type(t, cls)
+            for t in unwrap_union_types(unwrap_annotated_type(typ))
+        ]
+        return all(is_entity_type(t) for t in member_types)
+    else:
+        return False
+
+
 def is_ip_address_type(field_type: type) -> bool:
     "Check if type is an IPv4 or IPv6 address type."
 
