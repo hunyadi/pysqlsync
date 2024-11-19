@@ -39,12 +39,14 @@ from strong_typing.inspection import (
     is_generic_set,
     is_type_enum,
     is_type_literal,
+    is_type_optional,
     is_type_union,
     unwrap_annotated_type,
     unwrap_generic_list,
     unwrap_generic_set,
     unwrap_literal_types,
     unwrap_literal_values,
+    unwrap_optional_type,
     unwrap_union_types,
 )
 from strong_typing.topological import type_topological_sort
@@ -496,6 +498,9 @@ class DataclassConverter:
         :param cls: Context in which to evaluate the type (e.g. a class).
         :returns: A tuple of host relationship type (e.g. list) and host field type.
         """
+
+        if is_type_optional(field_type):
+            return self._get_relationship(unwrap_optional_type(field_type))
 
         field_type = unwrap_annotated_type(field_type)
 
