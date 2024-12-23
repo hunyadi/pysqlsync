@@ -3,6 +3,7 @@ import enum
 import inspect
 import io
 import re
+import sys
 import textwrap
 import typing
 from types import ModuleType
@@ -15,7 +16,7 @@ from strong_typing.inspection import (
     is_dataclass_type,
     is_type_enum,
 )
-from strong_typing.name import python_type_to_str
+from strong_typing.name import TypeFormatter
 
 
 def module_to_stream(module: ModuleType, target: TextIO) -> None:
@@ -101,15 +102,16 @@ def dataclass_to_stream(typ: type[DataclassInstance], target: TextIO) -> None:
         print(file=target)
 
     # member variables
+    fmt = TypeFormatter(context=sys.modules[typ.__module__])
     for field in dataclasses.fields(typ):
-        type_name = python_type_to_str(field.type)
+        type_name = fmt.python_type_to_str(field.type)
         metadata = dict(field.metadata)
 
         field_initializer: dict[str, str] = {}
         if field.default is not dataclasses.MISSING:
             field_initializer["default"] = repr(field.default)
         if field.default_factory is not dataclasses.MISSING:
-            field_initializer["default_factory"] = python_type_to_str(
+            field_initializer["default_factory"] = fmt.python_type_to_str(
                 field.default_factory
             )
         if metadata:

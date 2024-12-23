@@ -681,9 +681,9 @@ class Namespace(DatabaseObject):
 
     def drop_objects_stmt(self) -> Optional[str]:
         items: list[str] = []
-        items.extend(t.drop_stmt() for t in reversed(self.tables.values()))
-        items.extend(s.drop_stmt() for s in reversed(self.structs.values()))
-        items.extend(e.drop_stmt() for e in reversed(self.enums.values()))
+        items.extend(t.drop_stmt() for t in reversed(list(self.tables.values())))
+        items.extend(s.drop_stmt() for s in reversed(list(self.structs.values())))
+        items.extend(e.drop_stmt() for e in reversed(list(self.enums.values())))
         return join_or_none(items)
 
     def add_constraints_stmt(self) -> Optional[str]:
@@ -789,8 +789,12 @@ class Catalog(DatabaseObject):
     def drop_stmt(self) -> str:
         self.sort()
         items: list[Optional[str]] = []
-        items.extend(n.drop_objects_stmt() for n in reversed(self.namespaces.values()))
-        items.extend(n.drop_schema_stmt() for n in reversed(self.namespaces.values()))
+        items.extend(
+            n.drop_objects_stmt() for n in reversed(list(self.namespaces.values()))
+        )
+        items.extend(
+            n.drop_schema_stmt() for n in reversed(list(self.namespaces.values()))
+        )
         return join(items)
 
     def sort(self) -> None:

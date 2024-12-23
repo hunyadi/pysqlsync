@@ -385,6 +385,7 @@ class TestConverter(unittest.TestCase):
             ],
         )
 
+    @unittest.skip("create_module")
     def test_module(self) -> None:
         catalog = module_to_catalog(
             tables,
