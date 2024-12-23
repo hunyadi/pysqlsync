@@ -7,7 +7,7 @@ of Python language elements and database drivers (client libraries).
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 __author__ = "Levente Hunyadi"
 __copyright__ = "Copyright 2023-2024, Levente Hunyadi"
 __license__ = "MIT"
