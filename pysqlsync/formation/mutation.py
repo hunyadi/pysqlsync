@@ -70,10 +70,9 @@ class Mutator:
 
         added_values = [value for value in target.values if value not in source.values]
         if added_values:
-            return (
-                f"ALTER TYPE {source.name}\n"
-                + ",\n".join(f"ADD VALUE {constant(v)}" for v in added_values)
-                + ";"
+            return "\n".join(
+                f"ALTER TYPE {source.name} ADD VALUE {constant(v)};"
+                for v in added_values
             )
         else:
             return None

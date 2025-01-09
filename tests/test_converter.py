@@ -415,13 +415,14 @@ class TestConverter(unittest.TestCase):
         )
         target = copy.deepcopy(source)
         target_ns = target.namespaces["public"]
-        target_ns.enums["WorkflowState"].values.append("unknown")
+        target_ns.enums["WorkflowState"].values.append("value_1")
+        target_ns.enums["WorkflowState"].values.append("value_2")
         target_ns.structs.remove("Coordinates")
         target_ns.tables.remove("Employee")
         self.assertEqual(
             Mutator().mutate_catalog_stmt(source, target),
-            'ALTER TYPE "public"."WorkflowState"\n'
-            "ADD VALUE 'unknown';\n"
+            """ALTER TYPE "public"."WorkflowState" ADD VALUE 'value_1';\n"""
+            """ALTER TYPE "public"."WorkflowState" ADD VALUE 'value_2';\n"""
             'DROP TABLE "public"."Employee";\n'
             'DROP TYPE "public"."Coordinates";',
         )
@@ -434,7 +435,8 @@ class TestConverter(unittest.TestCase):
                     allow_drop_namespace=False,
                 )
             ).mutate_catalog_stmt(source, target),
-            'ALTER TYPE "public"."WorkflowState"\n' "ADD VALUE 'unknown';",
+            """ALTER TYPE "public"."WorkflowState" ADD VALUE 'value_1';\n"""
+            """ALTER TYPE "public"."WorkflowState" ADD VALUE 'value_2';""",
         )
 
         source = module_to_catalog(
