@@ -136,8 +136,11 @@ class FieldProperties:
     Captures type information associated with a field type.
 
     :param plain_type: Unadorned type without any metadata.
+    :param nullable: True if the field is optional.
     :param metadata: Any metadata that is not a constraint such as identity, primary key or unique.
     :param is_primary: True if the field is a primary key.
+    :param is_identity: True if the field is generated as identity.
+    :param is_unique: True if values of this type must be unique.
     """
 
     plain_type: TypeLike

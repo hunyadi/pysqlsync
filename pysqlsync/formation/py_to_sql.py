@@ -494,8 +494,7 @@ class DataclassConverter:
         """
         Returns relationship type and field type if the field expands into a separate relation (table).
 
-        :param typ: A type to check.
-        :param cls: Context in which to evaluate the type (e.g. a class).
+        :param field_type: A type to check.
         :returns: A tuple of host relationship type (e.g. list) and host field type.
         """
 
@@ -1069,7 +1068,7 @@ class DataclassConverter:
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))
 
-        # create join tables for one-to-many relationships
+        # create join tables for many-to-many relationships
         for entity in table_types:
             for field in dataclass_fields(entity):
                 relationship = self._get_relationship(field.type)
@@ -1078,7 +1077,7 @@ class DataclassConverter:
 
                 relationship_type, item_type = relationship
 
-                # "primary" refers to the primary key name/type of the tables participating in the one-to-many relationship
+                # "primary" refers to the primary key name/type of the tables participating in the many-to-many relationship
                 # "join" refers to the join table column names
                 primary_left_name = LocalId(dataclass_primary_key_name(entity))
                 if is_entity_type(item_type):

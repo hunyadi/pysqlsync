@@ -135,6 +135,7 @@ class GeneratorOptions:
 
     :param enum_mode: Conversion mode for enumeration types.
     :param struct_mode: Conversion mode for composite types.
+    :param array_mode: Conversion mode for sequence types.
     :param namespaces: Maps Python modules into SQL namespaces (a.k.a. schemas).
     :param foreign_constraints: Whether to create foreign/primary key relationships between tables.
     :param initialize_tables: Whether to populate special tables (e.g. enumerations) with data.

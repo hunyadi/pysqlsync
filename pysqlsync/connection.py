@@ -82,7 +82,16 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
 
 @dataclass
 class ConnectionParameters:
-    "Database connection parameters that would typically be encapsulated in a connection string."
+    """
+    Database connection parameters that would typically be encapsulated in a connection string.
+
+    :param host: Database server to connect to.
+    :param port: Port to use for the connection, `None` for default.
+    :param username: User identifier to log in with.
+    :param password: Password to log in with.
+    :param database: Database name to select as default (a.k.a. `USE`).
+    :param ssl: Connection mode for trusted connections.
+    """
 
     host: Optional[str] = None
     port: Optional[int] = None

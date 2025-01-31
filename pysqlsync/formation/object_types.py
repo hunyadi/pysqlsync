@@ -123,7 +123,13 @@ class EnumType(DatabaseObject, QualifiedObject):
 
 @dataclass
 class StructMember:
-    "A member of a struct type."
+    """
+    A member (a.k.a. field) of a composite (a.k.a. struct) type.
+
+    :param name: Name of the field.
+    :param data_type: Type of the field.
+    :param description: Human-readable description of the field.
+    """
 
     name: LocalId
     data_type: SqlDataType
@@ -135,7 +141,12 @@ class StructMember:
 
 @dataclass
 class StructType(DatabaseObject, QualifiedObject):
-    "A struct type, i.e. a nested type without a primary key."
+    """
+    A composite (a.k.a. struct) type, i.e. a nested type without a primary key.
+
+    :param members: Members (a.k.a. fields) of the composite type.
+    :param description: Human-readable description of the composite type.
+    """
 
     members: ObjectDict[StructMember]
     description: Optional[str]
@@ -175,7 +186,7 @@ class Column(DatabaseObject):
 
     :param name: The name of the column within its host table.
     :param data_type: The SQL data type of the column.
-    :param nullable: True if the column can be NULL.
+    :param nullable: True if the column can take the value NULL.
     :param default: The default value the column takes if no explicit value is set. Must be a valid SQL expression.
     :param identity: Whether the column is an identity column.
     :param description: The textual description of the column.
@@ -264,7 +275,11 @@ class Constraint(abc.ABC):
 
 @dataclass
 class UniqueConstraint(Constraint):
-    "A unique constraint."
+    """
+    A unique constraint.
+
+    :param unique_columns: Names of columns that comprise the constraint.
+    """
 
     unique_columns: tuple[LocalId, ...]
 
@@ -279,14 +294,22 @@ class UniqueConstraint(Constraint):
 
 @dataclass
 class ReferenceConstraint(Constraint):
-    "A constraint that references another table, such as a foreign or discriminated key constraint."
+    """
+    A constraint that references another table, such as a foreign or discriminated key constraint.
+
+    :param foreign_columns: Names of columns that comprise the reference constraint.
+    """
 
     foreign_columns: tuple[LocalId, ...]
 
 
 @dataclass
 class ForeignConstraint(ReferenceConstraint):
-    "A foreign key constraint."
+    """
+    A foreign key constraint.
+
+    :param reference: The reference this foreign constraint incorporates.
+    """
 
     reference: ConstraintReference
 
@@ -319,7 +342,11 @@ class DiscriminatedConstraint(ReferenceConstraint):
 
 @dataclass
 class CheckConstraint(Constraint):
-    "A check constraint."
+    """
+    A check constraint.
+
+    :param condition: A Boolean expression in SQL that must hold true for the column values.
+    """
 
     condition: str
 
@@ -597,7 +624,14 @@ class EnumTable(Table):
 
 @dataclass
 class Namespace(DatabaseObject):
-    "A namespace that multiple objects can share. Typically corresponds to a database schema."
+    """
+    A namespace that multiple objects can share. Typically corresponds to a database schema.
+
+    :param name: Unqualified name for the namespace (schema).
+    :param enums: Enumeration types defined in the namespace (if the database engine supports them).
+    :param structs: Composite types defined in the namespace (if the database engine supports them).
+    :param tables: Tables defined in the namespace.
+    """
 
     name: LocalId
     enums: ObjectDict[EnumType]
@@ -735,7 +769,13 @@ class Namespace(DatabaseObject):
 
 @dataclass
 class Catalog(DatabaseObject):
-    "A collection of database objects. Typically corresponds to a complete database."
+    """
+    A collection of database objects. Typically corresponds to a complete database.
+
+    For databases without namespace (schema) support, the only member in the collection is the empty string (`""`).
+
+    :param namespaces: Collection of namespaces (schemas) defined in the database.
+    """
 
     namespaces: ObjectDict[Namespace]
 
