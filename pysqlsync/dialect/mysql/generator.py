@@ -37,7 +37,7 @@ class MySQLGenerator(BaseGenerator):
 
         self.check_enum_mode(exclude=[EnumMode.TYPE])
         self.check_struct_mode(matches=StructMode.JSON)
-        self.check_array_mode(matches=ArrayMode.JSON)
+        self.check_array_mode(include=[ArrayMode.JSON, ArrayMode.RELATION])
 
         self.converter = DataclassConverter(
             options=DataclassConverterOptions(

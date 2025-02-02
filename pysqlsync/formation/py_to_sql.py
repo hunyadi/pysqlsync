@@ -278,6 +278,9 @@ class ArrayMode(enum.Enum):
     JSON = "json"
     "Convert Python list type to SQL JSON type (or its representation type)."
 
+    RELATION = "relation"
+    "Flatten Python list type to a separate table."
+
 
 @dataclasses.dataclass
 class DataclassConverterOptions:
@@ -492,19 +495,32 @@ class DataclassConverter:
         self, field_type: TypeLike
     ) -> Optional[tuple[type, TypeLike]]:
         """
-        Returns relationship type and field type if the field expands into a separate relation (table).
+        Returns relationship type and field type if the field expands into a separate relation (join table).
+
+        Join tables hold many-to-many relationships. For example, assume a table `Student` has a field `guardians`
+        of type `list[Person]`. This would expand into a separate table where each record holds:
+
+        1. a unique identifier
+        2. a foreign key to the originating table `Student`
+        3. a foreign key to the table `Person`
+
+        Likewise, a field of type `list[enum.Enum]` with options `ArrayMode.RELATION` and `EnumMode.RELATION` would
+        expand to a table of
+
+        1. a unique identifier
+        2. a foreign key to the originating table
+        3. a foreign key to the lookup table with all possible enumeration values
 
         :param field_type: A type to check.
         :returns: A tuple of host relationship type (e.g. list) and host field type.
         """
 
         if is_type_optional(field_type):
-            return self._get_relationship(unwrap_optional_type(field_type))
+            field_type = unwrap_optional_type(field_type)
 
         field_type = unwrap_annotated_type(field_type)
 
         # relations must be one-to-many
-        # related type must be an entity, or (depending on options) an enumeration type
         relation_type: type
         elem_type: TypeLike
         if is_generic_list(field_type):
@@ -516,9 +532,7 @@ class DataclassConverter:
         else:
             return None
 
-        if (
-            self.options.enum_mode is EnumMode.RELATION and is_type_enum(elem_type)
-        ) or is_entity_type(elem_type):
+        if self.options.array_mode is ArrayMode.RELATION or is_entity_type(elem_type):
             return relation_type, elem_type
         else:
             return None
@@ -582,20 +596,16 @@ class DataclassConverter:
             elif is_generic_list(typ):
                 item_type = unwrap_generic_list(typ)
             else:
-                raise NotImplementedError()
+                raise NotImplementedError("match not exhaustive: list | set")
             if is_simple_type(item_type):
                 if self.options.array_mode is ArrayMode.ARRAY:
-                    if self.options.enum_mode is EnumMode.RELATION and is_type_enum(
-                        item_type
-                    ):
-                        # list of enumeration type cannot become SQL array when enumeration values
-                        # are stored in their own table (and not represented as a SQL type)
-                        raise TypeError(
-                            f"use a join table; cannot convert list of enumeration type to SQL array: {typ}"
-                        )
                     return SqlArrayType(self.simple_type_to_sql_data_type(item_type))
                 elif self.options.array_mode is ArrayMode.JSON:
                     return self.member_to_sql_data_type(JsonType, cls)
+                elif self.options.array_mode is ArrayMode.RELATION:
+                    raise TypeError(
+                        "use a join table for flattening a list of values into a separate table"
+                    )
             if is_entity_type(item_type):
                 # list of entity type (i.e. type with primary key) cannot become SQL array (only list of struct type can)
                 raise TypeError(
@@ -612,6 +622,10 @@ class DataclassConverter:
                     )
                 elif self.options.array_mode is ArrayMode.JSON:
                     return self.member_to_sql_data_type(JsonType, cls)
+                elif self.options.array_mode is ArrayMode.RELATION:
+                    raise TypeError(
+                        "use a join table for flattening a list of struct type into a separate table"
+                    )
 
             raise TypeError(f"unsupported array data type: {item_type}")
         if is_extensible_enum_type(typ, cls):
@@ -1085,11 +1099,14 @@ class DataclassConverter:
                     primary_right_type = self.member_to_sql_data_type(
                         dataclass_primary_key_type(item_type), item_type
                     )
-                elif is_type_enum(item_type):
+                elif self.options.enum_mode is EnumMode.RELATION and is_type_enum(
+                    item_type
+                ):
                     # use the same name and type as used when generating the enumeration table
                     primary_right_name = LocalId("id")
                     primary_right_type = self._enumeration_key_type()
                 else:
+                    # related type must be an entity, or (depending on options) an enumeration type
                     raise TypeError(f"unrecognized join relation type: {item_type}")
 
                 column_left_name = f"{entity.__name__}_{field.name}"

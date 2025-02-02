@@ -192,7 +192,8 @@ class BaseGenerator(abc.ABC):
         mode: Optional[E],
         *,
         matches: Optional[E] = None,
-        exclude: Optional[list[E]],
+        include: Optional[list[E]] = None,
+        exclude: Optional[list[E]] = None,
     ) -> None:
         if mode is None:
             return
@@ -200,6 +201,9 @@ class BaseGenerator(abc.ABC):
         fail: bool = False
         if matches is not None:
             if mode is not matches:
+                fail = True
+        if include is not None:
+            if mode not in include:
                 fail = True
         if exclude is not None:
             if mode in exclude:
@@ -213,25 +217,34 @@ class BaseGenerator(abc.ABC):
         self,
         *,
         matches: Optional[EnumMode] = None,
+        include: Optional[list[EnumMode]] = None,
         exclude: Optional[list[EnumMode]] = None,
     ) -> None:
-        self._check_mode(self.options.enum_mode, matches=matches, exclude=exclude)
+        self._check_mode(
+            self.options.enum_mode, matches=matches, include=include, exclude=exclude
+        )
 
     def check_struct_mode(
         self,
         *,
         matches: Optional[StructMode] = None,
+        include: Optional[list[StructMode]] = None,
         exclude: Optional[list[StructMode]] = None,
     ) -> None:
-        self._check_mode(self.options.struct_mode, matches=matches, exclude=exclude)
+        self._check_mode(
+            self.options.struct_mode, matches=matches, include=include, exclude=exclude
+        )
 
     def check_array_mode(
         self,
         *,
         matches: Optional[ArrayMode] = None,
+        include: Optional[list[ArrayMode]] = None,
         exclude: Optional[list[ArrayMode]] = None,
     ) -> None:
-        self._check_mode(self.options.array_mode, matches=matches, exclude=exclude)
+        self._check_mode(
+            self.options.array_mode, matches=matches, include=include, exclude=exclude
+        )
 
     @overload
     def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]: ...
@@ -501,7 +514,7 @@ class BaseGenerator(abc.ABC):
 
         if isinstance(column.data_type, SqlJsonType) or (
             isinstance(column.data_type, SqlVariableCharacterType)
-            and (field_type is dict or field_type is list)
+            and (field_type is dict or field_type is list or field_type is set)
         ):
             return lambda field: _JSON_ENCODER.encode(field)
 

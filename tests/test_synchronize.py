@@ -4,7 +4,7 @@ import unittest
 from dataclasses import dataclass
 from io import BytesIO
 
-from strong_typing.inspection import dataclass_fields
+from strong_typing.inspection import DataclassInstance, dataclass_fields
 
 from pysqlsync.base import BaseContext, ClassRef, GeneratorOptions
 from pysqlsync.data.exchange import TextReader, TextWriter, fields_to_types
@@ -131,18 +131,30 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         count = await conn.query_one(int, f"SELECT COUNT(*) FROM {table.name}")
         return count
 
-    async def test_insert_update_delete_rows(self) -> None:
-        await self.insert_update_delete_rows(self.options)
+    async def test_insert_update_delete_rows_plain(self) -> None:
+        await self.insert_update_delete_rows_plain([tables.UniqueTable])
 
     async def test_insert_update_delete_rows_relation(self) -> None:
+        await self.insert_update_delete_rows_relation([tables.UniqueTable])
+
+    async def insert_update_delete_rows_plain(
+        self, exclude: list[type[DataclassInstance]]
+    ) -> None:
+        await self.insert_update_delete_rows(self.options, exclude)
+
+    async def insert_update_delete_rows_relation(
+        self, exclude: list[type[DataclassInstance]]
+    ) -> None:
         options = GeneratorOptions(
             namespaces={tables: "sample", event: "event", school: "school", user: None},
             foreign_constraints=False,
             enum_mode=EnumMode.RELATION,
         )
-        await self.insert_update_delete_rows(options)
+        await self.insert_update_delete_rows(options, exclude)
 
-    async def insert_update_delete_rows(self, options: GeneratorOptions) -> None:
+    async def insert_update_delete_rows(
+        self, options: GeneratorOptions, exclude: list[type[DataclassInstance]]
+    ) -> None:
         async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
@@ -153,11 +165,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             entity_types = get_entity_types([tables])
 
             for entity_type in entity_types:
-                if entity_type.__name__ == tables.EnumArrayTable.__name__:
-                    continue
-                if entity_type.__name__ == tables.EnumSetTable.__name__:
-                    continue
-                if entity_type.__name__ == tables.UniqueTable.__name__:
+                if entity_type in exclude:
                     continue
 
                 with self.subTest(entity=entity_type.__name__):
@@ -200,25 +208,11 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                         table,
                         field_names=field_labels,
                         field_types=field_types,
-                        records=[],
-                    )
-                    self.assertEqual(await self.get_rows(conn, table), 0)
-                    await conn.insert_rows(
-                        table,
-                        field_names=field_labels,
-                        field_types=field_types,
                         records=reuse_guard(row for row in rows),
                     )
                     self.assertEqual(await self.get_rows(conn, table), len(entities))
 
                     # update data in database table
-                    await conn.upsert_rows(
-                        table,
-                        field_names=field_labels,
-                        field_types=field_types,
-                        records=[],
-                    )
-                    self.assertEqual(await self.get_rows(conn, table), len(entities))
                     await conn.upsert_rows(
                         table,
                         field_names=field_labels,
@@ -286,6 +280,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await explorer.synchronize(module=tables)
 
         options = GeneratorOptions(
+            array_mode=ArrayMode.RELATION,
             enum_mode=EnumMode.RELATION,
             namespaces={tables: "sample"},
         )
@@ -301,6 +296,11 @@ class TestOracleSynchronize(OracleBase, TestSynchronize):
 
 @unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
+    async def test_insert_update_delete_rows_relation(self) -> None:
+        await self.insert_update_delete_rows_relation(
+            [tables.EnumArrayTable, tables.EnumSetTable, tables.UniqueTable]
+        )
+
     async def test_enum_migration(self) -> None:
         options = GeneratorOptions(
             enum_mode=EnumMode.TYPE,

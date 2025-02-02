@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from strong_typing.inspection import DataclassInstance
 
 from pysqlsync.base import GeneratorOptions
-from pysqlsync.formation.py_to_sql import EnumMode
+from pysqlsync.formation.py_to_sql import ArrayMode, EnumMode
 from tests import tables
 from tests.params import (
     MSSQLBase,
@@ -351,7 +351,9 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             ");",
         )
         options = GeneratorOptions(
-            enum_mode=EnumMode.RELATION, namespaces={tables: None}
+            enum_mode=EnumMode.RELATION,
+            array_mode=ArrayMode.RELATION,
+            namespaces={tables: None},
         )
         self.assertMatchSQLCreateOptions(
             options,
@@ -392,7 +394,9 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             ");",
         )
         options = GeneratorOptions(
-            enum_mode=EnumMode.RELATION, namespaces={tables: None}
+            enum_mode=EnumMode.RELATION,
+            array_mode=ArrayMode.RELATION,
+            namespaces={tables: None},
         )
         self.assertMatchSQLCreateOptions(
             options,
