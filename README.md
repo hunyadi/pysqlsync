@@ -159,7 +159,7 @@ Extensible enumerations (declared with `E | str` or `E | str | None` where `E` i
 ## Database standard and engine support
 
 * PostgreSQL (with [asyncpg](https://magicstack.github.io/asyncpg/))
-* Microsoft SQL Server (with [pyodbc](https://github.com/mkleehammer/pyodbc/wiki))
+* Microsoft SQL Server (with [pyodbc](https://github.com/mkleehammer/pyodbc/wiki), requires [ODBC Driver 18](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server) or later)
 * Oracle (with [oracledb](https://python-oracledb.readthedocs.io/))
 * MySQL (with [aiomysql](https://aiomysql.readthedocs.io/))
 

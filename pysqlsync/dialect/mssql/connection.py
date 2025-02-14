@@ -33,6 +33,7 @@ class MSSQLConnection(BaseConnection):
         LOGGER.info("connecting to %s", self.params)
         params = {
             "DRIVER": "{ODBC Driver 18 for SQL Server}",
+            "APP": "pysqlsync",
             "SERVER": (
                 f"{self.params.host},{self.params.port}"
                 if self.params.port is not None
@@ -40,6 +41,7 @@ class MSSQLConnection(BaseConnection):
             ),
             "UID": self.params.username,
             "PWD": self.params.password,
+            "LongAsMax": "yes",
             "TrustServerCertificate": "yes",
         }
         if self.params.database is not None:
