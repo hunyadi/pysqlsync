@@ -25,6 +25,13 @@ class MSSQLBooleanType(SqlBooleanType):
     def __str__(self) -> str:
         return "bit"
 
+    def value_to_sql_literal(self, value) -> str | None:
+        if value is True:
+            return "1"
+        elif value is False:
+            return "0"
+        return None
+
 
 class MSSQLEncoding(enum.Enum):
     UTF8 = "utf-8"
