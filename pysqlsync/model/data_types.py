@@ -72,7 +72,7 @@ class SqlDataType:
             f"unrecognized Python type annotation for {type(self).__name__}: {meta}"
         )
 
-    def value_to_sql_literal(self, value: Any) -> str | None:
+    def value_to_sql_literal(self, value: Any) -> Optional[str]:
         return None
 
 
