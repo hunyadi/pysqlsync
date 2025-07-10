@@ -1,5 +1,5 @@
 import enum
-from typing import Optional
+from typing import Any, Optional
 
 import pyodbc
 
@@ -25,7 +25,7 @@ class MSSQLBooleanType(SqlBooleanType):
     def __str__(self) -> str:
         return "bit"
 
-    def value_to_sql_literal(self, value) -> str | None:
+    def value_to_sql_literal(self, value: Any) -> str | None:
         if value is True:
             return "1"
         elif value is False:
