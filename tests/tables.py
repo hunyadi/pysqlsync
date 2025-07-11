@@ -44,6 +44,16 @@ class BooleanTable:
 
 
 @dataclass
+class DefaultBooleanTable:
+    id: PrimaryKey[int]
+    boolean_false: bool = False
+    boolean_true: bool = True
+    nullable_boolean_null: Optional[bool] = None
+    nullable_boolean_false: Optional[bool] = False
+    nullable_boolean_true: Optional[bool] = True
+
+
+@dataclass
 class NumericTable:
     id: PrimaryKey[int]
 

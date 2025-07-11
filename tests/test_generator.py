@@ -89,6 +89,48 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             ");",
         )
 
+    def test_create_default_boolean_table(self) -> None:
+        self.maxDiff = None
+        self.assertMatchSQLCreate(
+            "postgresql",
+            tables.DefaultBooleanTable,
+            'CREATE TABLE "DefaultBooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean_false" boolean NOT NULL DEFAULT FALSE,\n'
+            '"boolean_true" boolean NOT NULL DEFAULT TRUE,\n'
+            '"nullable_boolean_null" boolean,\n'
+            '"nullable_boolean_false" boolean DEFAULT FALSE,\n'
+            '"nullable_boolean_true" boolean DEFAULT TRUE,\n'
+            'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMatchSQLCreate(
+            "mssql",
+            tables.DefaultBooleanTable,
+            'CREATE TABLE "DefaultBooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean_false" bit NOT NULL CONSTRAINT "df_boolean_false" DEFAULT 0,\n'
+            '"boolean_true" bit NOT NULL CONSTRAINT "df_boolean_true" DEFAULT 1,\n'
+            '"nullable_boolean_null" bit,\n'
+            '"nullable_boolean_false" bit CONSTRAINT "df_nullable_boolean_false" DEFAULT 0,\n'
+            '"nullable_boolean_true" bit CONSTRAINT "df_nullable_boolean_true" DEFAULT 1,\n'
+            'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+        self.assertMatchSQLCreate(
+            "mysql",
+            tables.DefaultBooleanTable,
+            'CREATE TABLE "DefaultBooleanTable" (\n'
+            '"id" bigint NOT NULL,\n'
+            '"boolean_false" tinyint NOT NULL DEFAULT FALSE,\n'
+            '"boolean_true" tinyint NOT NULL DEFAULT TRUE,\n'
+            '"nullable_boolean_null" tinyint,\n'
+            '"nullable_boolean_false" tinyint DEFAULT FALSE,\n'
+            '"nullable_boolean_true" tinyint DEFAULT TRUE,\n'
+            'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
+            ");",
+        )
+
     def test_create_numeric_table(self) -> None:
         self.maxDiff = None
         for dialect in ["postgresql", "mssql", "mysql"]:

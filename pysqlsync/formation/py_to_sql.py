@@ -670,7 +670,7 @@ class DataclassConverter:
         data_type = self.member_to_sql_data_type(props.field_type, cls)
 
         if field.default is not dataclasses.MISSING and field.default is not None:
-            default_value = constant(field.default)
+            default_value = data_type.value_to_sql_literal(field.default)
         elif (
             self.options.auto_default
             and not props.nullable

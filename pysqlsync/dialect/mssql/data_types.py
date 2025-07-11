@@ -1,5 +1,5 @@
 import enum
-from typing import Optional
+from typing import Any, Optional
 
 import pyodbc
 
@@ -24,6 +24,12 @@ from pysqlsync.model.data_types import (
 class MSSQLBooleanType(SqlBooleanType):
     def __str__(self) -> str:
         return "bit"
+
+    def value_to_sql_literal(self, value: Any) -> str:
+        if not isinstance(value, bool):
+            raise TypeError(f"expected: value of type `bool`, got: {type(value)}")
+
+        return "1" if value else "0"
 
 
 class MSSQLEncoding(enum.Enum):
