@@ -26,15 +26,10 @@ class MSSQLBooleanType(SqlBooleanType):
         return "bit"
 
     def value_to_sql_literal(self, value: Any) -> str:
-        if value is True:
-            return "1"
+        if not isinstance(value, bool):
+            raise TypeError(f"expected: value of type `bool`, got: {type(value)}")
 
-        if value is False:
-            return "0"
-
-        raise NotImplementedError(
-            f"Cannot convert boolean value to SQL literal: {value}"
-        )
+        return "1" if value else "0"
 
 
 class MSSQLEncoding(enum.Enum):
