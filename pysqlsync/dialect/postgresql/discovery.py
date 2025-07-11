@@ -29,11 +29,8 @@ def to_default_expr(expr: Optional[str]) -> Optional[str]:
     if expr is None:
         return None
 
-    if expr == "false":
-        return "FALSE"
-
-    if expr == "true":
-        return "TRUE"
+    if expr.lower() in ("true", "false"):
+        return expr.upper()
 
     m = re.match(
         r"^'(?P<year>\d{4})-(?P<mon>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})'::timestamp without time zone$",

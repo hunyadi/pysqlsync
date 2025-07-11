@@ -25,12 +25,16 @@ class MSSQLBooleanType(SqlBooleanType):
     def __str__(self) -> str:
         return "bit"
 
-    def value_to_sql_literal(self, value: Any) -> Optional[str]:
+    def value_to_sql_literal(self, value: Any) -> str:
         if value is True:
             return "1"
-        elif value is False:
+
+        if value is False:
             return "0"
-        return None
+
+        raise NotImplementedError(
+            f"Cannot convert boolean value to SQL literal: {value}"
+        )
 
 
 class MSSQLEncoding(enum.Enum):
