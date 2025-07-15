@@ -90,6 +90,7 @@ class MySQLExplorer(AnsiExplorer):
         for col in column_meta:
             columns.append(
                 self.factory.column_class(
+                    table_id,
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
                         type_name=col.data_type,

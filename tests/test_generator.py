@@ -109,11 +109,11 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             tables.DefaultBooleanTable,
             'CREATE TABLE "DefaultBooleanTable" (\n'
             '"id" bigint NOT NULL,\n'
-            '"boolean_false" bit NOT NULL CONSTRAINT "df_boolean_false" DEFAULT 0,\n'
-            '"boolean_true" bit NOT NULL CONSTRAINT "df_boolean_true" DEFAULT 1,\n'
+            '"boolean_false" bit NOT NULL CONSTRAINT "df_DefaultBooleanTable_boolean_false" DEFAULT 0,\n'
+            '"boolean_true" bit NOT NULL CONSTRAINT "df_DefaultBooleanTable_boolean_true" DEFAULT 1,\n'
             '"nullable_boolean_null" bit,\n'
-            '"nullable_boolean_false" bit CONSTRAINT "df_nullable_boolean_false" DEFAULT 0,\n'
-            '"nullable_boolean_true" bit CONSTRAINT "df_nullable_boolean_true" DEFAULT 1,\n'
+            '"nullable_boolean_false" bit CONSTRAINT "df_DefaultBooleanTable_nullable_boolean_false" DEFAULT 0,\n'
+            '"nullable_boolean_true" bit CONSTRAINT "df_DefaultBooleanTable_nullable_boolean_true" DEFAULT 1,\n'
             'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
@@ -172,11 +172,11 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             tables.DefaultNumericTable,
             'CREATE TABLE "DefaultNumericTable" (\n'
             '"id" bigint NOT NULL,\n'
-            '"integer_8" smallint NOT NULL CONSTRAINT "df_integer_8" DEFAULT 127,\n'
-            '"integer_16" smallint NOT NULL CONSTRAINT "df_integer_16" DEFAULT 32767,\n'
-            '"integer_32" integer NOT NULL CONSTRAINT "df_integer_32" DEFAULT 2147483647,\n'
-            '"integer_64" bigint NOT NULL CONSTRAINT "df_integer_64" DEFAULT 0,\n'
-            '"integer" bigint NOT NULL CONSTRAINT "df_integer" DEFAULT 23,\n'
+            '"integer_8" smallint NOT NULL CONSTRAINT "df_DefaultNumericTable_integer_8" DEFAULT 127,\n'
+            '"integer_16" smallint NOT NULL CONSTRAINT "df_DefaultNumericTable_integer_16" DEFAULT 32767,\n'
+            '"integer_32" integer NOT NULL CONSTRAINT "df_DefaultNumericTable_integer_32" DEFAULT 2147483647,\n'
+            '"integer_64" bigint NOT NULL CONSTRAINT "df_DefaultNumericTable_integer_64" DEFAULT 0,\n'
+            '"integer" bigint NOT NULL CONSTRAINT "df_DefaultNumericTable_integer" DEFAULT 23,\n'
             'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
             ");",
         )
@@ -328,7 +328,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             tables.DefaultDateTimeTable,
             'CREATE TABLE "DefaultDateTimeTable" (\n'
             '"id" bigint NOT NULL,\n'
-            """"iso_date_time" datetime2 NOT NULL CONSTRAINT "df_iso_date_time" DEFAULT '1989-10-24 23:59:59',\n"""
+            """"iso_date_time" datetime2 NOT NULL CONSTRAINT "df_DefaultDateTimeTable_iso_date_time" DEFAULT '1989-10-24 23:59:59',\n"""
             'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )

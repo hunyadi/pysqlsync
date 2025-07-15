@@ -277,6 +277,7 @@ class PostgreSQLExplorer(Explorer):
                 data_type = SqlArrayType(data_type)
             columns.append(
                 self.factory.column_class(
+                    table_id,
                     LocalId(col.column_name),
                     data_type,
                     bool(col.is_nullable),

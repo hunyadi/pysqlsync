@@ -662,7 +662,11 @@ class DataclassConverter:
         raise TypeError(f"unsupported data type: {typ}")
 
     def member_to_column(
-        self, field: DataclassField, cls: type[DataclassInstance], doc: Docstring
+        self,
+        table_name: SupportsQualifiedId,
+        field: DataclassField,
+        cls: type[DataclassInstance],
+        doc: Docstring,
     ) -> Column:
         "Converts a data-class field into a SQL table column."
 
@@ -724,6 +728,7 @@ class DataclassConverter:
         )
 
         return self.options.factory.column_class(
+            table_name=table_name,
             name=LocalId(field.name),
             data_type=data_type,
             nullable=props.nullable,
@@ -739,10 +744,11 @@ class DataclassConverter:
             raise TypeError(f"expected: dataclass type; got: {cls}")
 
         doc = parse_type(cls)
+        id = self.create_qualified_id(cls.__module__, cls.__name__)
 
         try:
             columns = [
-                self.member_to_column(field, cls, doc)
+                self.member_to_column(id, field, cls, doc)
                 for field in dataclass_fields(cls)
                 if self._get_relationship(field.type) is None
             ]
@@ -809,7 +815,7 @@ class DataclassConverter:
                 )
 
         return self.options.factory.table_class(
-            name=self.create_qualified_id(cls.__module__, cls.__name__),
+            name=id,
             columns=columns,
             primary_key=(LocalId(dataclass_primary_key_name(cls)),),
             constraints=constraints or None,
@@ -932,6 +938,7 @@ class DataclassConverter:
         id = self.create_qualified_id(enum_type.__module__, enum_table_name)
         columns = [
             self.options.factory.column_class(
+                id,
                 LocalId("id"),
                 self._enumeration_key_type(),
                 False,
@@ -953,6 +960,7 @@ class DataclassConverter:
         if unadorned_member_type is int or unadorned_member_type is str:
             columns.append(
                 self.options.factory.column_class(
+                    id,
                     LocalId("value"),
                     self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
                     False,
@@ -967,7 +975,7 @@ class DataclassConverter:
         elif is_dataclass_type(unadorned_member_type):
             columns.extend(
                 self.member_to_column(
-                    field, enum_member_type, parse_type(unadorned_member_type)
+                    id, field, enum_member_type, parse_type(unadorned_member_type)
                 )
                 for field in dataclass_fields(unadorned_member_type)
             )
@@ -1148,19 +1156,23 @@ class DataclassConverter:
                     )
 
                 table_defs = tables.setdefault(entity.__module__, [])
+                table_id = self.create_qualified_id(
+                    entity.__module__,
+                    table_name,
+                )
+
                 table_defs.append(
                     self.options.factory.table_class(
-                        self.create_qualified_id(
-                            entity.__module__,
-                            table_name,
-                        ),
+                        table_id,
                         [
                             self.options.factory.column_class(
+                                table_id,
                                 LocalId("uuid"),
                                 self.member_to_sql_data_type(uuid.UUID, entity),
                                 False,
                             ),
                             self.options.factory.column_class(
+                                table_id,
                                 LocalId(column_left_name),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
@@ -1168,6 +1180,7 @@ class DataclassConverter:
                                 False,
                             ),
                             self.options.factory.column_class(
+                                table_id,
                                 LocalId(column_right_name),
                                 primary_right_type,
                                 False,

@@ -183,6 +183,7 @@ class AnsiExplorer(Explorer):
             column_name, data_type, nullable = col
             columns.append(
                 self.factory.column_class(
+                    table_id,
                     LocalId(column_name),
                     self.discovery.sql_data_type_from_spec(type_name=data_type),
                     bool(nullable),
@@ -211,6 +212,7 @@ class AnsiExplorer(Explorer):
         for col in column_meta:
             columns.append(
                 self.factory.column_class(
+                    table_id,
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
                         type_name=col.data_type,

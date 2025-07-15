@@ -17,7 +17,7 @@ class MSSQLColumn(Column):
     def default_constraint_name(self) -> LocalId:
         "The name of the constraint for DEFAULT."
 
-        return LocalId(f"df_{self.name.local_id}")
+        return LocalId(f"df_{self.table_name.local_id}_{self.name.local_id}")
 
     @property
     def data_spec(self) -> str:

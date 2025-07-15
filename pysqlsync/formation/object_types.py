@@ -184,6 +184,7 @@ class Column(DatabaseObject):
     """
     A column in a database table.
 
+    :param table_name: The name of the table that the column belongs to.
     :param name: The name of the column within its host table.
     :param data_type: The SQL data type of the column.
     :param nullable: True if the column can take the value NULL.
@@ -192,6 +193,7 @@ class Column(DatabaseObject):
     :param description: The textual description of the column.
     """
 
+    table_name: SupportsQualifiedId
     name: LocalId
     data_type: SqlDataType
     nullable: bool

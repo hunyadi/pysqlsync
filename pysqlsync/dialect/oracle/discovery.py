@@ -152,6 +152,7 @@ class OracleExplorer(Explorer):
             identity = bool(col.is_identity)
             columns.append(
                 self.factory.column_class(
+                    table_id,
                     LocalId(col.column_name),
                     data_type,
                     nullable,
