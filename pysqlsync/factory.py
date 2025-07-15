@@ -56,7 +56,7 @@ def get_dialect(engine_name: str) -> BaseEngine:
     try:
         engine_factory = _engines[engine_name]
     except KeyError:
-        raise ValueError(f"unrecognized dialect: {engine_name}")
+        raise ValueError(f"unrecognized dialect: {engine_name}") from None
     else:
         return engine_factory
 

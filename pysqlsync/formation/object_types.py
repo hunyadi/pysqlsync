@@ -195,9 +195,29 @@ class Column(DatabaseObject):
     name: LocalId
     data_type: SqlDataType
     nullable: bool
-    default: Optional[str] = None
-    identity: bool = False
-    description: Optional[str] = None
+    default: Optional[str]
+    identity: bool
+    description: Optional[str]
+
+    @classmethod
+    def create(
+        cls,
+        name: LocalId,
+        data_type: SqlDataType,
+        *,
+        nullable: bool,
+        default: Optional[str] = None,
+        identity: bool = False,
+        description: Optional[str] = None,
+    ) -> "Column":
+        return cls(
+            name,
+            data_type,
+            nullable=nullable,
+            default=default,
+            identity=identity,
+            description=description,
+        )
 
     def __str__(self) -> str:
         return self.column_spec
@@ -377,16 +397,16 @@ class Table(DatabaseObject, QualifiedObject):
     def __init__(
         self,
         name: SupportsQualifiedId,
-        columns: list[Column],
+        columns: Iterable[Column],
         *,
         primary_key: tuple[LocalId, ...],
-        constraints: Optional[list[Constraint]] = None,
+        constraints: Optional[Iterable[Constraint]] = None,
         description: Optional[str] = None,
     ) -> None:
         super().__init__(name)
         self.columns = ObjectDict(columns)
         self.primary_key = primary_key
-        self.constraints = ObjectDict(constraints or [])
+        self.constraints = ObjectDict(constraints or ())
         self.description = description
 
     def __str__(self) -> str:

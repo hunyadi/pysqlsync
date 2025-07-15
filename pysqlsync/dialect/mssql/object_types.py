@@ -1,4 +1,7 @@
-from typing import Optional
+import random
+import string
+from dataclasses import dataclass
+from typing import Optional, Union
 
 from pysqlsync.formation.object_types import (
     Column,
@@ -8,21 +11,62 @@ from pysqlsync.formation.object_types import (
     Table,
     join_or_none,
 )
-from pysqlsync.model.data_types import quote
+from pysqlsync.model.data_types import SqlDataType, quote
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.util.typing import override
 
+ID_GENERATOR = random.Random()
+
+
+@dataclass
+class MSSQLDefault:
+    """
+    Default value constraint.
+
+    :param name: Globally unique name for the default constraint.
+    :param expr: SQL expression for the default value.
+    """
+
+    name: str
+    expr: str
+
 
 class MSSQLColumn(Column):
-    def default_constraint_name(self) -> LocalId:
-        "The name of the constraint for DEFAULT."
+    """
+    A column in a Microsoft SQL Server database table.
 
-        return LocalId(f"df_{self.name.local_id}")
+    :param default_constraint_name: The name of the constraint for DEFAULT.
+    """
+
+    default_constraint_name: LocalId
+
+    def __init__(
+        self,
+        name: LocalId,
+        data_type: SqlDataType,
+        nullable: bool,
+        default: Union[MSSQLDefault, str, None] = None,
+        identity: bool = False,
+        description: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            name,
+            data_type,
+            nullable=nullable,
+            default=default.expr if isinstance(default, MSSQLDefault) else default,
+            identity=identity,
+            description=description,
+        )
+        if isinstance(default, MSSQLDefault):
+            self.default_constraint_name = LocalId(default.name)
+        else:
+            r = "".join(ID_GENERATOR.choices(string.ascii_lowercase, k=6))
+            self.default_constraint_name = LocalId(f"df_{self.name.local_id}_{r}")
 
     @property
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable else ""
-        name = self.default_constraint_name()
+        name = self.default_constraint_name
         default = (
             f" CONSTRAINT {name} DEFAULT {self.default}"
             if self.default is not None
@@ -38,7 +82,7 @@ class MSSQLColumn(Column):
     @override
     def drop_stmt(self) -> str:
         if self.default is not None:
-            name = self.default_constraint_name()
+            name = self.default_constraint_name
             return f"DROP CONSTRAINT {name}, COLUMN {self.name}"
         else:
             return f"DROP COLUMN {self.name}"

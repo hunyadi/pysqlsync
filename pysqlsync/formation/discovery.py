@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from ..base import BaseContext, DiscoveryError, Explorer
 from ..model.data_types import escape_like, quote
@@ -163,13 +163,15 @@ class AnsiExplorer(Explorer):
         )
         return count > 0
 
-    async def get_columns(self, table_id: SupportsQualifiedId) -> list[Column]:
+    async def get_columns(self, table_id: SupportsQualifiedId) -> Sequence[Column]:
         if await self.has_column_extended_info():
             return await self._get_columns_full(table_id)
         else:
             return await self._get_columns_limited(table_id)
 
-    async def _get_columns_limited(self, table_id: SupportsQualifiedId) -> list[Column]:
+    async def _get_columns_limited(
+        self, table_id: SupportsQualifiedId
+    ) -> Sequence[Column]:
         column_meta = await self.conn.query_all(
             tuple[str, str, bool],
             "SELECT col.column_name, col.data_type, CASE WHEN col.is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable\n"
@@ -182,15 +184,17 @@ class AnsiExplorer(Explorer):
         for col in column_meta:
             column_name, data_type, nullable = col
             columns.append(
-                self.factory.column_class(
+                self.factory.column_class.create(
                     LocalId(column_name),
                     self.discovery.sql_data_type_from_spec(type_name=data_type),
-                    bool(nullable),
+                    nullable=bool(nullable),
                 )
             )
         return columns
 
-    async def _get_columns_full(self, table_id: SupportsQualifiedId) -> list[Column]:
+    async def _get_columns_full(
+        self, table_id: SupportsQualifiedId
+    ) -> Sequence[Column]:
         column_meta = await self.conn.query_all(
             AnsiColumnMeta,
             "SELECT\n"
@@ -210,7 +214,7 @@ class AnsiExplorer(Explorer):
         columns: list[Column] = []
         for col in column_meta:
             columns.append(
-                self.factory.column_class(
+                self.factory.column_class.create(
                     LocalId(col.column_name),
                     self.discovery.sql_data_type_from_spec(
                         type_name=col.data_type,
@@ -219,7 +223,7 @@ class AnsiExplorer(Explorer):
                         numeric_scale=col.numeric_scale,
                         datetime_precision=col.datetime_precision,
                     ),
-                    bool(col.nullable),
+                    nullable=bool(col.nullable),
                     default=col.column_default,
                 )
             )

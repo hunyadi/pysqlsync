@@ -47,9 +47,9 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("city"), SqlVariableCharacterType(), False),
-                Column(LocalId("state"), SqlVariableCharacterType(), True),
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(LocalId("city"), SqlVariableCharacterType(), nullable=False),
+                Column.create(LocalId("state"), SqlVariableCharacterType(), nullable=True),
             ],
         )
 
@@ -58,35 +58,35 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(
                     LocalId("integer_8"),
                     SqlIntegerType(2),
-                    False,
+                    nullable=False,
                     default="127",
                 ),
-                Column(
+                Column.create(
                     LocalId("integer_16"),
                     SqlIntegerType(2),
-                    False,
+                    nullable=False,
                     default="32767",
                 ),
-                Column(
+                Column.create(
                     LocalId("integer_32"),
                     SqlIntegerType(4),
-                    False,
+                    nullable=False,
                     default="2147483647",
                 ),
-                Column(
+                Column.create(
                     LocalId("integer_64"),
                     SqlIntegerType(8),
-                    False,
+                    nullable=False,
                     default="0",
                 ),
-                Column(
+                Column.create(
                     LocalId("integer"),
                     SqlIntegerType(8),
-                    False,
+                    nullable=False,
                     default="23",
                 ),
             ],
@@ -97,8 +97,8 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False, identity=True),
-                Column(LocalId("unique"), SqlVariableCharacterType(64), False),
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False, identity=True),
+                Column.create(LocalId("unique"), SqlVariableCharacterType(64), nullable=False),
             ],
         )
         self.assertListEqual(
@@ -113,17 +113,17 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(
                     LocalId("name"),
                     SqlVariableCharacterType(),
-                    False,
+                    nullable=False,
                     description="The person's full name.",
                 ),
-                Column(
+                Column.create(
                     LocalId("address"),
                     SqlIntegerType(8),
-                    False,
+                    nullable=False,
                     description="The address of the person's permanent residence.",
                 ),
             ],
@@ -134,9 +134,9 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlUuidType(), False),
-                Column(LocalId("name"), SqlVariableCharacterType(), False),
-                Column(LocalId("reports_to"), SqlUuidType(), False),
+                Column.create(LocalId("id"), SqlUuidType(), nullable=False),
+                Column.create(LocalId("name"), SqlVariableCharacterType(), nullable=False),
+                Column.create(LocalId("reports_to"), SqlUuidType(), nullable=False),
             ],
         )
 
@@ -148,16 +148,16 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(
                     LocalId("state"),
                     SqlUserDefinedType(QualifiedId(None, "WorkflowState")),
-                    False,
+                    nullable=False,
                 ),
-                Column(
+                Column.create(
                     LocalId("optional_state"),
                     SqlUserDefinedType(QualifiedId(None, "WorkflowState")),
-                    True,
+                    nullable=True,
                 ),
             ],
         )
@@ -173,9 +173,9 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("state"), SqlIntegerType(4), False),
-                Column(LocalId("optional_state"), SqlIntegerType(4), True),
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(LocalId("state"), SqlIntegerType(4), nullable=False),
+                Column.create(LocalId("optional_state"), SqlIntegerType(4), nullable=True),
             ],
         )
         enum_name = tables.ExtensibleEnum.__name__
@@ -183,9 +183,11 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(enum_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
-                Column(
-                    LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                Column.create(LocalId("id"), SqlIntegerType(4), nullable=False, identity=True),
+                Column.create(
+                    LocalId("value"),
+                    SqlVariableCharacterType(ENUM_NAME_LENGTH),
+                    nullable=False,
                 ),
             ],
         )
@@ -213,7 +215,8 @@ class TestConverter(unittest.TestCase):
 
     def test_enum_relation(self) -> None:
         options = DataclassConverterOptions(
-            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({tables: None})
+            enum_mode=EnumMode.RELATION,
+            namespaces=NamespaceMapping({tables: None}),
         )
         converter = DataclassConverter(options=options)
         catalog = converter.dataclasses_to_catalog([tables.EnumTable])
@@ -222,9 +225,9 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("state"), SqlIntegerType(4), False),
-                Column(LocalId("optional_state"), SqlIntegerType(4), True),
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(LocalId("state"), SqlIntegerType(4), nullable=False),
+                Column.create(LocalId("optional_state"), SqlIntegerType(4), nullable=True),
             ],
         )
         enum_name = tables.WorkflowState.__name__
@@ -232,9 +235,11 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(enum_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(4), False, identity=True),
-                Column(
-                    LocalId("value"), SqlVariableCharacterType(ENUM_NAME_LENGTH), False
+                Column.create(LocalId("id"), SqlIntegerType(4), nullable=False, identity=True),
+                Column.create(
+                    LocalId("value"),
+                    SqlVariableCharacterType(ENUM_NAME_LENGTH),
+                    nullable=False,
                 ),
             ],
         )
@@ -262,7 +267,8 @@ class TestConverter(unittest.TestCase):
 
     def test_dataclass_enum_relation(self) -> None:
         options = DataclassConverterOptions(
-            enum_mode=EnumMode.RELATION, namespaces=NamespaceMapping({country: None})
+            enum_mode=EnumMode.RELATION,
+            namespaces=NamespaceMapping({country: None}),
         )
         converter = DataclassConverter(options=options)
         catalog = converter.dataclasses_to_catalog([country.DataclassEnumTable])
@@ -271,9 +277,9 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(LocalId("country"), SqlIntegerType(4), False),
-                Column(LocalId("optional_country"), SqlIntegerType(4), True),
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(LocalId("country"), SqlIntegerType(4), nullable=False),
+                Column.create(LocalId("optional_country"), SqlIntegerType(4), nullable=True),
             ],
         )
         enum_name = country.CountryEnum.__name__
@@ -281,21 +287,21 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(enum_def.columns.values()),
             [
-                Column(
+                Column.create(
                     LocalId("id"),
                     SqlIntegerType(4),
-                    False,
+                    nullable=False,
                     identity=True,
                 ),
-                Column(
+                Column.create(
                     LocalId("iso_code"),
                     SqlVariableCharacterType(),
-                    False,
+                    nullable=False,
                 ),
-                Column(
+                Column.create(
                     LocalId("name"),
                     SqlVariableCharacterType(),
-                    False,
+                    nullable=False,
                 ),
             ],
         )
@@ -326,26 +332,26 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(
                     LocalId("single"),
                     SqlFixedCharacterType(limit=5),
-                    False,
+                    nullable=False,
                 ),
-                Column(
+                Column.create(
                     LocalId("multiple"),
                     SqlFixedCharacterType(limit=4),
-                    False,
+                    nullable=False,
                 ),
-                Column(
+                Column.create(
                     LocalId("union"),
                     SqlVariableCharacterType(limit=255),
-                    False,
+                    nullable=False,
                 ),
-                Column(
+                Column.create(
                     LocalId("unbounded"),
                     SqlVariableCharacterType(),
-                    False,
+                    nullable=False,
                 ),
             ],
         )
@@ -374,13 +380,11 @@ class TestConverter(unittest.TestCase):
         self.assertListEqual(
             list(table_def.columns.values()),
             [
-                Column(LocalId("id"), SqlIntegerType(8), False),
-                Column(
+                Column.create(LocalId("id"), SqlIntegerType(8), nullable=False),
+                Column.create(
                     LocalId("coords"),
-                    SqlUserDefinedType(
-                        QualifiedId("sample", tables.Coordinates.__name__)
-                    ),
-                    False,
+                    SqlUserDefinedType(QualifiedId("sample", tables.Coordinates.__name__)),
+                    nullable=False,
                 ),
             ],
         )
@@ -456,10 +460,10 @@ class TestConverter(unittest.TestCase):
         user_table.columns["homepage_url"].default = "'https://example.com/'"
         user_table.columns["homepage_url"].nullable = False
         user_table.columns.add(
-            Column(
+            Column.create(
                 LocalId("social_url"),
                 SqlVariableCharacterType(),
-                False,
+                nullable=False,
                 default="'https://community.canvaslms.com/'",
             )
         )

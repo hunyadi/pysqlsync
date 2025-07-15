@@ -30,8 +30,8 @@ def update_readme() -> None:
         r"^<!--\s*(?P<label>.+?)\s*-->\n```python\n(?P<code>.+?)\n```$",
         lambda m: code_block(samples, m.group("label"), m.group("code")),
         text,
-        0,
-        re.MULTILINE | re.DOTALL,
+        count=0,
+        flags=re.MULTILINE | re.DOTALL,
     )
 
     with open(os.path.join(os.path.dirname(__file__), "..", "README.md"), "w") as f:

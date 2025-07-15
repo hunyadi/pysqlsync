@@ -1,19 +1,14 @@
-from typing import Optional
+from typing import Optional, Sequence
 
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import AnsiExplorer
-from pysqlsync.formation.object_types import Column, Namespace, Table
+from pysqlsync.formation.object_types import Namespace, Table
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, SupportsQualifiedId
 
-from .data_types import (
-    MSSQLBooleanType,
-    MSSQLDateTimeType,
-    MSSQLEncoding,
-    MSSQLVariableCharacterType,
-)
-from .object_types import MSSQLObjectFactory
+from .data_types import MSSQLBooleanType, MSSQLDateTimeType, MSSQLEncoding, MSSQLVariableCharacterType
+from .object_types import MSSQLColumn, MSSQLDefault, MSSQLObjectFactory
 
 
 class MSSQLExplorer(AnsiExplorer):
@@ -37,8 +32,8 @@ class MSSQLExplorer(AnsiExplorer):
             MSSQLObjectFactory(),
         )
 
-    async def get_columns(self, table_id: SupportsQualifiedId) -> list[Column]:
-        columns = await super().get_columns(table_id)
+    async def get_columns(self, table_id: SupportsQualifiedId) -> Sequence[MSSQLColumn]:
+        plain_columns = await super().get_columns(table_id)
         identity_columns = await self.conn.query_all(
             str,
             "SELECT c.name\n"
@@ -48,20 +43,28 @@ class MSSQLExplorer(AnsiExplorer):
             f"WHERE s.name = {quote(table_id.scope_id or 'dbo')} AND t.name = {quote(table_id.local_id)} AND c.is_identity = 1;",
         )
         default_columns = await self.conn.query_all(
-            tuple[str, str],
-            "SELECT c.name, d.definition\n"
+            tuple[str, str, str],
+            "SELECT c.name, d.name, d.definition\n"
             "FROM sys.schemas AS s\n"
             "    INNER JOIN sys.tables AS t ON t.schema_id = s.schema_id\n"
             "    INNER JOIN sys.columns AS c ON c.object_id = t.object_id\n"
             "    INNER JOIN sys.default_constraints AS d ON d.object_id = c.default_object_id\n"
             f"WHERE s.name = {quote(table_id.scope_id or 'dbo')} AND t.name = {quote(table_id.local_id)} AND c.default_object_id != 0;",
         )
-        default_values = dict(default_columns)
-        for c in columns:
-            if c.name.id in identity_columns:
-                c.identity = True
-            if c.name.id in default_values:
-                c.default = default_values[c.name.id]
+        default_values = {col_name: MSSQLDefault(con_name, expr) for col_name, con_name, expr in default_columns}
+
+        columns: list[MSSQLColumn] = []
+        for col in plain_columns:
+            columns.append(
+                MSSQLColumn(
+                    name=col.name,
+                    data_type=col.data_type,
+                    nullable=col.nullable,
+                    default=default_values.get(col.name.id),
+                    identity=col.name.id in identity_columns,
+                    description=col.description,
+                )
+            )
 
         return columns
 

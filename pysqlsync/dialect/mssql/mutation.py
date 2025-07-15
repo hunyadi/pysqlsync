@@ -39,7 +39,7 @@ class MSSQLMutator(Mutator):
             if source_def == target_def:
                 continue
 
-            name = typing.cast(MSSQLColumn, source_column).default_constraint_name()
+            name = typing.cast(MSSQLColumn, source_column).default_constraint_name
             if source_def is not None:
                 constraints.append(f"DROP CONSTRAINT {name}")
             if target_def is not None:

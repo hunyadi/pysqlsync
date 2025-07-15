@@ -931,10 +931,10 @@ class DataclassConverter:
         enum_table_name = enum_type.__name__
         id = self.create_qualified_id(enum_type.__module__, enum_table_name)
         columns = [
-            self.options.factory.column_class(
+            self.options.factory.column_class.create(
                 LocalId("id"),
                 self._enumeration_key_type(),
-                False,
+                nullable=False,
                 identity=True,
             )
         ]
@@ -952,10 +952,10 @@ class DataclassConverter:
 
         if unadorned_member_type is int or unadorned_member_type is str:
             columns.append(
-                self.options.factory.column_class(
+                self.options.factory.column_class.create(
                     LocalId("value"),
                     self.member_to_sql_data_type(ENUM_LABEL_TYPE, type(None)),
-                    False,
+                    nullable=False,
                 )
             )
             constraints.append(
@@ -1155,22 +1155,22 @@ class DataclassConverter:
                             table_name,
                         ),
                         [
-                            self.options.factory.column_class(
+                            self.options.factory.column_class.create(
                                 LocalId("uuid"),
                                 self.member_to_sql_data_type(uuid.UUID, entity),
-                                False,
+                                nullable=False,
                             ),
-                            self.options.factory.column_class(
+                            self.options.factory.column_class.create(
                                 LocalId(column_left_name),
                                 self.member_to_sql_data_type(
                                     dataclass_primary_key_type(entity), entity
                                 ),
-                                False,
+                                nullable=False,
                             ),
-                            self.options.factory.column_class(
+                            self.options.factory.column_class.create(
                                 LocalId(column_right_name),
                                 primary_right_type,
-                                False,
+                                nullable=False,
                             ),
                         ],
                         primary_key=(LocalId("uuid"),),

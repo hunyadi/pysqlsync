@@ -16,9 +16,7 @@ D = TypeVar("D", bound=DataclassInstance)
 T = TypeVar("T")
 
 
-def resultset_unwrap_dict(
-    signature: type[D], records: Iterable[dict[str, Any]]
-) -> list[D]:
+def resultset_unwrap_dict(signature: type[D], records: Iterable[dict[str, Any]]) -> list[D]:
     """
     Converts a result-set into a list of data-class instances.
 
@@ -27,9 +25,7 @@ def resultset_unwrap_dict(
     """
 
     if not is_dataclass_type(signature):
-        raise TypeError(
-            f"expected: data-class type as result-set signature; got: {signature}"
-        )
+        raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
     return [
         signature(**{name: value for name, value in record.items()})  # type: ignore
@@ -46,19 +42,16 @@ def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[
     """
 
     if not is_dataclass_type(signature):
-        raise TypeError(
-            f"expected: data-class type as result-set signature; got: {signature}"
-        )
+        raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
     names = [name for name in signature.__dataclass_fields__.keys()]
     return [
-        signature(**{name: record.__getattribute__(name) for name in names}) for record in records  # type: ignore
+        signature(**{name: record.__getattribute__(name) for name in names})  # type: ignore[misc]
+        for record in records
     ]
 
 
-def resultset_unwrap_tuple(
-    signature: type[T], records: Iterable[Sequence[Any]]
-) -> list[T]:
+def resultset_unwrap_tuple(signature: type[T], records: Iterable[Sequence[Any]]) -> list[T]:
     """
     Converts a result-set into a list of tuples, or a list of simple types (as appropriate).
 
@@ -76,9 +69,7 @@ def resultset_unwrap_tuple(
         except StopIteration:
             return []
         if len(item) != 1:
-            raise ValueError(
-                f"invalid number of columns, expected: 1; got: {len(item)}"
-            )
+            raise ValueError(f"invalid number of columns, expected: 1; got: {len(item)}")
         scalar_results.append(item[0])
         while True:
             try:
@@ -99,9 +90,7 @@ def resultset_unwrap_tuple(
         except StopIteration:
             return []
         if len(item) != len(origin_args):
-            raise ValueError(
-                f"invalid number of columns, expected: {len(origin_args)}; got: {len(item)}"
-            )
+            raise ValueError(f"invalid number of columns, expected: {len(origin_args)}; got: {len(item)}")
 
         if isinstance(item, tuple):
             results.append(item)  # type: ignore
@@ -120,6 +109,4 @@ def resultset_unwrap_tuple(
                     return results
                 results.append(tuple(item))  # type: ignore
 
-    raise TypeError(
-        f"expected: tuple or simple type as result-set signature; got: {signature}"
-    )
+    raise TypeError(f"expected: tuple or simple type as result-set signature; got: {signature}")
