@@ -1,4 +1,5 @@
 import ipaddress
+import re
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -17,6 +18,51 @@ from tests.params import (
     has_env_var,
 )
 
+
+def masked_equal(
+    actual: str, expected: str, *, mask_char: str = "#", mask_min_count: int = 3
+) -> bool:
+    """
+    Compares two strings with a mask. Strings are equal if all characters are equal, except for sequences of mask
+    characters in the expected string, which allow any corresponding character in the actual string.
+
+    :param actual: String to test.
+    :param expected: Masked string to compare against.
+    :returns: True if strings are equal, except for sequences covered by the mask.
+    """
+
+    if len(mask_char) != 1:
+        raise ValueError(
+            f"invalid mask character; expected string of length 1, got: {len(mask_char)}"
+        )
+    if mask_min_count < 1:
+        raise ValueError(
+            f"invalid minimum mask length; expected >= 1, got: {mask_min_count}"
+        )
+
+    if len(actual) != len(expected):
+        return False
+
+    mask_pattern = re.compile(re.escape(mask_char) + "{" + str(mask_min_count) + ",}")
+    pos = 0  # tracks current position in the strings
+
+    for match in mask_pattern.finditer(expected):
+        start, end = match.span()
+
+        # compare the segment before the mask directly
+        if actual[pos:start] != expected[pos:start]:
+            return False
+
+        # skip masked region
+        pos = end
+
+    # compare the final unmasked segment after the last mask
+    if actual[pos:] != expected[pos:]:
+        return False
+
+    return True
+
+
 if __name__ == "__main__":
     configure()
 
@@ -26,10 +72,20 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
     def options(self) -> GeneratorOptions:
         return GeneratorOptions(namespaces={tables: None})
 
+    def assertMaskedMultiLineEqual(self, actual: str, expected: str) -> None:
+        if not masked_equal(actual, expected, mask_min_count=3):
+            # always fails but shows differences
+            self.assertMultiLineEqual(actual, expected)
+
     def assertMatchSQLCreate(
         self, dialect: str, table: type[DataclassInstance], sql: str
     ) -> None:
         return self.assertMatchSQLCreateOptions(self.options, dialect, table, sql)
+
+    def assertMaskedMatchSQLCreate(
+        self, dialect: str, table: type[DataclassInstance], sql: str
+    ) -> None:
+        return self.assertMaskedMatchSQLCreateOptions(self.options, dialect, table, sql)
 
     def assertMatchSQLCreateOptions(
         self,
@@ -44,6 +100,19 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         statement = self.engine.create_generator(options).create(tables=[table]) or ""
         self.assertMultiLineEqual(statement, sql)
 
+    def assertMaskedMatchSQLCreateOptions(
+        self,
+        options: GeneratorOptions,
+        dialect: str,
+        table: type[DataclassInstance],
+        sql: str,
+    ) -> None:
+        if dialect != self.engine.name:
+            return
+
+        statement = self.engine.create_generator(options).create(tables=[table]) or ""
+        self.assertMaskedMultiLineEqual(statement, sql)
+
     def assertMatchSQLUpsert(
         self, dialect: str, table: type[DataclassInstance], sql: str
     ) -> None:
@@ -54,6 +123,12 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         generator.create(tables=[table])
         statement = generator.get_dataclass_upsert_stmt(table)
         self.assertMultiLineEqual(statement, sql)
+
+    def test_masking(self) -> None:
+        self.assertTrue(masked_equal("ab123xy", "ab###xy", mask_min_count=3))
+        self.assertFalse(masked_equal("ab123xy", "ab##3xy", mask_min_count=3))
+        self.assertTrue(masked_equal("foobar", "foo###", mask_min_count=3))
+        self.assertFalse(masked_equal("foobar", "foo##r", mask_min_count=3))
 
     def test_create_boolean_table(self) -> None:
         self.maxDiff = None
@@ -104,16 +179,16 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
-        self.assertMatchSQLCreate(
+        self.assertMaskedMatchSQLCreate(
             "mssql",
             tables.DefaultBooleanTable,
             'CREATE TABLE "DefaultBooleanTable" (\n'
             '"id" bigint NOT NULL,\n'
-            '"boolean_false" bit NOT NULL CONSTRAINT "df_boolean_false" DEFAULT 0,\n'
-            '"boolean_true" bit NOT NULL CONSTRAINT "df_boolean_true" DEFAULT 1,\n'
+            '"boolean_false" bit NOT NULL CONSTRAINT "df_boolean_false_######" DEFAULT 0,\n'
+            '"boolean_true" bit NOT NULL CONSTRAINT "df_boolean_true_######" DEFAULT 1,\n'
             '"nullable_boolean_null" bit,\n'
-            '"nullable_boolean_false" bit CONSTRAINT "df_nullable_boolean_false" DEFAULT 0,\n'
-            '"nullable_boolean_true" bit CONSTRAINT "df_nullable_boolean_true" DEFAULT 1,\n'
+            '"nullable_boolean_false" bit CONSTRAINT "df_nullable_boolean_false_######" DEFAULT 0,\n'
+            '"nullable_boolean_true" bit CONSTRAINT "df_nullable_boolean_true_######" DEFAULT 1,\n'
             'CONSTRAINT "pk_DefaultBooleanTable" PRIMARY KEY ("id")\n'
             ");",
         )
@@ -167,16 +242,16 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
                     'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
                     ");",
                 )
-        self.assertMatchSQLCreate(
+        self.assertMaskedMatchSQLCreate(
             "mssql",
             tables.DefaultNumericTable,
             'CREATE TABLE "DefaultNumericTable" (\n'
             '"id" bigint NOT NULL,\n'
-            '"integer_8" smallint NOT NULL CONSTRAINT "df_integer_8" DEFAULT 127,\n'
-            '"integer_16" smallint NOT NULL CONSTRAINT "df_integer_16" DEFAULT 32767,\n'
-            '"integer_32" integer NOT NULL CONSTRAINT "df_integer_32" DEFAULT 2147483647,\n'
-            '"integer_64" bigint NOT NULL CONSTRAINT "df_integer_64" DEFAULT 0,\n'
-            '"integer" bigint NOT NULL CONSTRAINT "df_integer" DEFAULT 23,\n'
+            '"integer_8" smallint NOT NULL CONSTRAINT "df_integer_8_######" DEFAULT 127,\n'
+            '"integer_16" smallint NOT NULL CONSTRAINT "df_integer_16_######" DEFAULT 32767,\n'
+            '"integer_32" integer NOT NULL CONSTRAINT "df_integer_32_######" DEFAULT 2147483647,\n'
+            '"integer_64" bigint NOT NULL CONSTRAINT "df_integer_64_######" DEFAULT 0,\n'
+            '"integer" bigint NOT NULL CONSTRAINT "df_integer_######" DEFAULT 23,\n'
             'CONSTRAINT "pk_DefaultNumericTable" PRIMARY KEY ("id")\n'
             ");",
         )
@@ -323,12 +398,12 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )
-        self.assertMatchSQLCreate(
+        self.assertMaskedMatchSQLCreate(
             "mssql",
             tables.DefaultDateTimeTable,
             'CREATE TABLE "DefaultDateTimeTable" (\n'
             '"id" bigint NOT NULL,\n'
-            """"iso_date_time" datetime2 NOT NULL CONSTRAINT "df_iso_date_time" DEFAULT '1989-10-24 23:59:59',\n"""
+            """"iso_date_time" datetime2 NOT NULL CONSTRAINT "df_iso_date_time_######" DEFAULT '1989-10-24 23:59:59',\n"""
             'CONSTRAINT "pk_DefaultDateTimeTable" PRIMARY KEY ("id")\n'
             ");",
         )
