@@ -117,13 +117,7 @@ class PrefixedId:
     @property
     def quoted_id(self) -> str:
         if self.namespace is not None:
-            return (
-                ID_QUOTE_CHAR
-                + quote_id(self.namespace)
-                + "__"
-                + quote_id(self.id)
-                + ID_QUOTE_CHAR
-            )
+            return ID_QUOTE_CHAR + quote_id(self.namespace) + "__" + quote_id(self.id) + ID_QUOTE_CHAR
         else:
             return ID_QUOTE_CHAR + quote_id(self.id) + ID_QUOTE_CHAR
 
@@ -159,15 +153,7 @@ class QualifiedId:
     @property
     def quoted_id(self) -> str:
         if self.namespace is not None:
-            return (
-                ID_QUOTE_CHAR
-                + quote_id(self.namespace)
-                + ID_QUOTE_CHAR
-                + "."
-                + ID_QUOTE_CHAR
-                + quote_id(self.id)
-                + ID_QUOTE_CHAR
-            )
+            return ID_QUOTE_CHAR + quote_id(self.namespace) + ID_QUOTE_CHAR + "." + ID_QUOTE_CHAR + quote_id(self.id) + ID_QUOTE_CHAR
         else:
             return ID_QUOTE_CHAR + quote_id(self.id) + ID_QUOTE_CHAR
 

@@ -40,9 +40,7 @@ class MSSQLEncoding(enum.Enum):
 class MSSQLVariableCharacterType(SqlVariableCharacterType):
     encoding: Optional[MSSQLEncoding] = None
 
-    def __init__(
-        self, limit: Optional[int] = None, encoding: Optional[MSSQLEncoding] = None
-    ) -> None:
+    def __init__(self, limit: Optional[int] = None, encoding: Optional[MSSQLEncoding] = None) -> None:
         super().__init__(limit)
         self.encoding = encoding
 

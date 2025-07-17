@@ -67,11 +67,7 @@ class MSSQLColumn(Column):
     def data_spec(self) -> str:
         nullable = " NOT NULL" if not self.nullable else ""
         name = self.default_constraint_name
-        default = (
-            f" CONSTRAINT {name} DEFAULT {self.default}"
-            if self.default is not None
-            else ""
-        )
+        default = f" CONSTRAINT {name} DEFAULT {self.default}" if self.default is not None else ""
         identity = " IDENTITY" if self.identity else ""
         return f"{self.data_type}{nullable}{default}{identity}"
 
@@ -90,27 +86,19 @@ class MSSQLColumn(Column):
 
 class MSSQLTable(Table):
     def alter_table_stmt(self, statements: list[str]) -> str:
-        return "\n".join(
-            f"ALTER TABLE {self.name} {statement};" for statement in statements
-        )
+        return "\n".join(f"ALTER TABLE {self.name} {statement};" for statement in statements)
 
     def add_constraints_stmt(self) -> Optional[str]:
         statements: list[str] = []
         if self.table_constraints:
-            statements.append(
-                f"ALTER TABLE {self.name} ADD\n"
-                + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints)
-                + ";"
-            )
+            statements.append(f"ALTER TABLE {self.name} ADD\n" + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints) + ";")
         return join_or_none(statements)
 
     def drop_constraints_stmt(self) -> Optional[str]:
         statements: list[str] = []
         if self.table_constraints:
             statements.append(
-                f"ALTER TABLE {self.name} DROP\n"
-                + ",\n".join(f"CONSTRAINT {c.name}" for c in self.table_constraints)
-                + "\n;"
+                f"ALTER TABLE {self.name} DROP\n" + ",\n".join(f"CONSTRAINT {c.name}" for c in self.table_constraints) + "\n;"
             )
 
         return join_or_none(statements)

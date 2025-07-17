@@ -16,17 +16,12 @@ from .object_types import MySQLColumn, MySQLTable
 
 
 class MySQLMutator(Mutator):
-    def migrate_column_stmt(
-        self, source_table: Table, source: Column, target_table: Table, target: Column
-    ) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
         statements: list[str] = []
         ref = target_table.get_constraint(target.name)
         if isinstance(source.data_type, SqlEnumType):
             enum_values = ", ".join(f"({quote(v)})" for v in source.data_type.values)
-            statements.append(
-                f'INSERT INTO {ref.table} ("value") VALUES {enum_values}\n'
-                'ON DUPLICATE KEY UPDATE "value" = "value";'
-            )
+            statements.append(f'INSERT INTO {ref.table} ("value") VALUES {enum_values}\nON DUPLICATE KEY UPDATE "value" = "value";')
         elif isinstance(source.data_type, SqlVariableCharacterType):
             statements.append(
                 f'INSERT INTO {ref.table} ("value") SELECT DISTINCT {LocalId(deleted(source.name.id))} FROM {source_table.name}\n'
@@ -39,9 +34,7 @@ class MySQLMutator(Mutator):
         )
         return "\n".join(statements)
 
-    def mutate_table_stmt(
-        self, source_table: Table, target_table: Table
-    ) -> Optional[str]:
+    def mutate_table_stmt(self, source_table: Table, target_table: Table) -> Optional[str]:
         source = typing.cast(MySQLTable, source_table)
         target = typing.cast(MySQLTable, target_table)
 
@@ -53,22 +46,16 @@ class MySQLMutator(Mutator):
 
         if source_desc is None:
             if target_desc is not None:
-                statements.append(
-                    f"ALTER TABLE {target.name} COMMENT = {quote(target_desc)};"
-                )
+                statements.append(f"ALTER TABLE {target.name} COMMENT = {quote(target_desc)};")
         else:
             if target_desc is None:
                 statements.append(f"ALTER TABLE {target.name} COMMENT = {quote('')};")
             elif source_desc != target_desc:
-                statements.append(
-                    f"ALTER TABLE {target.name} COMMENT = {quote(target_desc)};"
-                )
+                statements.append(f"ALTER TABLE {target.name} COMMENT = {quote(target_desc)};")
 
         return join_or_none(statements)
 
-    def mutate_column_stmt(
-        self, source_column: Column, target_column: Column
-    ) -> Optional[str]:
+    def mutate_column_stmt(self, source_column: Column, target_column: Column) -> Optional[str]:
         source = typing.cast(MySQLColumn, source_column)
         target = typing.cast(MySQLColumn, target_column)
 

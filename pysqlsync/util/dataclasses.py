@@ -29,23 +29,15 @@ def make_dataclass(
     field_names = set(field.name for field in fields)
 
     if docstring is not None:
-        docstring.params = {
-            name: param
-            for name, param in docstring.params.items()
-            if name in field_names
-        }
+        docstring.params = {name: param for name, param in docstring.params.items() if name in field_names}
 
     dataclass_fields = [(field.name, field.type, field.default) for field in fields]
     module_name = module.__name__ if module is not None else None
     if sys.version_info >= (3, 12):
-        data_type = dataclasses.make_dataclass(
-            name, dataclass_fields, module=module_name
-        )
+        data_type = dataclasses.make_dataclass(name, dataclass_fields, module=module_name)
     else:
         namespace = {"__module__": module_name} if module is not None else None
-        data_type = dataclasses.make_dataclass(
-            name, dataclass_fields, namespace=namespace
-        )
+        data_type = dataclasses.make_dataclass(name, dataclass_fields, namespace=namespace)
     if module is not None:
         setattr(module, data_type.__name__, data_type)
 
@@ -81,9 +73,7 @@ def flatten_dataclass(
                 )
                 param = nested_docstring.params.get(subfield.name)
                 if param is not None:
-                    docstring.params[name] = DocstringParam(
-                        name, param.description, param.param_type
-                    )
+                    docstring.params[name] = DocstringParam(name, param.description, param.param_type)
         else:
             fields.append(field)
 

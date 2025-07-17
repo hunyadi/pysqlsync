@@ -23,8 +23,6 @@ def thread_dispatch(fn: Callable[P, R]) -> Callable[P, Coroutine[None, None, R]]
     async def invoke(*args: P.args, **kwargs: P.kwargs) -> R:
         loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=1) as pool:
-            return await loop.run_in_executor(
-                pool, functools.partial(fn, *args, **kwargs)
-            )
+            return await loop.run_in_executor(pool, functools.partial(fn, *args, **kwargs))
 
     return invoke

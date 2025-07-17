@@ -19,9 +19,7 @@ from tests.params import (
 )
 
 
-def masked_equal(
-    actual: str, expected: str, *, mask_char: str = "#", mask_min_count: int = 3
-) -> bool:
+def masked_equal(actual: str, expected: str, *, mask_char: str = "#", mask_min_count: int = 3) -> bool:
     """
     Compares two strings with a mask. Strings are equal if all characters are equal, except for sequences of mask
     characters in the expected string, which allow any corresponding character in the actual string.
@@ -32,13 +30,9 @@ def masked_equal(
     """
 
     if len(mask_char) != 1:
-        raise ValueError(
-            f"invalid mask character; expected string of length 1, got: {len(mask_char)}"
-        )
+        raise ValueError(f"invalid mask character; expected string of length 1, got: {len(mask_char)}")
     if mask_min_count < 1:
-        raise ValueError(
-            f"invalid minimum mask length; expected >= 1, got: {mask_min_count}"
-        )
+        raise ValueError(f"invalid minimum mask length; expected >= 1, got: {mask_min_count}")
 
     if len(actual) != len(expected):
         return False
@@ -77,14 +71,10 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             # always fails but shows differences
             self.assertMultiLineEqual(actual, expected)
 
-    def assertMatchSQLCreate(
-        self, dialect: str, table: type[DataclassInstance], sql: str
-    ) -> None:
+    def assertMatchSQLCreate(self, dialect: str, table: type[DataclassInstance], sql: str) -> None:
         return self.assertMatchSQLCreateOptions(self.options, dialect, table, sql)
 
-    def assertMaskedMatchSQLCreate(
-        self, dialect: str, table: type[DataclassInstance], sql: str
-    ) -> None:
+    def assertMaskedMatchSQLCreate(self, dialect: str, table: type[DataclassInstance], sql: str) -> None:
         return self.assertMaskedMatchSQLCreateOptions(self.options, dialect, table, sql)
 
     def assertMatchSQLCreateOptions(
@@ -113,9 +103,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         statement = self.engine.create_generator(options).create(tables=[table]) or ""
         self.assertMaskedMultiLineEqual(statement, sql)
 
-    def assertMatchSQLUpsert(
-        self, dialect: str, table: type[DataclassInstance], sql: str
-    ) -> None:
+    def assertMatchSQLUpsert(self, dialect: str, table: type[DataclassInstance], sql: str) -> None:
         if dialect != self.engine.name:
             return
 
@@ -643,11 +631,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         self.assertMatchSQLCreate(
             "postgresql",
             tables.DataTable,
-            'CREATE TABLE "DataTable" (\n'
-            '"id" bigint NOT NULL,\n'
-            '"data" text NOT NULL,\n'
-            'CONSTRAINT "pk_DataTable" PRIMARY KEY ("id")\n'
-            ");",
+            'CREATE TABLE "DataTable" (\n"id" bigint NOT NULL,\n"data" text NOT NULL,\nCONSTRAINT "pk_DataTable" PRIMARY KEY ("id")\n);',
         )
         self.assertMatchSQLCreate(
             "mssql",
@@ -753,11 +737,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         self.assertMatchSQLUpsert(
             "postgresql",
             tables.DataTable,
-            'INSERT INTO "DataTable"\n'
-            '("id", "data") VALUES ($1, $2)\n'
-            'ON CONFLICT ("id") DO UPDATE SET\n'
-            '"data" = EXCLUDED."data"\n'
-            ";",
+            'INSERT INTO "DataTable"\n("id", "data") VALUES ($1, $2)\nON CONFLICT ("id") DO UPDATE SET\n"data" = EXCLUDED."data"\n;',
         )
 
         for dialect in ["mssql", "oracle"]:
@@ -780,11 +760,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
         self.assertMatchSQLUpsert(
             "mysql",
             tables.DataTable,
-            'INSERT INTO "DataTable"\n'
-            '("id", "data") VALUES (%s, %s)\n'
-            "ON DUPLICATE KEY UPDATE\n"
-            '"data" = VALUES("data")\n'
-            ";",
+            'INSERT INTO "DataTable"\n("id", "data") VALUES (%s, %s)\nON DUPLICATE KEY UPDATE\n"data" = VALUES("data")\n;',
         )
 
     def test_insert_multiple(self) -> None:
@@ -839,21 +815,15 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             ]
         )
         self.assertEqual(
-            generator.get_dataclass_as_record(
-                tables.DataTable, tables.DataTable(123, "abc")
-            ),
+            generator.get_dataclass_as_record(tables.DataTable, tables.DataTable(123, "abc")),
             (123, "abc"),
         )
         self.assertEqual(
-            generator.get_dataclass_as_record(
-                tables.StringTable, tables.StringTable(1, "abc", None, "def", None)
-            ),
+            generator.get_dataclass_as_record(tables.StringTable, tables.StringTable(1, "abc", None, "def", None)),
             (1, "abc", None, "def", None),
         )
         self.assertEqual(
-            generator.get_dataclass_as_record(
-                tables.StringTable, tables.StringTable(2, "abc", "def", "ghi", "jkl")
-            ),
+            generator.get_dataclass_as_record(tables.StringTable, tables.StringTable(2, "abc", "def", "ghi", "jkl")),
             (2, "abc", "def", "ghi", "jkl"),
         )
 
@@ -942,9 +912,7 @@ class TestPostgreSQLGenerator(PostgreSQLBase, TestGenerator):
         generator = self.engine.create_generator(self.options)
         generator.create(tables=[tables.EnumTable])
         self.assertEqual(
-            generator.get_dataclass_as_record(
-                tables.EnumTable, tables.EnumTable(1, tables.WorkflowState.active, None)
-            ),
+            generator.get_dataclass_as_record(tables.EnumTable, tables.EnumTable(1, tables.WorkflowState.active, None)),
             (1, "active", None),
         )
 

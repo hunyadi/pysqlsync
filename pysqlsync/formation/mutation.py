@@ -60,50 +60,31 @@ class Mutator:
     def mutate_enum_stmt(self, source: EnumType, target: EnumType) -> Optional[str]:
         self.check_identity(source, target)
 
-        removed_values = [
-            value for value in source.values if value not in target.values
-        ]
+        removed_values = [value for value in source.values if value not in target.values]
         if removed_values:
-            raise FormationError(
-                f"operation not permitted; cannot drop values in an enumeration: {''.join(removed_values)}"
-            )
+            raise FormationError(f"operation not permitted; cannot drop values in an enumeration: {''.join(removed_values)}")
 
         added_values = [value for value in target.values if value not in source.values]
         if added_values:
-            return "\n".join(
-                f"ALTER TYPE {source.name} ADD VALUE {constant(v)};"
-                for v in added_values
-            )
+            return "\n".join(f"ALTER TYPE {source.name} ADD VALUE {constant(v)};" for v in added_values)
         else:
             return None
 
-    def mutate_struct_stmt(
-        self, source: StructType, target: StructType
-    ) -> Optional[str]:
+    def mutate_struct_stmt(self, source: StructType, target: StructType) -> Optional[str]:
         self.check_identity(source, target)
 
         statements: list[str] = []
-        statements.extend(
-            f"DROP ATTRIBUTE {member.name}"
-            for member in source.members.difference(target.members)
-        )
+        statements.extend(f"DROP ATTRIBUTE {member.name}" for member in source.members.difference(target.members))
         for source_member, target_member in source.members.intersection(target.members):
             if source_member != target_member:
-                statements.append(
-                    f"ALTER ATTRIBUTE {source_member.name} SET DATA TYPE {target_member.data_type}"
-                )
-        statements.extend(
-            f"ADD ATTRIBUTE {member}"
-            for member in target.members.difference(source.members)
-        )
+                statements.append(f"ALTER ATTRIBUTE {source_member.name} SET DATA TYPE {target_member.data_type}")
+        statements.extend(f"ADD ATTRIBUTE {member}" for member in target.members.difference(source.members))
         if statements:
             return f"ALTER TYPE {source.name}\n" + ",\n".join(statements) + ";\n"
         else:
             return None
 
-    def migrate_column_stmt(
-        self, source_table: Table, source: Column, target_table: Table, target: Column
-    ) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
         return None
 
     def is_column_migrated(self, source: Column, target: Column) -> Optional[bool]:
@@ -176,23 +157,17 @@ class Mutator:
             for pair in common_columns:
                 source_column, target_column = pair
                 if self.is_column_migrated(source_column, target_column):
-                    statements.append(
-                        source.alter_table_stmt([source_column.soft_drop_stmt()])
-                    )
+                    statements.append(source.alter_table_stmt([source_column.soft_drop_stmt()]))
                     create_stmts.append(target_column.create_stmt())
                     migrated_columns.append(pair)
         except ColumnFormationError as e:
-            raise TableFormationError(
-                "failed to migrate columns in table", target.name
-            ) from e
+            raise TableFormationError("failed to migrate columns in table", target.name) from e
 
         # create new columns
         try:
             create_stmts.extend(column.create_stmt() for column in create_columns)
         except ColumnFormationError as e:
-            raise TableFormationError(
-                "failed to create columns in table", target.name
-            ) from e
+            raise TableFormationError("failed to create columns in table", target.name) from e
 
         if create_stmts:
             statements.append(source.alter_table_stmt(create_stmts))
@@ -203,35 +178,23 @@ class Mutator:
         # migrate data when data type changes
         try:
             for source_column, target_column in migrated_columns:
-                statements.append(
-                    self.migrate_column_stmt(
-                        source, source_column, target, target_column
-                    )
-                )
+                statements.append(self.migrate_column_stmt(source, source_column, target, target_column))
                 alter_stmts.append(source_column.hard_drop_stmt())
         except ColumnFormationError as e:
-            raise TableFormationError(
-                "failed to migrate columns in table", target.name
-            ) from e
+            raise TableFormationError("failed to migrate columns in table", target.name) from e
 
         # mutate existing columns as necessary
         try:
             for source_column, target_column in common_columns:
-                alter_stmts.append(
-                    self.mutate_column_stmt(source_column, target_column)
-                )
+                alter_stmts.append(self.mutate_column_stmt(source_column, target_column))
         except ColumnFormationError as e:
-            raise TableFormationError(
-                "failed to update columns in table", target.name
-            ) from e
+            raise TableFormationError("failed to update columns in table", target.name) from e
 
         # remove deleted columns
         try:
             alter_stmts.extend(column.drop_stmt() for column in drop_columns)
         except ColumnFormationError as e:
-            raise TableFormationError(
-                "failed to drop columns in table", target.name
-            ) from e
+            raise TableFormationError("failed to drop columns in table", target.name) from e
 
         alter_stmts.extend(
             f"DROP CONSTRAINT {constraint.name}"
@@ -261,9 +224,7 @@ class Mutator:
 
         return join_or_none(statements)
 
-    def mutate_namespace_stmt(
-        self, source: Namespace, target: Namespace
-    ) -> Optional[str]:
+    def mutate_namespace_stmt(self, source: Namespace, target: Namespace) -> Optional[str]:
         self.check_identity(source, target)
 
         statements: StatementList = StatementList()
@@ -303,22 +264,13 @@ class Mutator:
 
         # mutate existing object
         enum_mutate = list(source.enums.intersection(target.enums))
-        statements.extend(
-            self.mutate_enum_stmt(source_enum, target_enum)
-            for source_enum, target_enum in enum_mutate
-        )
+        statements.extend(self.mutate_enum_stmt(source_enum, target_enum) for source_enum, target_enum in enum_mutate)
 
         struct_mutate = list(source.structs.intersection(target.structs))
-        statements.extend(
-            self.mutate_struct_stmt(source_struct, target_struct)
-            for source_struct, target_struct in struct_mutate
-        )
+        statements.extend(self.mutate_struct_stmt(source_struct, target_struct) for source_struct, target_struct in struct_mutate)
 
         table_mutate = list(source.tables.intersection(target.tables))
-        statements.extend(
-            self.mutate_table_stmt(source_table, target_table)
-            for source_table, target_table in table_mutate
-        )
+        statements.extend(self.mutate_table_stmt(source_table, target_table) for source_table, target_table in table_mutate)
 
         # drop old objects
         if self.options.allow_drop_table:
@@ -329,11 +281,7 @@ class Mutator:
 
         if self.options.allow_drop_enum:
             for enum_type in enum_drop:
-                statements.append(
-                    enum_type.hard_drop_stmt()
-                    if enum_type in enum_soft_deleted
-                    else enum_type.drop_stmt()
-                )
+                statements.append(enum_type.hard_drop_stmt() if enum_type in enum_soft_deleted else enum_type.drop_stmt())
 
         return join_or_none(statements)
 
@@ -357,10 +305,7 @@ class Mutator:
         statements.extend(namespace.add_constraints_stmt() for namespace in ns_create)
 
         # mutate existing namespaces
-        statements.extend(
-            self.mutate_namespace_stmt(source_ns, target_ns)
-            for source_ns, target_ns in ns_mutate
-        )
+        statements.extend(self.mutate_namespace_stmt(source_ns, target_ns) for source_ns, target_ns in ns_mutate)
 
         # remove old constraints
         statements.extend(namespace.drop_constraints_stmt() for namespace in ns_drop)

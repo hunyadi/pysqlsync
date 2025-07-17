@@ -14,7 +14,7 @@ _sql_quoted_str_table = str.maketrans(
         "\n": "\\n",
         "\r": "\\r",
         "\t": "\\t",
-        "\u001A": "\\Z",
+        "\u001a": "\\Z",
     }
 )
 
@@ -31,11 +31,7 @@ class DeltaTable(Table):
         defs.extend(str(c) for c in self.columns.values())
         defs.append(self.create_keys())
         definition = ",\n".join(defs)
-        comment = (
-            f"\nCOMMENT {sql_quoted_string(self.description)}"
-            if self.description
-            else ""
-        )
+        comment = f"\nCOMMENT {sql_quoted_string(self.description)}" if self.description else ""
         return f"CREATE TABLE {self.name} (\n{definition}\n){comment};"
 
     @property

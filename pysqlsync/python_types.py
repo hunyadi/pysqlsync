@@ -44,9 +44,7 @@ def module_to_stream(module: ModuleType, target: TextIO) -> None:
         elif is_dataclass_type(cls):
             dataclass_to_stream(cls, target)
         else:
-            raise NotImplementedError(
-                "classes in module must be of enumeration or data-class type"
-            )
+            raise NotImplementedError("classes in module must be of enumeration or data-class type")
         print(file=target)
 
 
@@ -111,9 +109,7 @@ def dataclass_to_stream(typ: type[DataclassInstance], target: TextIO) -> None:
         if field.default is not dataclasses.MISSING:
             field_initializer["default"] = repr(field.default)
         if field.default_factory is not dataclasses.MISSING:
-            field_initializer["default_factory"] = fmt.python_type_to_str(
-                field.default_factory
-            )
+            field_initializer["default_factory"] = fmt.python_type_to_str(field.default_factory)
         if metadata:
             field_initializer["metadata"] = repr(metadata)
 
@@ -122,9 +118,7 @@ def dataclass_to_stream(typ: type[DataclassInstance], target: TextIO) -> None:
         elif field.default is not dataclasses.MISSING and len(field_initializer) == 1:
             initializer = f" = {repr(field.default)}"
         else:
-            initializer_list = ", ".join(
-                f"{key} = {value}" for key, value in field_initializer.items()
-            )
+            initializer_list = ", ".join(f"{key} = {value}" for key, value in field_initializer.items())
             initializer = f" = field({initializer_list})"
 
         print(f"    {field.name}: {type_name}{initializer}", file=target)

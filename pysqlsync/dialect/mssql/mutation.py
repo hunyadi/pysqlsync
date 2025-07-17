@@ -43,9 +43,7 @@ class MSSQLMutator(Mutator):
             if source_def is not None:
                 constraints.append(f"DROP CONSTRAINT {name}")
             if target_def is not None:
-                constraints.append(
-                    f"ADD CONSTRAINT {name} DEFAULT {target_def} FOR {source_column.name}"
-                )
+                constraints.append(f"ADD CONSTRAINT {name} DEFAULT {target_def} FOR {source_column.name}")
 
         if constraints:
             statements.append(source.alter_table_stmt(constraints))

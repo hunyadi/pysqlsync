@@ -47,11 +47,7 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
 
     if ssl_mode is None or ssl_mode is ConnectionSSLMode.disable:
         return None
-    elif (
-        ssl_mode is ConnectionSSLMode.prefer
-        or ssl_mode is ConnectionSSLMode.allow
-        or ssl_mode is ConnectionSSLMode.require
-    ):
+    elif ssl_mode is ConnectionSSLMode.prefer or ssl_mode is ConnectionSSLMode.allow or ssl_mode is ConnectionSSLMode.require:
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
@@ -60,9 +56,7 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
         if sys.version_info >= (3, 10):
             ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         else:
-            ctx = ssl.create_default_context(
-                ssl.Purpose.SERVER_AUTH, cafile=certifi.where()
-            )
+            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=certifi.where())
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_REQUIRED
         return ctx
@@ -70,9 +64,7 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
         if sys.version_info >= (3, 10):
             ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         else:
-            ctx = ssl.create_default_context(
-                ssl.Purpose.SERVER_AUTH, cafile=certifi.where()
-            )
+            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=certifi.where())
         ctx.check_hostname = True
         ctx.verify_mode = ssl.CERT_REQUIRED
         return ctx

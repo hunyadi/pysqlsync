@@ -36,13 +36,9 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
         options = GeneratorOptions(namespaces={tables: None})
         async with self.engine.create_connection(self.parameters, options) as conn:
             if self.engine.name == "oracle":
-                await conn.execute(
-                    'CREATE TABLE "DataTable" ("id" number PRIMARY KEY, "data" clob);'
-                )
+                await conn.execute('CREATE TABLE "DataTable" ("id" number PRIMARY KEY, "data" clob);')
             else:
-                await conn.execute(
-                    'CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text);'
-                )
+                await conn.execute('CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text);')
             await conn.execute('DROP TABLE "DataTable";')
 
     async def test_upsert(self) -> None:
@@ -71,10 +67,7 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             for i in range(10):
                 records = generator.get_dataclasses_as_records(
                     tables.DataTable,
-                    [
-                        tables.DataTable(i * 1000 + j, str(i * 1000 + j))
-                        for j in range(1000)
-                    ],
+                    [tables.DataTable(i * 1000 + j, str(i * 1000 + j)) for j in range(1000)],
                 )
                 await conn.execute_all(statement, records)
             await conn.drop_objects()
@@ -128,18 +121,14 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
             await conn.drop_objects()
 
     async def test_rows_upsert(self) -> None:
-        options = GeneratorOptions(
-            namespaces={tables: None}, enum_mode=EnumMode.RELATION
-        )
+        options = GeneratorOptions(namespaces={tables: None}, enum_mode=EnumMode.RELATION)
         async with self.engine.create_connection(self.parameters, options) as conn:
             converter = conn.connection.generator.converter
             catalog = converter.dataclasses_to_catalog([tables.EnumTable])
             await conn.execute(str(catalog))
             conn.connection.generator.state = catalog
             table = catalog.get_table(QualifiedId(None, tables.EnumTable.__name__))
-            state_table = catalog.get_table(
-                QualifiedId(None, tables.WorkflowState.__name__)
-            )
+            state_table = catalog.get_table(QualifiedId(None, tables.WorkflowState.__name__))
             await conn.upsert_rows(
                 table,
                 field_types=(int, str, str),
@@ -167,12 +156,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
                     (9, "deleted", "deleted"),
                 ],
             )
-            self.assertEqual(
-                await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable"'), 9
-            )
-            self.assertEqual(
-                await conn.query_one(int, 'SELECT COUNT(*) FROM "WorkflowState"'), 3
-            )
+            self.assertEqual(await conn.query_one(int, 'SELECT COUNT(*) FROM "EnumTable"'), 9)
+            self.assertEqual(await conn.query_one(int, 'SELECT COUNT(*) FROM "WorkflowState"'), 3)
             await conn.execute(table.drop_stmt())
             await conn.execute(state_table.drop_stmt())
 

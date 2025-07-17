@@ -44,11 +44,7 @@ class MySQLConnection(BaseConnection):
                 return await self._open()
             except pymysql.err.OperationalError:
                 return await self._open(create_context(ssl_mode))
-        elif (
-            ssl_mode is ConnectionSSLMode.require
-            or ssl_mode is ConnectionSSLMode.verify_ca
-            or ssl_mode is ConnectionSSLMode.verify_full
-        ):
+        elif ssl_mode is ConnectionSSLMode.require or ssl_mode is ConnectionSSLMode.verify_ca or ssl_mode is ConnectionSSLMode.verify_full:
             return await self._open(create_context(ssl_mode))
         else:
             raise ValueError(f"unsupported SSL mode: {ssl_mode}")

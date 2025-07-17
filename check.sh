@@ -1,11 +1,9 @@
 set -e
 
-PYTHON=python3
+PYTHON_EXECUTABLE=${PYTHON:-python3}
 
 # Run static type checker and verify formatting guidelines
-# $PYTHON -m ruff check
-# $PYTHON -m ruff format --check
-$PYTHON -m mypy pysqlsync
-$PYTHON -m flake8 pysqlsync
-$PYTHON -m mypy tests
-$PYTHON -m flake8 tests
+$PYTHON_EXECUTABLE -m ruff check
+$PYTHON_EXECUTABLE -m ruff format --check
+$PYTHON_EXECUTABLE -m mypy pysqlsync
+$PYTHON_EXECUTABLE -m mypy tests

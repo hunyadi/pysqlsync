@@ -8,9 +8,7 @@ from .object_types import OracleColumn
 
 
 class OracleMutator(Mutator):
-    def mutate_column_stmt(
-        self, source_column: Column, target_column: Column
-    ) -> Optional[str]:
+    def mutate_column_stmt(self, source_column: Column, target_column: Column) -> Optional[str]:
         source = typing.cast(OracleColumn, source_column)
         target = typing.cast(OracleColumn, target_column)
 

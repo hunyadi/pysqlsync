@@ -16,10 +16,7 @@ class UniqueFactory:
         self.name_to_columns.setdefault(constraint_name, []).append(column)
 
     def fetch(self) -> list[UniqueConstraint]:
-        return [
-            UniqueConstraint(LocalId(name), tuple(columns))
-            for name, columns in self.name_to_columns.items()
-        ]
+        return [UniqueConstraint(LocalId(name), tuple(columns)) for name, columns in self.name_to_columns.items()]
 
 
 @dataclass

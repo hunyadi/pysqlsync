@@ -21,9 +21,7 @@ class MSSQLExplorer(AnsiExplorer):
                         "bit": MSSQLBooleanType(),
                         "datetime": MSSQLDateTimeType(),
                         "datetime2": MSSQLDateTimeType(),
-                        "nvarchar": MSSQLVariableCharacterType(
-                            encoding=MSSQLEncoding.UTF16
-                        ),
+                        "nvarchar": MSSQLVariableCharacterType(encoding=MSSQLEncoding.UTF16),
                         "varchar": MSSQLVariableCharacterType(),
                         "text": MSSQLVariableCharacterType(),
                     }
@@ -84,10 +82,7 @@ class MSSQLExplorer(AnsiExplorer):
             schema_id = "SCHEMA_ID()"
         table_names = await self.conn.query_all(
             str,
-            "SELECT name\n"
-            "FROM sys.tables\n"
-            f"WHERE schema_id = {schema_id} AND is_ms_shipped = 0\n"
-            "ORDER BY name ASC",
+            f"SELECT name\nFROM sys.tables\nWHERE schema_id = {schema_id} AND is_ms_shipped = 0\nORDER BY name ASC",
         )
         if table_names:
             if namespace_id is not None:
@@ -96,13 +91,9 @@ class MSSQLExplorer(AnsiExplorer):
                 scope_id = None
 
             for table_name in table_names:
-                table = await self.get_table(
-                    self.get_qualified_id(scope_id, table_name)
-                )
+                table = await self.get_table(self.get_qualified_id(scope_id, table_name))
                 tables.append(table)
 
-            return self.factory.namespace_class(
-                name=LocalId(scope_id or ""), enums=[], structs=[], tables=tables
-            )
+            return self.factory.namespace_class(name=LocalId(scope_id or ""), enums=[], structs=[], tables=tables)
         else:
             return self.factory.namespace_class()

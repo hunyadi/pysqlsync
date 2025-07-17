@@ -35,16 +35,12 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
         return repr(list(self._items.values()))
 
     @overload
-    def get(self, key: str, /) -> Optional[ObjectItem]:
-        ...
+    def get(self, key: str, /) -> Optional[ObjectItem]: ...
 
     @overload
-    def get(self, key: str, /, default: Union[ObjectItem, T]) -> Union[ObjectItem, T]:
-        ...
+    def get(self, key: str, /, default: Union[ObjectItem, T]) -> Union[ObjectItem, T]: ...
 
-    def get(
-        self, key: str, /, default: Optional[T] = None
-    ) -> Union[None, ObjectItem, T]:
+    def get(self, key: str, /, default: Optional[T] = None) -> Union[None, ObjectItem, T]:
         return self._items.get(key, default)
 
     def add(self, item: ObjectItem) -> None:
@@ -70,9 +66,7 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
             if key not in op:
                 yield item
 
-    def intersection(
-        self, op: "ObjectDict[ObjectItem]"
-    ) -> Iterable[tuple["ObjectItem", "ObjectItem"]]:
+    def intersection(self, op: "ObjectDict[ObjectItem]") -> Iterable[tuple["ObjectItem", "ObjectItem"]]:
         for key, item in self.items():
             op_item = op.get(key)
             if op_item is not None:

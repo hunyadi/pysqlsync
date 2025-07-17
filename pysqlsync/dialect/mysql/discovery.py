@@ -54,9 +54,7 @@ class MySQLExplorer(AnsiExplorer):
         )
 
     @override
-    def get_qualified_id(
-        self, namespace: Optional[str], id: str
-    ) -> SupportsQualifiedId:
+    def get_qualified_id(self, namespace: Optional[str], id: str) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -107,9 +105,7 @@ class MySQLExplorer(AnsiExplorer):
             )
         return columns
 
-    async def get_referential_constraints(
-        self, table_id: SupportsQualifiedId
-    ) -> list[ForeignConstraint]:
+    async def get_referential_constraints(self, table_id: SupportsQualifiedId) -> list[ForeignConstraint]:
         constraint_meta = await self.conn.query_all(
             AnsiConstraintMeta,
             "SELECT\n"
@@ -141,15 +137,11 @@ class MySQLExplorer(AnsiExplorer):
             )
         return constraints.fetch()
 
-    async def get_table_description(
-        self, table_id: SupportsQualifiedId
-    ) -> Optional[str]:
+    async def get_table_description(self, table_id: SupportsQualifiedId) -> Optional[str]:
         return (
             await self.conn.query_one(
                 str,
-                "SELECT table_comment\n"
-                "FROM information_schema.tables AS tab\n"
-                f"WHERE {self._where_table(table_id, 'tab')}",
+                f"SELECT table_comment\nFROM information_schema.tables AS tab\nWHERE {self._where_table(table_id, 'tab')}",
             )
             or None
         )

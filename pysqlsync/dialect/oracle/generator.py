@@ -39,9 +39,7 @@ class OracleGenerator(BaseGenerator):
     converter: DataclassConverter
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(
-            options, OracleObjectFactory(), OracleMutator(options.synchronization)
-        )
+        super().__init__(options, OracleObjectFactory(), OracleMutator(options.synchronization))
 
         self.check_enum_mode(exclude=[EnumMode.TYPE, EnumMode.INLINE])
         self.check_struct_mode(matches=StructMode.JSON)
@@ -86,35 +84,23 @@ class OracleGenerator(BaseGenerator):
         return f":{index}"
 
     @override
-    def get_field_extractor(
-        self, column: Column, field_name: str, field_type: type
-    ) -> Callable[[Any], Any]:
+    def get_field_extractor(self, column: Column, field_name: str, field_type: type) -> Callable[[Any], Any]:
         if field_type is uuid.UUID:
             return lambda obj: getattr(obj, field_name).bytes
         elif is_ip_address_type(field_type):
             return lambda obj: getattr(obj, field_name).packed
         elif field_type is datetime.time:
-            return (
-                lambda obj: datetime.datetime.combine(
-                    MIN_DATE, getattr(obj, field_name)
-                )
-                - MIN_DATETIME
-            )
+            return lambda obj: datetime.datetime.combine(MIN_DATE, getattr(obj, field_name)) - MIN_DATETIME
 
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(
-        self, column: Column, field_type: type
-    ) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):
             return lambda field: field.packed
         elif field_type is datetime.time:
-            return (
-                lambda field: datetime.datetime.combine(datetime.date.min, field)
-                - datetime.datetime.min
-            )
+            return lambda field: datetime.datetime.combine(datetime.date.min, field) - datetime.datetime.min
 
         return super().get_value_transformer(column, field_type)

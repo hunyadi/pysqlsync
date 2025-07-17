@@ -56,25 +56,17 @@ class TextWriter(Generic[D]):
         self._extractors = []
 
         if field_mapping is None:
-            field_mapping = {
-                field.name: field.name for field in dataclass_fields(entity_type)
-            }
+            field_mapping = {field.name: field.name for field in dataclass_fields(entity_type)}
 
         for name in field_mapping.keys():
             self._extractors.append(_get_extractor_fn(name))
 
-        stream.write(
-            b"\t".join(name.encode("utf-8") for name in field_mapping.values())
-        )
+        stream.write(b"\t".join(name.encode("utf-8") for name in field_mapping.values()))
         stream.write(b"\n")
 
     def write_objects(self, entities: list[D]) -> None:
         for entity in entities:
-            self.stream.write(
-                self.generator.generate_line(
-                    tuple(extractor(entity) for extractor in self._extractors)
-                )
-            )
+            self.stream.write(self.generator.generate_line(tuple(extractor(entity) for extractor in self._extractors)))
             self.stream.write(b"\n")
 
 
@@ -90,14 +82,10 @@ def fields_to_types(
     """
 
     if field_mapping is None:
-        field_mapping = {
-            field.name: field.name for field in dataclass_fields(entity_type)
-        }
+        field_mapping = {field.name: field.name for field in dataclass_fields(entity_type)}
 
     return {
-        field_mapping[field.name]: get_field_properties(
-            reference_to_key(field.type, entity_type)
-        ).tsv_type
+        field_mapping[field.name]: get_field_properties(reference_to_key(field.type, entity_type)).tsv_type
         for field in dataclass_fields(entity_type)
     }
 
@@ -177,9 +165,7 @@ class AsyncTextReader:
         line = await self.stream.readline()
         header = line.rstrip(b"\n")
         self.parser = AutoDetectParser(self.names_to_types, header)
-        self.field_types = tuple(
-            self.names_to_types[name] for name in self.parser.columns
-        )
+        self.field_types = tuple(self.names_to_types[name] for name in self.parser.columns)
 
     @property
     def columns(self) -> tuple[str, ...]:

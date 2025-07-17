@@ -40,11 +40,7 @@ class PostgreSQLConnection(BaseConnection):
                 return await self._open()
             except ConnectionError:
                 return await self._open(create_context(ssl_mode))
-        elif (
-            ssl_mode is ConnectionSSLMode.require
-            or ssl_mode is ConnectionSSLMode.verify_ca
-            or ssl_mode is ConnectionSSLMode.verify_full
-        ):
+        elif ssl_mode is ConnectionSSLMode.require or ssl_mode is ConnectionSSLMode.verify_ca or ssl_mode is ConnectionSSLMode.verify_full:
             return await self._open(create_context(ssl_mode))
         else:
             raise ValueError(f"unsupported SSL mode: {ssl_mode}")
@@ -111,11 +107,7 @@ class PostgreSQLContext(BaseContext):
         result = await self.native_connection.copy_records_to_table(
             schema_name=table_name.scope_id,
             table_name=table_name.local_id,
-            columns=tuple(
-                field.name
-                for field in dataclasses.fields(table)
-                if not is_identity_type(field.type)
-            ),
+            columns=tuple(field.name for field in dataclasses.fields(table) if not is_identity_type(field.type)),
             records=records,
         )
         LOGGER.debug(result)
@@ -129,9 +121,7 @@ class PostgreSQLContext(BaseContext):
         field_types: tuple[type, ...],
         field_names: Optional[tuple[str, ...]] = None,
     ) -> None:
-        record_generator = await self._generate_records(
-            table, source, field_types=field_types, field_names=field_names
-        )
+        record_generator = await self._generate_records(table, source, field_types=field_types, field_names=field_names)
         order = tuple(name for name in field_names if name) if field_names else None
         async for batch in record_generator.batches():
             result = await self.native_connection.copy_records_to_table(

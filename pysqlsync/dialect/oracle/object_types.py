@@ -30,9 +30,7 @@ class OracleColumn(Column):
 
 class OracleTable(Table):
     def alter_table_stmt(self, statements: list[str]) -> str:
-        return "\n".join(
-            f"ALTER TABLE {self.name} {statement};" for statement in statements
-        )
+        return "\n".join(f"ALTER TABLE {self.name} {statement};" for statement in statements)
 
     def drop_if_exists_stmt(self) -> str:
         return (

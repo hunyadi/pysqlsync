@@ -23,9 +23,7 @@ if __name__ == "__main__":
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters) as conn:
-            await conn.drop_table_if_exists(
-                QualifiedId(None, tables.NumericTable.__name__)
-            )
+            await conn.drop_table_if_exists(QualifiedId(None, tables.NumericTable.__name__))
             await conn.drop_table_if_exists(QualifiedId(None, tables.Person.__name__))
             await conn.drop_table_if_exists(QualifiedId(None, tables.Address.__name__))
             await conn.drop_schema(LocalId("sample"))
@@ -40,9 +38,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.execute(str(table_def))
 
             explorer = self.engine.create_explorer(conn)
-            table_ref = await explorer.get_table(
-                QualifiedId(current_namespace, tables.NumericTable.__name__)
-            )
+            table_ref = await explorer.get_table(QualifiedId(current_namespace, tables.NumericTable.__name__))
 
             await conn.execute(table_def.drop_stmt())
 
@@ -60,12 +56,8 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             await conn.execute(str(person_def))
 
             explorer = self.engine.create_explorer(conn)
-            address_ref = await explorer.get_table(
-                QualifiedId(current_namespace, tables.Address.__name__)
-            )
-            person_ref = await explorer.get_table(
-                QualifiedId(current_namespace, tables.Person.__name__)
-            )
+            address_ref = await explorer.get_table(QualifiedId(current_namespace, tables.Address.__name__))
+            person_ref = await explorer.get_table(QualifiedId(current_namespace, tables.Person.__name__))
 
             await conn.execute(person_def.drop_stmt())
             await conn.execute(address_def.drop_stmt())
@@ -91,9 +83,7 @@ class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 self.fail()
 
             catalog = conn.connection.generator.state
-            create_ns = catalog.namespaces[
-                "sample" if "sample" in catalog.namespaces else ""
-            ]
+            create_ns = catalog.namespaces["sample" if "sample" in catalog.namespaces else ""]
 
             # discover actual schema
             explorer = self.engine.create_explorer(conn)

@@ -92,9 +92,7 @@ class SqlDiscovery:
         return None
 
     def sql_data_type_from_def(self, type_def: str) -> Optional[SqlDataType]:
-        m = re.fullmatch(
-            r"^(?:decimal|number|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE
-        )
+        m = re.fullmatch(r"^(?:decimal|number|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlDecimalType(int(m.group(1)), int(m.group(2)))
 
@@ -113,9 +111,7 @@ class SqlDiscovery:
         if m is not None:
             return SqlFixedCharacterType(int(m.group(1)))
 
-        m = re.fullmatch(
-            r"^(?:varchar|character varying)[(](\d+)[)]$", type_def, re.IGNORECASE
-        )
+        m = re.fullmatch(r"^(?:varchar|character varying)[(](\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlVariableCharacterType(int(m.group(1)))
 
@@ -123,9 +119,7 @@ class SqlDiscovery:
         if m is not None:
             return SqlFixedBinaryType(int(m.group(1)))
 
-        m = re.fullmatch(
-            r"^(?:varbinary|binary varying)[(](\d+)[)]$", type_def, re.IGNORECASE
-        )
+        m = re.fullmatch(r"^(?:varbinary|binary varying)[(](\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlVariableBinaryType(int(m.group(1)))
 
@@ -133,9 +127,7 @@ class SqlDiscovery:
         m = re.fullmatch(r"^enum[(](.+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             value_list = m.group(1)
-            values = [
-                value for value in re.findall(r"'((?:[^']+|'')*)'(?:,|$)", value_list)
-            ]
+            values = [value for value in re.findall(r"'((?:[^']+|'')*)'(?:,|$)", value_list)]
             return SqlEnumType(values)
 
         return None

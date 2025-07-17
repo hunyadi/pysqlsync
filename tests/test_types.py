@@ -121,9 +121,7 @@ class TestTypes(unittest.TestCase):
         fields, docstring = flatten_dataclass(Nested)
         fields.insert(0, DataclassField("account_uuid", str))
         fields.append(DataclassField("commit_time", Optional[datetime.datetime], None))
-        TransformedNested = make_dataclass(
-            "TransformedNested", fields, docstring=docstring, module=tables
-        )
+        TransformedNested = make_dataclass("TransformedNested", fields, docstring=docstring, module=tables)
         self.assertIsNotNone(getattr(tables, "TransformedNested", None))
         self.assertMultiLineEqual(
             dataclass_to_code(TransformedNested),

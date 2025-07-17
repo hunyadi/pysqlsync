@@ -73,9 +73,7 @@ class OracleExplorer(Explorer):
         )
         self.factory = OracleObjectFactory()
 
-    def get_qualified_id(
-        self, namespace: Optional[str], id: str
-    ) -> SupportsQualifiedId:
+    def get_qualified_id(self, namespace: Optional[str], id: str) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -91,9 +89,7 @@ class OracleExplorer(Explorer):
     async def has_table(self, table_id: SupportsQualifiedId) -> bool:
         raise NotImplementedError()
 
-    async def has_column(
-        self, table_id: SupportsQualifiedId, column_id: LocalId
-    ) -> bool:
+    async def has_column(self, table_id: SupportsQualifiedId, column_id: LocalId) -> bool:
         raise NotImplementedError()
 
     async def get_table(self, table_id: SupportsQualifiedId) -> Table:
@@ -213,9 +209,7 @@ class OracleExplorer(Explorer):
 
     async def _get_namespace(self, namespace_id: Optional[LocalId] = None) -> Namespace:
         if namespace_id is not None:
-            condition = (
-                f"table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'"
-            )
+            condition = f"table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'"
         else:
             condition = "table_name NOT LIKE '%~_~_%' ESCAPE '~'"
 

@@ -87,9 +87,7 @@ def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
         query = parse_qs(parts.query, strict_parsing=True)
         if "ssl" in query:
             if len(query["ssl"]) != 1:
-                raise ValueError(
-                    "only a single `ssl` parameter is permitted in a connection string"
-                )
+                raise ValueError("only a single `ssl` parameter is permitted in a connection string")
             ssl_mode = query["ssl"][0]
             for v in ConnectionSSLMode.__members__.values():
                 if ssl_mode == v.value:
@@ -130,9 +128,7 @@ class UnavailableEngine(BaseEngine):
         self._raise_error()
 
     def _raise_error(self) -> typing.NoReturn:
-        raise RuntimeError(
-            f"missing dependency: `{self._module}`; you may need to run `pip install pysqlsync[{self._name}]`"
-        )
+        raise RuntimeError(f"missing dependency: `{self._module}`; you may need to run `pip install pysqlsync[{self._name}]`")
 
 
 def discover_dialects() -> None:
@@ -146,31 +142,20 @@ def discover_dialects() -> None:
         # run a preliminary check importing only the module `dependency`;
         # if the check fails, it indicates that required dependencies have not been installed (e.g. database driver)
         try:
-            module = importlib.import_module(
-                f".dialect.{resource.name}.dependency", package=__package__
-            )
+            module = importlib.import_module(f".dialect.{resource.name}.dependency", package=__package__)
         except ModuleNotFoundError as e:
             LOGGER.debug(
-                "skipping dialect `%s`: missing dependency: `%s`; "
-                "you may need to run `pip install pysqlsync[%s]`",
+                "skipping dialect `%s`: missing dependency: `%s`; you may need to run `pip install pysqlsync[%s]`",
                 resource.name,
                 e.name,
                 resource.name,
             )
-            register_dialect(
-                resource.name, UnavailableEngine(resource.name, e.name or "")
-            )
+            register_dialect(resource.name, UnavailableEngine(resource.name, e.name or ""))
             continue
 
         # import the module `engine`, which acts as an entry point to connector, generator and explorer functionality
-        module = importlib.import_module(
-            f".dialect.{resource.name}.engine", package=__package__
-        )
-        classes = [
-            cls
-            for cls in get_module_classes(module)
-            if re.match(r"^\w+Engine$", cls.__name__)
-        ]
+        module = importlib.import_module(f".dialect.{resource.name}.engine", package=__package__)
+        classes = [cls for cls in get_module_classes(module) if re.match(r"^\w+Engine$", cls.__name__)]
         engine_type = typing.cast(type[BaseEngine], classes.pop())
         engine_factory = engine_type()
         LOGGER.info(

@@ -39,14 +39,10 @@ class PostgreSQLTable(Table):
 
         # output comments for table and column objects
         if self.description is not None:
-            statements.append(
-                f"COMMENT ON TABLE {self.name} IS {sql_quoted_string(self.description)};"
-            )
+            statements.append(f"COMMENT ON TABLE {self.name} IS {sql_quoted_string(self.description)};")
         for column in self.columns.values():
             if column.description is not None:
-                statements.append(
-                    f"COMMENT ON COLUMN {self.name}.{column.name} IS {sql_quoted_string(column.description)};"
-                )
+                statements.append(f"COMMENT ON COLUMN {self.name}.{column.name} IS {sql_quoted_string(column.description)};")
         return "\n".join(statements)
 
     @property
@@ -64,14 +60,10 @@ class PostgreSQLStructType(StructType):
         statements.append(super().create_stmt())
 
         if self.description is not None:
-            statements.append(
-                f"COMMENT ON TYPE {self.name} IS {sql_quoted_string(self.description)};"
-            )
+            statements.append(f"COMMENT ON TYPE {self.name} IS {sql_quoted_string(self.description)};")
         for member in self.members.values():
             if member.description is not None:
-                statements.append(
-                    f"COMMENT ON COLUMN {self.name}.{member.name} IS {sql_quoted_string(member.description)};"
-                )
+                statements.append(f"COMMENT ON COLUMN {self.name}.{member.name} IS {sql_quoted_string(member.description)};")
         return "\n".join(statements)
 
 

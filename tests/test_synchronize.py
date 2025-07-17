@@ -60,9 +60,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         options = GeneratorOptions(
             namespaces={tables: "sample", event: "event", school: "school", user: None},
             foreign_constraints=True,
-            synchronization=MutatorOptions(
-                allow_drop_namespace=False, allow_drop_table=False
-            ),
+            synchronization=MutatorOptions(allow_drop_namespace=False, allow_drop_table=False),
         )
         async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
@@ -120,9 +118,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                 continue
 
             with self.subTest(combination=combination):
-                async with self.engine.create_connection(
-                    self.parameters, options
-                ) as conn:
+                async with self.engine.create_connection(self.parameters, options) as conn:
                     await conn.drop_schema(LocalId("sample"))
                     explorer = self.engine.create_explorer(conn)
                     await explorer.synchronize(module=tables)
@@ -137,14 +133,10 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def test_insert_update_delete_rows_relation(self) -> None:
         await self.insert_update_delete_rows_relation([tables.UniqueTable])
 
-    async def insert_update_delete_rows_plain(
-        self, exclude: list[type[DataclassInstance]]
-    ) -> None:
+    async def insert_update_delete_rows_plain(self, exclude: list[type[DataclassInstance]]) -> None:
         await self.insert_update_delete_rows(self.options, exclude)
 
-    async def insert_update_delete_rows_relation(
-        self, exclude: list[type[DataclassInstance]]
-    ) -> None:
+    async def insert_update_delete_rows_relation(self, exclude: list[type[DataclassInstance]]) -> None:
         options = GeneratorOptions(
             namespaces={tables: "sample", event: "event", school: "school", user: None},
             foreign_constraints=False,
@@ -152,9 +144,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
         )
         await self.insert_update_delete_rows(options, exclude)
 
-    async def insert_update_delete_rows(
-        self, options: GeneratorOptions, exclude: list[type[DataclassInstance]]
-    ) -> None:
+    async def insert_update_delete_rows(self, options: GeneratorOptions, exclude: list[type[DataclassInstance]]) -> None:
         async with self.engine.create_connection(self.parameters, options) as conn:
             explorer = self.engine.create_explorer(conn)
             await explorer.synchronize(module=tables)
@@ -172,9 +162,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     entities = random_objects(entity_type, 100)
 
                     # randomize order of columns in tabular file
-                    field_names = [
-                        field.name for field in dataclass_fields(entity_type)
-                    ]
+                    field_names = [field.name for field in dataclass_fields(entity_type)]
 
                     # generate random data and write records
                     random.shuffle(field_names)
@@ -188,9 +176,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
                     field_names.sort()
                     field_mapping = {name: f"value.{name}" for name in field_names}
                     with BytesIO(data) as stream:
-                        reader = TextReader(
-                            stream, fields_to_types(entity_type, field_mapping)
-                        )
+                        reader = TextReader(stream, fields_to_types(entity_type, field_mapping))
                         field_labels, field_types = reader.columns, reader.field_types
                         rows = reader.read_records()
 
@@ -297,9 +283,7 @@ class TestOracleSynchronize(OracleBase, TestSynchronize):
 @unittest.skipUnless(has_env_var("POSTGRESQL"), "PostgreSQL tests are disabled")
 class TestPostgreSQLSynchronize(PostgreSQLBase, TestSynchronize):
     async def test_insert_update_delete_rows_relation(self) -> None:
-        await self.insert_update_delete_rows_relation(
-            [tables.EnumArrayTable, tables.EnumSetTable, tables.UniqueTable]
-        )
+        await self.insert_update_delete_rows_relation([tables.EnumArrayTable, tables.EnumSetTable, tables.UniqueTable])
 
     async def test_enum_migration(self) -> None:
         options = GeneratorOptions(

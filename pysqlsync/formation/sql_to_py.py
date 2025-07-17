@@ -125,9 +125,7 @@ class SqlConverter:
     def qual_to_module(self, id: SupportsQualifiedId) -> str:
         return f"{self.options.namespaces[id.scope_id].__name__}.{safe_id(id.local_id)}"
 
-    def column_to_field(
-        self, table: Table, column: Column
-    ) -> tuple[str, type, dataclasses.Field]:
+    def column_to_field(self, table: Table, column: Column) -> tuple[str, type, dataclasses.Field]:
         """
         Generates a dataclass field corresponding to a table column.
 
@@ -171,9 +169,7 @@ class SqlConverter:
         :param table: The database table from which to produce a dataclass.
         """
 
-        fields = [
-            self.column_to_field(table, column) for column in table.columns.values()
-        ]
+        fields = [self.column_to_field(table, column) for column in table.columns.values()]
         class_name = safe_id(table.name.local_id)
 
         # default arguments must follow non-default arguments
@@ -186,9 +182,7 @@ class SqlConverter:
         if sys.version_info >= (3, 12):
             typ = dataclasses.make_dataclass(class_name, fields, module=module.__name__)
         else:
-            typ = dataclasses.make_dataclass(
-                class_name, fields, namespace={"__module__": module.__name__}
-            )
+            typ = dataclasses.make_dataclass(class_name, fields, namespace={"__module__": module.__name__})
         with StringIO() as out:
             for field in dataclasses.fields(typ):
                 description = field.metadata.get("description")
@@ -211,8 +205,6 @@ class SqlConverter:
         return typ
 
 
-def table_to_dataclass(
-    table: Table, options: SqlConverterOptions
-) -> type[DataclassInstance]:
+def table_to_dataclass(table: Table, options: SqlConverterOptions) -> type[DataclassInstance]:
     converter = SqlConverter(options)
     return converter.table_to_dataclass(table)

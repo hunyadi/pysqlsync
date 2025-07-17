@@ -18,25 +18,15 @@ class MySQLTable(Table):
         if self.description is None:
             return None
 
-        return (
-            self.description
-            if "\n" not in self.description
-            else self.description[: self.description.index("\n")]
-        )
+        return self.description if "\n" not in self.description else self.description[: self.description.index("\n")]
 
     def create_stmt(self) -> str:
         defs: list[str] = []
         defs.extend(str(c) for c in self.columns.values())
         primary_columns = ", ".join(str(key) for key in self.primary_key)
-        defs.append(
-            f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({primary_columns})"
-        )
+        defs.append(f"CONSTRAINT {self.primary_key_constraint_id} PRIMARY KEY ({primary_columns})")
         definition = ",\n".join(defs)
-        comment = (
-            f"\nCOMMENT = {quote(self.short_description)}"
-            if self.short_description
-            else ""
-        )
+        comment = f"\nCOMMENT = {quote(self.short_description)}" if self.short_description else ""
         return f"CREATE TABLE {self.name} (\n{definition}\n){comment};"
 
 
@@ -48,11 +38,7 @@ class MySQLEnumTable(EnumTable, MySQLTable):
 class MySQLColumn(Column):
     @property
     def data_spec(self) -> str:
-        charset = (
-            " CHARACTER SET ascii COLLATE ascii_bin"
-            if isinstance(self.data_type, SqlEnumType)
-            else ""
-        )
+        charset = " CHARACTER SET ascii COLLATE ascii_bin" if isinstance(self.data_type, SqlEnumType) else ""
         nullable = " NOT NULL" if not self.nullable else ""
         default = f" DEFAULT {self.default}" if self.default is not None else ""
         identity = " AUTO_INCREMENT" if self.identity else ""
@@ -62,16 +48,10 @@ class MySQLColumn(Column):
     @property
     def comment(self) -> Optional[str]:
         if self.description is not None:
-            description = (
-                self.description
-                if "\n" not in self.description
-                else self.description[: self.description.index("\n")]
-            )
+            description = self.description if "\n" not in self.description else self.description[: self.description.index("\n")]
 
             if len(description) > 1024:
-                raise FormationError(
-                    f"comment for column {self.name} too long, expected: maximum 1024; got: {len(description)}"
-                )
+                raise FormationError(f"comment for column {self.name} too long, expected: maximum 1024; got: {len(description)}")
 
             return quote(description)
         else:

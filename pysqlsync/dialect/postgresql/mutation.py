@@ -35,9 +35,7 @@ class PostgreSQLMutator(Mutator):
         enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
         return f'INSERT INTO {table.name} ("value") VALUES {enum_values} ON CONFLICT ("value") DO NOTHING;'
 
-    def migrate_column_stmt(
-        self, source_table: Table, source: Column, target_table: Table, target: Column
-    ) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
         ref = target_table.get_constraint(target.name)
         return (
             f"UPDATE {source_table.name} data_table\n"
@@ -53,36 +51,26 @@ class PostgreSQLMutator(Mutator):
         for target_column in target.columns.values():
             source_column = source.columns.get(target_column.name.id)
 
-            source_desc = (
-                source_column.description if source_column is not None else None
-            )
+            source_desc = source_column.description if source_column is not None else None
             target_desc = target_column.description
 
             if target_desc is None:
                 if source_desc is not None:
-                    statements.append(
-                        f"COMMENT ON COLUMN {target.name}.{target_column.name} IS NULL;"
-                    )
+                    statements.append(f"COMMENT ON COLUMN {target.name}.{target_column.name} IS NULL;")
             else:
                 if source_desc != target_desc:
-                    statements.append(
-                        f"COMMENT ON COLUMN {target.name}.{target_column.name} IS {sql_quoted_string(target_desc)};"
-                    )
+                    statements.append(f"COMMENT ON COLUMN {target.name}.{target_column.name} IS {sql_quoted_string(target_desc)};")
 
         if target.description is None:
             if source.description is not None:
                 statements.append(f"COMMENT ON TABLE {target.name} IS NULL;")
         else:
             if source.description != target.description:
-                statements.append(
-                    f"COMMENT ON TABLE {target.name} IS {sql_quoted_string(target.description)};"
-                )
+                statements.append(f"COMMENT ON TABLE {target.name} IS {sql_quoted_string(target.description)};")
 
         return join_or_none(statements)
 
-    def mutate_struct_stmt(
-        self, source: StructType, target: StructType
-    ) -> Optional[str]:
+    def mutate_struct_stmt(self, source: StructType, target: StructType) -> Optional[str]:
         statements: StatementList = StatementList()
         statements.append(super().mutate_struct_stmt(source, target))
 
@@ -91,8 +79,6 @@ class PostgreSQLMutator(Mutator):
                 statements.append(f"COMMENT ON TYPE {target.name} IS NULL;")
         else:
             if source.description != target.description:
-                statements.append(
-                    f"COMMENT ON TYPE {target.name} IS {sql_quoted_string(target.description)};"
-                )
+                statements.append(f"COMMENT ON TYPE {target.name} IS {sql_quoted_string(target.description)};")
 
         return join_or_none(statements)

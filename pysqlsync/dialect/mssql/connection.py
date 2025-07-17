@@ -34,11 +34,7 @@ class MSSQLConnection(BaseConnection):
         params = {
             "DRIVER": "{ODBC Driver 18 for SQL Server}",
             "APP": "pysqlsync",
-            "SERVER": (
-                f"{self.params.host},{self.params.port}"
-                if self.params.port is not None
-                else self.params.host
-            ),
+            "SERVER": (f"{self.params.host},{self.params.port}" if self.params.port is not None else self.params.host),
             "UID": self.params.username,
             "PWD": self.params.password,
             "LongAsMax": "yes",
@@ -46,9 +42,7 @@ class MSSQLConnection(BaseConnection):
         }
         if self.params.database is not None:
             params["DATABASE"] = self.params.database
-        conn_string = ";".join(
-            f"{key}={value}" for key, value in params.items() if value is not None
-        )
+        conn_string = ";".join(f"{key}={value}" for key, value in params.items() if value is not None)
         conn = pyodbc.connect(conn_string)
         with conn.cursor() as cur:
             rows = cur.execute("SELECT @@VERSION").fetchall()
@@ -95,9 +89,7 @@ class MSSQLContext(BaseContext):
             await self._internal_execute_typed(statement, batch, table, order)
 
     @thread_dispatch
-    def _internal_execute_all(
-        self, statement: str, records: Iterable[RecordType]
-    ) -> None:
+    def _internal_execute_all(self, statement: str, records: Iterable[RecordType]) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
             cur.executemany(statement, records)
@@ -112,12 +104,7 @@ class MSSQLContext(BaseContext):
     ) -> None:
         with self.native_connection.cursor() as cur:
             cur.fast_executemany = True
-            cur.setinputsizes(
-                [
-                    sql_to_odbc_type(column.data_type)
-                    for column in table.get_columns(order)
-                ]
-            )
+            cur.setinputsizes([sql_to_odbc_type(column.data_type) for column in table.get_columns(order)])
             cur.executemany(statement, records)
 
     @override
@@ -145,21 +132,15 @@ class MSSQLContext(BaseContext):
             stmts: list[str] = []
             for constraint in constraints:
                 table_name, constraint_name = constraint
-                stmts.append(
-                    f"ALTER TABLE {QualifiedId(namespace.id, table_name)} DROP CONSTRAINT {LocalId(constraint_name)};"
-                )
+                stmts.append(f"ALTER TABLE {QualifiedId(namespace.id, table_name)} DROP CONSTRAINT {LocalId(constraint_name)};")
             await self.execute("\n".join(stmts))
 
         tables = await self.query_all(
             str,
-            "SELECT table_name\n"
-            "FROM information_schema.tables\n"
-            f"WHERE table_schema = {quote(namespace.id)};",
+            f"SELECT table_name\nFROM information_schema.tables\nWHERE table_schema = {quote(namespace.id)};",
         )
         if tables:
-            table_list = ", ".join(
-                str(QualifiedId(namespace.local_id, table)) for table in tables
-            )
+            table_list = ", ".join(str(QualifiedId(namespace.local_id, table)) for table in tables)
             await self.execute(f"DROP TABLE IF EXISTS {table_list};")
 
         await self.execute(f"DROP SCHEMA IF EXISTS {namespace};")

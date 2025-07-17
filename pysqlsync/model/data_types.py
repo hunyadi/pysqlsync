@@ -44,14 +44,10 @@ def constant(v: Any) -> str:
         values = ", ".join(constant(value) for value in v)
         return f"({values})"
     elif is_dataclass_instance(v):
-        values = ", ".join(
-            constant(getattr(v, field.name)) for field in dataclass_fields(type(v))
-        )
+        values = ", ".join(constant(getattr(v, field.name)) for field in dataclass_fields(type(v)))
         return f"({values})"
     else:
-        raise NotImplementedError(
-            f"unknown constant representation for value (of type): {v} ({type(v)})"
-        )
+        raise NotImplementedError(f"unknown constant representation for value (of type): {v} ({type(v)})")
 
 
 def escape_like(value: str, escape_char: str) -> str:
@@ -68,9 +64,7 @@ def escape_like(value: str, escape_char: str) -> str:
 @dataclass
 class SqlDataType:
     def parse_meta(self, meta: Any) -> None:
-        raise TypeError(
-            f"unrecognized Python type annotation for {type(self).__name__}: {meta}"
-        )
+        raise TypeError(f"unrecognized Python type annotation for {type(self).__name__}: {meta}")
 
     def value_to_sql_literal(self, value: Any) -> str:
         return constant(value)

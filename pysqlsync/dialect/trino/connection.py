@@ -21,9 +21,7 @@ class TrinoConnection(BaseConnection):
             host=self.params.host,
             port=self.params.port,
             user=self.params.username,
-            auth=aiotrino.auth.BasicAuthentication(
-                self.params.username, self.params.password
-            ),
+            auth=aiotrino.auth.BasicAuthentication(self.params.username, self.params.password),
             http_scheme="https",
             catalog=self.params.database,
         )

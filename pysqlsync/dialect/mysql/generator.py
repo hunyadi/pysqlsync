@@ -31,9 +31,7 @@ class MySQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(
-            options, MySQLObjectFactory(), MySQLMutator(options.synchronization)
-        )
+        super().__init__(options, MySQLObjectFactory(), MySQLMutator(options.synchronization))
 
         self.check_enum_mode(exclude=[EnumMode.TYPE])
         self.check_struct_mode(matches=StructMode.JSON)
@@ -70,9 +68,7 @@ class MySQLGenerator(BaseGenerator):
         return r"%s"
 
     @override
-    def get_table_insert_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
+    def get_table_insert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -83,9 +79,7 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_merge_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
+    def get_table_merge_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -99,9 +93,7 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(
-        self, table: Table, order: Optional[tuple[str, ...]] = None
-    ) -> str:
+    def get_table_upsert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order)]
@@ -117,9 +109,7 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_field_extractor(
-        self, column: Column, field_name: str, field_type: type
-    ) -> Callable[[Any], Any]:
+    def get_field_extractor(self, column: Column, field_name: str, field_type: type) -> Callable[[Any], Any]:
         if field_type is uuid.UUID:
             return lambda obj: getattr(obj, field_name).bytes
         elif is_ip_address_type(field_type):
@@ -128,9 +118,7 @@ class MySQLGenerator(BaseGenerator):
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(
-        self, column: Column, field_type: type
-    ) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):

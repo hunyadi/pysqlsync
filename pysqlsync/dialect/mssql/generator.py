@@ -32,9 +32,7 @@ class MSSQLGenerator(BaseGenerator):
     """
 
     def __init__(self, options: GeneratorOptions) -> None:
-        super().__init__(
-            options, MSSQLObjectFactory(), MSSQLMutator(options.synchronization)
-        )
+        super().__init__(options, MSSQLObjectFactory(), MSSQLMutator(options.synchronization))
 
         self.check_enum_mode(exclude=[EnumMode.TYPE, EnumMode.INLINE])
         self.check_struct_mode(matches=StructMode.JSON)
@@ -72,9 +70,7 @@ class MSSQLGenerator(BaseGenerator):
         return "?"
 
     @override
-    def get_field_extractor(
-        self, column: Column, field_name: str, field_type: type
-    ) -> Callable[[Any], Any]:
+    def get_field_extractor(self, column: Column, field_name: str, field_type: type) -> Callable[[Any], Any]:
         if field_type is uuid.UUID:
             return lambda obj: getattr(obj, field_name).bytes
         elif is_ip_address_type(field_type):
@@ -83,9 +79,7 @@ class MSSQLGenerator(BaseGenerator):
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(
-        self, column: Column, field_type: type
-    ) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):

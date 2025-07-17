@@ -130,9 +130,7 @@ class PostgreSQLExplorer(Explorer):
         conditions.append(f"cls.relname = {quote(relation_id.local_id)}")
         if relation_id.scope_id is not None:
             conditions.append(f"nsp.nspname = {quote(relation_id.scope_id)}")
-        conditions.append(
-            " OR ".join(f"(cls.relkind = {quote(kind)})" for kind in kinds)
-        )
+        conditions.append(" OR ".join(f"(cls.relkind = {quote(kind)})" for kind in kinds))
         return " AND ".join(f"({c})" for c in conditions)
 
     @classmethod
@@ -152,9 +150,7 @@ class PostgreSQLExplorer(Explorer):
         )
         return len(rows) > 0 and rows[0] > 0
 
-    async def has_column(
-        self, table_id: SupportsQualifiedId, column_id: LocalId
-    ) -> bool:
+    async def has_column(self, table_id: SupportsQualifiedId, column_id: LocalId) -> bool:
         conditions: list[str] = []
         conditions.append(f"cls.relname = {quote(table_id.local_id)}")
         if table_id.scope_id is not None:
@@ -399,8 +395,6 @@ class PostgreSQLExplorer(Explorer):
             tables.append(table)
 
         if enums or structs or tables:
-            return self.factory.namespace_class(
-                namespace_id, enums=enums, structs=structs, tables=tables
-            )
+            return self.factory.namespace_class(namespace_id, enums=enums, structs=structs, tables=tables)
         else:
             return self.factory.namespace_class()

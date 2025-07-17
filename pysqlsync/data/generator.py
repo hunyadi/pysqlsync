@@ -48,14 +48,10 @@ def random_decimal(significant_digits: int, decimal_digits: int) -> decimal.Deci
 
 
 def time_today(time_of_day: datetime.time) -> datetime.datetime:
-    return datetime.datetime.combine(
-        datetime.datetime.today(), time_of_day, time_of_day.tzinfo
-    )
+    return datetime.datetime.combine(datetime.datetime.today(), time_of_day, time_of_day.tzinfo)
 
 
-def random_datetime(
-    start: datetime.datetime, end: datetime.datetime
-) -> datetime.datetime:
+def random_datetime(start: datetime.datetime, end: datetime.datetime) -> datetime.datetime:
     """
     Returns a random datetime between two datetime objects.
     """
@@ -75,9 +71,7 @@ def random_date(start: datetime.date, end: datetime.date) -> datetime.date:
     return start + datetime.timedelta(days=random.randrange(days))
 
 
-def random_time(
-    start: Optional[datetime.time] = None, end: Optional[datetime.time] = None
-) -> datetime.time:
+def random_time(start: Optional[datetime.time] = None, end: Optional[datetime.time] = None) -> datetime.time:
     """
     Returns a random time between two time objects.
     """
@@ -126,9 +120,7 @@ def random_enum_generator(
         min_c = min_count or 0
         max_c = max_count or 4
         c = max_c - min_c
-        return lambda: shuffled(values)[
-            : min(min_c + random.randint(0, c), len(values))
-        ]
+        return lambda: shuffled(values)[: min(min_c + random.randint(0, c), len(values))]
     else:
         raise TypeError("invalid parameter combination")
 
@@ -147,11 +139,7 @@ def random_ipv6addr() -> IPv6Address:
 
     return typing.cast(
         IPv6Address,
-        ip_address(
-            inet_ntop(
-                AF_INET6, pack(">QQ", random.getrandbits(64), random.getrandbits(64))
-            )
-        ),
+        ip_address(inet_ntop(AF_INET6, pack(">QQ", random.getrandbits(64), random.getrandbits(64)))),
     )
 
 
@@ -163,11 +151,7 @@ def random_alphanumeric_str(min_len: int, max_len: int) -> str:
     :param max_len: The maximum number of characters the string should comprise of.
     """
 
-    return "".join(
-        random.choices(
-            string.ascii_letters + string.digits, k=random.randint(min_len, max_len)
-        )
-    )
+    return "".join(random.choices(string.ascii_letters + string.digits, k=random.randint(min_len, max_len)))
 
 
 P = TypeVar("P")
@@ -197,12 +181,8 @@ class RandomGenerator:
         random.shuffle(self.keys)
 
     def create_json(self, cls: type) -> Callable[[int], dict[str, Any]]:
-        generators = {
-            field.name: self.create(field.type, cls) for field in dataclass_fields(cls)
-        }
-        return lambda k: {
-            field_name: generator(k) for field_name, generator in generators.items()
-        }
+        generators = {field.name: self.create(field.type, cls) for field in dataclass_fields(cls)}
+        return lambda k: {field_name: generator(k) for field_name, generator in generators.items()}
 
     def create(self, typ: Any, cls: type[DataclassInstance]) -> Callable[[int], Any]:
         """
@@ -230,9 +210,7 @@ class RandomGenerator:
 
         if value_properties.nullable:
             optional_generator = self.create(field_type, cls)
-            return lambda k: (
-                optional_generator(k) if random.uniform(0.0, 1.0) > 0.1 else None
-            )
+            return lambda k: (optional_generator(k) if random.uniform(0.0, 1.0) > 0.1 else None)
         elif plain_type is bool:
             return lambda _: random_bool()
         elif plain_type is int:
@@ -286,9 +264,7 @@ class RandomGenerator:
                 return lambda _: literal_value
         elif is_type_union(plain_type):
             union_types = unwrap_union_types(plain_type)
-            union_generators = [
-                self.create(union_type, cls) for union_type in union_types
-            ]
+            union_generators = [self.create(union_type, cls) for union_type in union_types]
             return lambda k: random.choice(union_generators)(k)
         elif is_struct_type(plain_type):
             json_generator = self.create_json(plain_type)
@@ -317,16 +293,11 @@ def random_objects(cls: type[D], count: int) -> list[D]:
 
     random_generator = RandomGenerator(count)
 
-    generators = {
-        field.name: random_generator.create(field.type, cls)
-        for field in dataclass_fields(cls)
-    }
+    generators = {field.name: random_generator.create(field.type, cls) for field in dataclass_fields(cls)}
 
     items: list[D] = []
     for k in range(0, count):
-        args = {
-            field_name: generator(k) for field_name, generator in generators.items()
-        }
+        args = {field_name: generator(k) for field_name, generator in generators.items()}
         items.append(cls(**args))
 
     return items

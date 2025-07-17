@@ -84,10 +84,7 @@ def is_reference_type(typ: Any, cls: type) -> bool:
     if is_entity_type(typ):
         return True
     elif is_type_union(typ):
-        member_types = [
-            evaluate_member_type(t, cls)
-            for t in unwrap_union_types(unwrap_annotated_type(typ))
-        ]
+        member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(unwrap_annotated_type(typ))]
         return all(is_entity_type(t) for t in member_types)
     else:
         return False
@@ -149,7 +146,7 @@ def get_entity_types(modules: list[types.ModuleType]) -> list[type[DataclassInst
 
     entity_types: list[type[DataclassInstance]] = []
     for module in modules:
-        for name, obj in inspect.getmembers(module, is_entity_type):
+        for _, obj in inspect.getmembers(module, is_entity_type):
             if sys.modules[obj.__module__] in modules:
                 entity_types.append(obj)
     return entity_types
@@ -175,11 +172,7 @@ def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:
         return dataclass_primary_key_type(plain_type)
     elif is_type_union(plain_type):
         # discriminated key reference
-        union_types = tuple(
-            evaluate_member_type(t, cls)
-            for t in unwrap_union_types(plain_type)
-            if t is not None
-        )
+        union_types = tuple(evaluate_member_type(t, cls) for t in unwrap_union_types(plain_type) if t is not None)
         if all(is_entity_type(t) for t in union_types):
             return dataclass_primary_key_type(union_types[0])
 

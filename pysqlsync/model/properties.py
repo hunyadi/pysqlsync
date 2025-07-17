@@ -84,11 +84,7 @@ def tsv_type(plain_type: TypeLike) -> type:
     elif is_type_union(plain_type):
         union_types = set(tsv_type(t) for t in unwrap_union_types(plain_type))
         if len(union_types) != 1:
-            if (
-                len(union_types) == 2
-                and ipaddress.IPv4Address in union_types
-                and ipaddress.IPv6Address in union_types
-            ):
+            if len(union_types) == 2 and ipaddress.IPv4Address in union_types and ipaddress.IPv6Address in union_types:
                 return typing.cast(type, plain_type)
             raise TypeError(f"inconsistent union types: {union_types}")
         return union_types.pop()
@@ -235,8 +231,4 @@ class ClassProperties:
 
 
 def get_class_properties(class_type: type[DataclassInstance]) -> ClassProperties:
-    return ClassProperties(
-        tuple(
-            get_field_properties(field.type) for field in dataclasses.fields(class_type)
-        )
-    )
+    return ClassProperties(tuple(get_field_properties(field.type) for field in dataclasses.fields(class_type)))

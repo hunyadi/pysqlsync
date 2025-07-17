@@ -97,9 +97,7 @@ class OracleContext(BaseContext):
             await self._internal_execute_typed(statement, batch, table, order)
 
     @thread_dispatch
-    def _internal_execute_all(
-        self, statement: str, records: Iterable[RecordType]
-    ) -> None:
+    def _internal_execute_all(self, statement: str, records: Iterable[RecordType]) -> None:
         statement = statement.rstrip("\r\n\t\v ;")
         with self.native_connection.cursor() as cur:
             cur.executemany(statement, list(records))
@@ -114,12 +112,7 @@ class OracleContext(BaseContext):
     ) -> None:
         statement = statement.rstrip("\r\n\t\v ;")
         with self.native_connection.cursor() as cur:
-            cur.setinputsizes(
-                *tuple(
-                    sql_to_oracle_type(cur, column.data_type)
-                    for column in table.get_columns(order)
-                )
-            )
+            cur.setinputsizes(*tuple(sql_to_oracle_type(cur, column.data_type) for column in table.get_columns(order)))
             cur.executemany(statement, list(records))
 
     @override
@@ -144,16 +137,11 @@ class OracleContext(BaseContext):
     @override
     async def drop_schema(self, namespace: LocalId) -> None:
         LOGGER.debug("drop schema: %s", namespace)
-        condition = (
-            f"table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~'"
-        )
+        condition = f"table_name LIKE '{escape_like(namespace.id, '~')}~_~_%' ESCAPE '~'"
         tables = await self.query_all(
             str,
             f"SELECT table_name FROM dba_tables WHERE {condition}",
         )
-        statement = "\n".join(
-            f"DROP TABLE {LocalId(table)} CASCADE CONSTRAINTS PURGE;"
-            for table in tables
-        )
+        statement = "\n".join(f"DROP TABLE {LocalId(table)} CASCADE CONSTRAINTS PURGE;" for table in tables)
         if statement:
             await self.execute(statement)

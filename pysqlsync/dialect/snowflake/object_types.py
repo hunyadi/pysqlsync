@@ -34,11 +34,7 @@ class SnowflakeTable(Table):
         defs.extend(str(c) for c in self.columns.values())
         defs.append(self.create_keys())
         definitions = ",\n".join(defs)
-        comment = (
-            f"\nCOMMENT = {sql_quoted_string(self.description)}"
-            if self.description
-            else ""
-        )
+        comment = f"\nCOMMENT = {sql_quoted_string(self.description)}" if self.description else ""
         return f"CREATE TABLE {self.name} (\n{definitions}\n){comment};"
 
     @property

@@ -64,9 +64,7 @@ class RedshiftGenerator(BaseGenerator):
         return f":{index}"
 
     @override
-    def get_field_extractor(
-        self, column: Column, field_name: str, field_type: type
-    ) -> Callable[[Any], Any]:
+    def get_field_extractor(self, column: Column, field_name: str, field_type: type) -> Callable[[Any], Any]:
         if field_type is uuid.UUID:
             return lambda obj: getattr(obj, field_name).bytes
         elif is_ip_address_type(field_type):
@@ -75,9 +73,7 @@ class RedshiftGenerator(BaseGenerator):
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(
-        self, column: Column, field_type: type
-    ) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):

@@ -29,9 +29,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(params.password, password)
         self.assertEqual(params.database, database)
         self.assertEqual(params.ssl, None)
-        self.assertEqual(
-            str(params), r"my%2Buser%40example.com@server.example.com:2310/database"
-        )
+        self.assertEqual(str(params), r"my%2Buser%40example.com@server.example.com:2310/database")
 
     def test_connection_query_parameters(self) -> None:
         host = "server.example.com"
@@ -55,9 +53,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(params.port, port)
         self.assertEqual(params.database, database)
         self.assertEqual(params.ssl, ConnectionSSLMode.verify_full)
-        self.assertEqual(
-            str(params), r"server.example.com:2310/database?ssl=verify-full"
-        )
+        self.assertEqual(str(params), r"server.example.com:2310/database?ssl=verify-full")
 
 
 if __name__ == "__main__":

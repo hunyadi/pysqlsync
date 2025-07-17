@@ -141,9 +141,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_enum_type(self) -> None:
-        options = DataclassConverterOptions(
-            enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None})
-        )
+        options = DataclassConverterOptions(enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None}))
         table_def = dataclass_to_table(tables.EnumTable, options=options)
         self.assertListEqual(
             list(table_def.columns.values()),
@@ -163,9 +161,7 @@ class TestConverter(unittest.TestCase):
         )
 
     def test_extensible_enum(self) -> None:
-        options = DataclassConverterOptions(
-            enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None})
-        )
+        options = DataclassConverterOptions(enum_mode=EnumMode.TYPE, namespaces=NamespaceMapping({tables: None}))
         converter = DataclassConverter(options=options)
         catalog = converter.dataclasses_to_catalog([tables.ExtensibleEnumTable])
         table_name = tables.ExtensibleEnumTable.__name__
@@ -358,9 +354,7 @@ class TestConverter(unittest.TestCase):
 
     def test_struct_definition(self) -> None:
         struct_def = dataclass_to_struct(tables.Coordinates, options=self.options)
-        self.assertEqual(
-            struct_def.description, "Coordinates in the geographic coordinate system."
-        )
+        self.assertEqual(struct_def.description, "Coordinates in the geographic coordinate system.")
         self.assertListEqual(
             list(struct_def.members.values()),
             [

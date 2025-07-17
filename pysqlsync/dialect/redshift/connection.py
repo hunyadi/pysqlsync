@@ -84,9 +84,7 @@ class RedshiftContext(BaseContext):
             await self._internal_execute_all(statement, batch)
 
     @thread_dispatch
-    def _internal_execute_all(
-        self, statement: str, records: Iterable[RecordType]
-    ) -> None:
+    def _internal_execute_all(self, statement: str, records: Iterable[RecordType]) -> None:
         with self.native_connection.cursor() as cursor:
             cursor.executemany(statement, records)
 
@@ -108,11 +106,7 @@ class RedshiftContext(BaseContext):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator
         table_name = generator.get_qualified_id(ClassRef(table))
-        columns = [
-            LocalId(field.name)
-            for field in dataclasses.fields(table)
-            if not is_identity_type(field.type)
-        ]
+        columns = [LocalId(field.name) for field in dataclasses.fields(table) if not is_identity_type(field.type)]
         records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
         self._insert_copy_stream(table_name, columns, records)
 
@@ -127,9 +121,7 @@ class RedshiftContext(BaseContext):
     ) -> None:
         order = tuple(name for name in field_names if name) if field_names else None
         columns = [col.name for col in table.get_columns(order)]
-        record_generator = await self._generate_records(
-            table, source, field_types=field_types, field_names=field_names
-        )
+        record_generator = await self._generate_records(table, source, field_types=field_types, field_names=field_names)
         async for batch in record_generator.batches():
             await self._insert_copy_stream_async(table.name, columns, batch)
 
