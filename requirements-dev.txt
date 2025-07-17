@@ -1,14 +1,14 @@
 # core
-json_strong_typing >= 0.3.5
-typing_extensions >= 4.12; python_version<"3.12"
+json_strong_typing >= 0.3.9
+typing_extensions >= 4.14; python_version<"3.12"
 
 # certificate stores
-certifi >= 2024.12.14; python_version<"3.10"
+certifi >= 2025.7.14; python_version<"3.10"
 truststore >= 0.10; python_version>="3.10"
 
 # development tools
 build >= 1.2
-mypy >= 1.13
+mypy >= 1.17
 ruff >= 0.12
 
 # PostgreSQL
@@ -16,7 +16,7 @@ asyncpg >= 0.30
 asyncpg-stubs >= 0.30
 
 # Oracle
-oracledb >= 2.5
+oracledb >= 3.2
 
 # MySQL
 aiomysql >= 0.2
@@ -27,7 +27,7 @@ types-PyMySQL >= 1.1
 pyodbc >= 5.2
 
 # Snowflake
-snowflake-connector-python >= 3.12
+snowflake-connector-python >= 3.16
 
 # Trino
-aiotrino >= 0.2
+aiotrino >= 0.3

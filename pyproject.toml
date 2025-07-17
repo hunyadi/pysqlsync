@@ -1,6 +1,85 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=80.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pysqlsync"
+description = "Synchronize schema and large volumes of data"
+readme = { file = "README.md", content-type = "text/markdown" }
+keywords = ["synchronization", "sql-schema", "sql-query", "sql-insert", "database-clients"]
+license = "MIT"
+authors = [
+    { name = "Levente Hunyadi", email = "hunyadi@gmail.com" }
+]
+maintainers = [
+    { name = "Levente Hunyadi", email = "hunyadi@gmail.com" }
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed"
+]
+dependencies = [
+    "json_strong_typing >= 0.3.9",
+    "certifi >= 2025.7.14; python_version<'3.10'",
+    "truststore >= 0.10; python_version>='3.10'",
+    "typing_extensions >= 4.14; python_version < '3.12'"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+tsv = [
+    "tsv2py >= 0.7"
+]
+postgresql = [
+    "asyncpg >= 0.30"
+]
+oracle = [
+    "oracledb >= 3.2"
+]
+mysql = [
+    "aiomysql >= 0.2",
+    "PyMySQL[rsa] >= 1.1"
+]
+mssql = [
+    "pyodbc >= 5.2"
+]
+snowflake = [
+    "snowflake-connector-python >= 3.16"
+]
+trino = [
+    "aiotrino >= 0.3"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/hunyadi/pysqlsync"
+"Source" = "https://github.com/hunyadi/pysqlsync"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pysqlsync*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pysqlsync.__version__" }
+
+[tool.setuptools.package-data]
+"pysqlsync" = ["py.typed"]
 
 [tool.ruff]
 line-length = 140
