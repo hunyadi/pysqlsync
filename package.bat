@@ -1,5 +1,7 @@
 @echo off
 
+ver > nul
+
 if exist dist rmdir /s /q dist
 if errorlevel 1 goto error
 for /d %%i in (*.egg-info) do rmdir /s /q "%%i"
