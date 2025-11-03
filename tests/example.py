@@ -6,9 +6,9 @@ import os.path
 import sys
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
-from strong_typing.auxiliary import Annotated, MaxLength
+from strong_typing.auxiliary import MaxLength
 
 from pysqlsync.base import GeneratorOptions
 from pysqlsync.connection import ConnectionParameters

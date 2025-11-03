@@ -3,21 +3,10 @@ import ipaddress
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
-from typing import Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 from uuid import UUID
 
-from strong_typing.auxiliary import (
-    Annotated,
-    MaxLength,
-    Precision,
-    TimePrecision,
-    float32,
-    float64,
-    int8,
-    int16,
-    int32,
-    int64,
-)
+from strong_typing.auxiliary import MaxLength, Precision, TimePrecision, float32, float64, int8, int16, int32, int64
 
 from pysqlsync.model.key_types import DEFAULT, Identity, PrimaryKey, Unique
 

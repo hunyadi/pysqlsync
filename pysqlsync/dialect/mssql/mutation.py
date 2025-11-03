@@ -2,13 +2,7 @@ import typing
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import (
-    Column,
-    ColumnFormationError,
-    StatementList,
-    Table,
-    join_or_none,
-)
+from pysqlsync.formation.object_types import Column, ColumnFormationError, StatementList, Table, join_or_none
 
 from .object_types import MSSQLColumn
 

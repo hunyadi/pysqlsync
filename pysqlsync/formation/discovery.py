@@ -7,15 +7,7 @@ from ..model.data_types import escape_like, quote
 from ..model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .constraints import ForeignFactory, UniqueFactory
 from .data_types import SqlDiscovery
-from .object_types import (
-    Column,
-    Constraint,
-    ForeignConstraint,
-    Namespace,
-    ObjectFactory,
-    Table,
-    UniqueConstraint,
-)
+from .object_types import Column, Constraint, ForeignConstraint, Namespace, ObjectFactory, Table, UniqueConstraint
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -124,7 +116,7 @@ class AnsiExplorer(Explorer):
             "WHERE table_schema != 'information_schema' AND table_schema != 'pg_catalog'\n"
             "ORDER BY table_name ASC",
         )
-        return [QualifiedId(record[0], record[1]) for record in records]  # type: ignore[arg-type]
+        return [QualifiedId(record[0], record[1]) for record in records]
 
     def _where_table(self, table_id: SupportsQualifiedId, alias: str) -> str:
         table_schema = (

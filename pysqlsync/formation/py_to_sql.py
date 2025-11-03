@@ -11,19 +11,7 @@ import typing
 import uuid
 from typing import Annotated, Any, Callable, Iterable, Optional, TypeVar
 
-from strong_typing.auxiliary import (
-    MaxLength,
-    float32,
-    float64,
-    int8,
-    int16,
-    int32,
-    int64,
-    uint8,
-    uint16,
-    uint32,
-    uint64,
-)
+from strong_typing.auxiliary import MaxLength, float32, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64
 from strong_typing.core import JsonType
 from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
@@ -76,13 +64,7 @@ from ..model.data_types import (
     compatible_type,
     constant,
 )
-from ..model.id_types import (
-    GlobalId,
-    LocalId,
-    PrefixedId,
-    QualifiedId,
-    SupportsQualifiedId,
-)
+from ..model.id_types import GlobalId, LocalId, PrefixedId, QualifiedId, SupportsQualifiedId
 from ..model.properties import get_field_properties
 from .inspection import (
     dataclass_primary_key_name,
@@ -918,7 +900,7 @@ class DataclassConverter:
             enum_types = [obj for obj in referenced_types if is_type_enum(obj)]
             enum_types.sort(key=lambda e: e.__name__)
             for enum_type in enum_types:
-                enum_values = [str(e.value) for e in enum_type]  # type: ignore
+                enum_values = [str(e.value) for e in enum_type]
                 if len(enum_values) < 2:
                     # enumerations with too few members expand into extensible enumeration tables
                     continue

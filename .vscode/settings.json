@@ -5,20 +5,14 @@
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder}"
     },
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": "explicit"
-    },
     "files.insertFinalNewline": true,
-    "isort.args": [
-        "--profile",
-        "black"
-    ],
-    "python.analysis.typeCheckingMode": "off",
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportInvalidTypeForm": "none"
-    },
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        },
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "python.analysis.typeCheckingMode": "strict"
 }

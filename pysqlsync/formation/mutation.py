@@ -1,13 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..model.data_types import (
-    SqlEnumType,
-    SqlIntegerType,
-    SqlVariableCharacterType,
-    constant,
-    quote,
-)
+from ..model.data_types import SqlEnumType, SqlIntegerType, SqlVariableCharacterType, constant, quote
 from ..model.id_types import SupportsName
 from .object_types import (
     Catalog,
@@ -110,14 +104,21 @@ class Mutator:
 
         return None  # undecided (converts to False in a Boolean expression)
 
+    def mutate_column_type(self, source: Column, target: Column) -> Optional[str]:
+        if source.data_type != target.data_type:
+            return f"SET DATA TYPE {target.data_type}"
+        else:
+            return None
+
     def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
         if source == target:
             return None
 
         statements: list[str] = []
 
-        if source.data_type != target.data_type:
-            statements.append(f"SET DATA TYPE {target.data_type}")
+        type_stmt = self.mutate_column_type(source, target)
+        if type_stmt:
+            statements.append(type_stmt)
 
         if source.nullable and not target.nullable:
             statements.append("SET NOT NULL")

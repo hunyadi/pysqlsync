@@ -1,15 +1,7 @@
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import (
-    Column,
-    EnumType,
-    StatementList,
-    StructType,
-    Table,
-    deleted,
-    join_or_none,
-)
+from pysqlsync.formation.object_types import Column, EnumType, StatementList, StructType, Table, deleted, join_or_none
 from pysqlsync.model.data_types import SqlIntegerType, SqlUserDefinedType, quote
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.util.typing import override
@@ -69,6 +61,12 @@ class PostgreSQLMutator(Mutator):
                 statements.append(f"COMMENT ON TABLE {target.name} IS {sql_quoted_string(target.description)};")
 
         return join_or_none(statements)
+
+    def mutate_column_type(self, source: Column, target: Column) -> Optional[str]:
+        if source.data_type != target.data_type:
+            return f"SET DATA TYPE {target.data_type} USING {source.name}::{target.data_type}"
+        else:
+            return None
 
     def mutate_struct_stmt(self, source: StructType, target: StructType) -> Optional[str]:
         statements: StatementList = StatementList()

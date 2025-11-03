@@ -10,17 +10,7 @@ from io import StringIO
 from typing import Annotated, Any, Optional, Union
 from uuid import UUID
 
-from strong_typing.auxiliary import (
-    Length,
-    MaxLength,
-    Precision,
-    TimePrecision,
-    float32,
-    float64,
-    int16,
-    int32,
-    int64,
-)
+from strong_typing.auxiliary import Length, MaxLength, Precision, TimePrecision, float32, float64, int16, int32, int64
 from strong_typing.core import JsonType
 from strong_typing.inspection import DataclassInstance, TypeLike
 
@@ -44,13 +34,7 @@ from ..model.data_types import (
 )
 from ..model.id_types import SupportsQualifiedId
 from ..model.key_types import PrimaryKey
-from .object_types import (
-    Column,
-    DiscriminatedConstraint,
-    ForeignConstraint,
-    ReferenceConstraint,
-    Table,
-)
+from .object_types import Column, DiscriminatedConstraint, ForeignConstraint, ReferenceConstraint, Table
 
 
 def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
@@ -125,7 +109,7 @@ class SqlConverter:
     def qual_to_module(self, id: SupportsQualifiedId) -> str:
         return f"{self.options.namespaces[id.scope_id].__name__}.{safe_id(id.local_id)}"
 
-    def column_to_field(self, table: Table, column: Column) -> tuple[str, type, dataclasses.Field]:
+    def column_to_field(self, table: Table, column: Column) -> tuple[str, type, dataclasses.Field[Any]]:
         """
         Generates a dataclass field corresponding to a table column.
 
@@ -139,7 +123,7 @@ class SqlConverter:
             default = column.default
 
         field_type = sql_type_to_python(column.data_type)
-        if column.name == table.primary_key:
+        if (column.name,) == table.primary_key:
             field_type = PrimaryKey[(field_type,)]  # type: ignore
         elif column.nullable:
             field_type = Optional[field_type]

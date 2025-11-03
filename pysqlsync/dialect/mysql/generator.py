@@ -6,14 +6,7 @@ from typing import Any, Callable, Optional
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.inspection import is_ip_address_type
 from pysqlsync.formation.object_types import Column, Table
-from pysqlsync.formation.py_to_sql import (
-    ArrayMode,
-    DataclassConverter,
-    DataclassConverterOptions,
-    EnumMode,
-    NamespaceMapping,
-    StructMode,
-)
+from pysqlsync.formation.py_to_sql import ArrayMode, DataclassConverter, DataclassConverterOptions, EnumMode, NamespaceMapping, StructMode
 from pysqlsync.model.data_types import SqlFixedBinaryType, SqlIntegerType
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.util.typing import override
@@ -132,7 +125,7 @@ def _field_list(field_ids: list[LocalId]) -> str:
     value_list = ", ".join("%s" for _ in field_ids)
     if False:
         # compatible with MySQL 8.0.19 and later, slow with aiomysql 0.2.0 and earlier
-        return f"({field_list}) VALUES ({value_list}) AS EXCLUDED"
+        return f"({field_list}) VALUES ({value_list}) AS EXCLUDED"  # type: ignore[unreachable]
     else:
         # emits a warning with MySQL 8.0.20 and later
         return f"({field_list}) VALUES ({value_list})"
@@ -141,7 +134,7 @@ def _field_list(field_ids: list[LocalId]) -> str:
 def _field_update(field_id: LocalId) -> str:
     if False:
         # compatible with MySQL 8.0.19 and later, slow with aiomysql 0.2.0 and earlier
-        return f"{field_id} = EXCLUDED.{field_id}"
+        return f"{field_id} = EXCLUDED.{field_id}"  # type: ignore[unreachable]
     else:
         # emits a warning with MySQL 8.0.20 and later
         return f"{field_id} = VALUES({field_id})"

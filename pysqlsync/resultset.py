@@ -27,10 +27,7 @@ def resultset_unwrap_dict(signature: type[D], records: Iterable[dict[str, Any]])
     if not is_dataclass_type(signature):
         raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
-    return [
-        signature(**{name: value for name, value in record.items()})  # type: ignore
-        for record in records
-    ]
+    return [signature(**{name: value for name, value in record.items()}) for record in records]
 
 
 def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[D]:
@@ -45,10 +42,7 @@ def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[
         raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
     names = [name for name in signature.__dataclass_fields__.keys()]
-    return [
-        signature(**{name: record.__getattribute__(name) for name in names})  # type: ignore[misc]
-        for record in records
-    ]
+    return [signature(**{name: record.__getattribute__(name) for name in names}) for record in records]
 
 
 def resultset_unwrap_tuple(signature: type[T], records: Iterable[Sequence[Any]]) -> list[T]:

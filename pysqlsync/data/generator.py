@@ -259,9 +259,11 @@ class RandomGenerator:
             literal_values = unwrap_literal_values(plain_type)
             if len(literal_values) > 1:
                 return lambda _: random.choice(literal_values)
-            else:
+            elif len(literal_values) > 0:
                 literal_value = literal_values[0]
                 return lambda _: literal_value
+            else:
+                raise TypeError("empty `typing.Literal`")
         elif is_type_union(plain_type):
             union_types = unwrap_union_types(plain_type)
             union_generators = [self.create(union_type, cls) for union_type in union_types]

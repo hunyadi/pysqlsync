@@ -7,15 +7,7 @@ from typing import Optional
 from pysqlsync.base import BaseContext, Explorer
 from pysqlsync.formation.constraints import ForeignFactory, UniqueFactory
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.object_types import (
-    Column,
-    Constraint,
-    EnumType,
-    Namespace,
-    StructMember,
-    StructType,
-    Table,
-)
+from pysqlsync.formation.object_types import Column, Constraint, EnumType, Namespace, StructMember, StructType, Table
 from pysqlsync.model.data_types import SqlArrayType, SqlUserDefinedType, quote
 from pysqlsync.model.id_types import GlobalId, LocalId, QualifiedId, SupportsQualifiedId
 
@@ -85,7 +77,7 @@ class PostgreSQLColumnMeta:
 
 @dataclass
 class PostgreSQLConstraintMeta:
-    constraint_type: str
+    constraint_type: bytes
     constraint_name: str
     source_column: str
     target_namespace: str
@@ -122,7 +114,7 @@ class PostgreSQLExplorer(Explorer):
             "FROM pg_catalog.pg_class AS cls INNER JOIN pg_catalog.pg_namespace AS nsp ON cls.relnamespace = nsp.oid\n"
             "WHERE cls.relkind = 'r' OR cls.relkind = 'v'",
         )
-        return [QualifiedId(row[0], row[1]) for row in rows]  # type: ignore
+        return [QualifiedId(row[0], row[1]) for row in rows]
 
     @classmethod
     def _where_relation(cls, relation_id: SupportsQualifiedId, kinds: list[str]) -> str:

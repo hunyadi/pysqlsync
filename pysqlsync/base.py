@@ -15,17 +15,7 @@ import logging
 import types
 import typing
 from dataclasses import dataclass
-from typing import (
-    Any,
-    AsyncIterable,
-    Callable,
-    Iterable,
-    Optional,
-    Sized,
-    TypeVar,
-    Union,
-    overload,
-)
+from typing import Any, AsyncIterable, Callable, Iterable, Optional, Sized, TypeVar, Union, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -33,14 +23,7 @@ from strong_typing.name import python_type_to_str
 from .connection import ConnectionParameters
 from .formation.inspection import get_entity_types
 from .formation.mutation import Mutator, MutatorOptions
-from .formation.object_types import (
-    Catalog,
-    Column,
-    FormationError,
-    Namespace,
-    ObjectFactory,
-    Table,
-)
+from .formation.object_types import Catalog, Column, FormationError, Namespace, ObjectFactory, Table
 from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, StructMode
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
@@ -424,7 +407,7 @@ class BaseGenerator(abc.ABC):
         table_object = self.state.get_table(self.get_qualified_id(ClassRef(table)))
         return self.get_table_delete_stmt(table_object)
 
-    def get_dataclass_as_record(self, entity_type: type[D], item: D, *, skip_identity: bool = False) -> tuple:
+    def get_dataclass_as_record(self, entity_type: type[D], item: D, *, skip_identity: bool = False) -> tuple[Any, ...]:
         "Converts a data-class object into a record to insert into a database table."
 
         table_object = self.state.get_table(self.get_qualified_id(ClassRef(entity_type)))
@@ -437,7 +420,7 @@ class BaseGenerator(abc.ABC):
         items: Iterable[D],
         *,
         skip_identity: bool = False,
-    ) -> Iterable[tuple]:
+    ) -> Iterable[tuple[Any, ...]]:
         "Converts a list of data-class objects into a list of records to insert into a database table."
 
         table_object = self.state.get_table(self.get_qualified_id(ClassRef(entity_type)))

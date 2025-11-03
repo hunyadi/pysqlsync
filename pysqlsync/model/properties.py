@@ -192,7 +192,7 @@ def get_field_properties(field_type: TypeLike) -> FieldProperties:
     metadata.extend(_get_field_metadata(plain_type))
     plain_type = unwrap_annotated_type(plain_type)
 
-    if metadata is None:
+    if not metadata:
         # field has a type without annotations or constraints
         return FieldProperties(
             plain_type=plain_type,

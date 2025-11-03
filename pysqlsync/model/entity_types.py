@@ -42,7 +42,7 @@ def make_entity(cls: type[DataclassInstance], key: str) -> type[DataclassInstanc
     key_type = key_field.type
 
     primary_key_type = PrimaryKey[key_type]  # type: ignore
-    target_fields: list[tuple[str, Any, dataclasses.Field]] = [
+    target_fields: list[tuple[str, Any, dataclasses.Field[Any]]] = [
         (key_field.name, primary_key_type, dataclasses.field(default=key_field.default))
     ]
     for value_field in value_fields:

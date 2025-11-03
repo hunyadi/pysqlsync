@@ -6,13 +6,7 @@ from typing import Iterable, Optional, TypeVar
 import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
-from pysqlsync.base import (
-    BaseConnection,
-    BaseContext,
-    DataSource,
-    QueryException,
-    RecordType,
-)
+from pysqlsync.base import BaseConnection, BaseContext, DataSource, QueryException, RecordType
 from pysqlsync.formation.object_types import Table
 from pysqlsync.model.data_types import escape_like
 from pysqlsync.model.id_types import LocalId
@@ -126,7 +120,7 @@ class OracleContext(BaseContext):
             records = cur.fetchall()
 
             if is_dataclass_type(signature):
-                return records
+                return typing.cast(list[T], records)
             else:
                 return resultset_unwrap_tuple(signature, records)
 

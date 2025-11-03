@@ -2,13 +2,7 @@ import typing
 from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
-from pysqlsync.formation.object_types import (
-    Column,
-    StatementList,
-    Table,
-    deleted,
-    join_or_none,
-)
+from pysqlsync.formation.object_types import Column, StatementList, Table, deleted, join_or_none
 from pysqlsync.model.data_types import SqlEnumType, SqlVariableCharacterType, quote
 from pysqlsync.model.id_types import LocalId
 
@@ -34,9 +28,9 @@ class MySQLMutator(Mutator):
         )
         return "\n".join(statements)
 
-    def mutate_table_stmt(self, source_table: Table, target_table: Table) -> Optional[str]:
-        source = typing.cast(MySQLTable, source_table)
-        target = typing.cast(MySQLTable, target_table)
+    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
+        source = typing.cast(MySQLTable, source)
+        target = typing.cast(MySQLTable, target)
 
         statements: StatementList = StatementList()
         statements.append(super().mutate_table_stmt(source, target))
@@ -55,9 +49,9 @@ class MySQLMutator(Mutator):
 
         return join_or_none(statements)
 
-    def mutate_column_stmt(self, source_column: Column, target_column: Column) -> Optional[str]:
-        source = typing.cast(MySQLColumn, source_column)
-        target = typing.cast(MySQLColumn, target_column)
+    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+        source = typing.cast(MySQLColumn, source)
+        target = typing.cast(MySQLColumn, target)
 
         if (
             source.data_type != target.data_type
