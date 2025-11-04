@@ -6,4 +6,4 @@ This module defines dependencies required for Microsoft SQL Server.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import pyodbc  # noqa: F401
+import pyodbc  # pyright: ignore[reportUnusedImport] # noqa: F401

@@ -130,7 +130,7 @@ class GeneratorOptions:
     enum_mode: Optional[EnumMode] = None
     struct_mode: Optional[StructMode] = None
     array_mode: Optional[ArrayMode] = None
-    namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(default_factory=dict)
+    namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(default_factory=dict[types.ModuleType, Optional[str]])
     foreign_constraints: bool = True
     initialize_tables: bool = False
     synchronization: MutatorOptions = dataclasses.field(default_factory=MutatorOptions)

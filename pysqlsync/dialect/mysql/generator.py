@@ -66,7 +66,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join("%s" for column in columns)
+        value_list = ", ".join("%s" for _column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append(";")
         return "\n".join(statements)
@@ -77,7 +77,7 @@ class MySQLGenerator(BaseGenerator):
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
         column_list = ", ".join(str(column.name) for column in columns)
-        value_list = ", ".join("%s" for column in columns)
+        value_list = ", ".join("%s" for _column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append("ON DUPLICATE KEY UPDATE")
         defs = [f"{key} = {key}" for key in table.primary_key]

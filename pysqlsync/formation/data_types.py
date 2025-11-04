@@ -28,7 +28,7 @@ from ..model.id_types import QualifiedId
 
 @dataclasses.dataclass
 class SqlDiscoveryOptions:
-    substitutions: dict[str, SqlDataType] = dataclasses.field(default_factory=dict)
+    substitutions: dict[str, SqlDataType] = dataclasses.field(default_factory=dict[str, SqlDataType])
 
 
 class SqlDiscovery:

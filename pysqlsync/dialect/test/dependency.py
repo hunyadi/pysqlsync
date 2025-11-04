@@ -7,4 +7,4 @@ This module is only required for integration tests.
 """
 
 # a fake import to trigger a ModuleNotFoundError exception
-import module_not_found  # noqa: F401
+import module_not_found  # pyright: ignore[reportMissingImports, reportUnusedImport] # noqa: F401

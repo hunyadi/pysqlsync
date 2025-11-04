@@ -6,4 +6,4 @@ This module defines dependencies required for Snowflake.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import snowflake  # noqa: F401
+import snowflake  # pyright: ignore[reportUnusedImport] # noqa: F401

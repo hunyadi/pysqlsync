@@ -6,7 +6,7 @@ inputs:
   python-version:
     description: Python version to run tests with
     required: true
-    default: '3.12'
+    default: '3.14'
   options-extras:
     description: Extras to pass to `pip install`
     required: false

@@ -6,5 +6,5 @@ This module defines dependencies required for MySQL.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import aiomysql  # noqa: F401
-import cryptography  # noqa: F401
+import aiomysql  # pyright: ignore[reportUnusedImport] # noqa: F401
+import cryptography  # pyright: ignore[reportUnusedImport] # noqa: F401

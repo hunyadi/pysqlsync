@@ -4,21 +4,13 @@ from typing import Optional
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.constraints import ForeignFactory
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
-from pysqlsync.formation.discovery import (
-    AnsiColumnMeta,
-    AnsiConstraintMeta,
-    AnsiExplorer,
-)
+from pysqlsync.formation.discovery import AnsiColumnMeta, AnsiConstraintMeta, AnsiExplorer
 from pysqlsync.formation.object_types import Column, ForeignConstraint, Namespace
 from pysqlsync.model.data_types import quote
 from pysqlsync.model.id_types import LocalId, PrefixedId, SupportsQualifiedId
 from pysqlsync.util.typing import override
 
-from .data_types import (
-    MySQLDateTimeType,
-    MySQLVariableBinaryType,
-    MySQLVariableCharacterType,
-)
+from .data_types import MySQLDateTimeType, MySQLVariableBinaryType, MySQLVariableCharacterType
 from .object_types import MySQLObjectFactory
 
 

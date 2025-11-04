@@ -14,5 +14,34 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
-    "python.analysis.typeCheckingMode": "strict"
+    "python.analysis.typeCheckingMode": "strict",
+    "cSpell.words": [
+        "aiomysql",
+        "aiotrino",
+        "asyncpg",
+        "bytea",
+        "dataclass",
+        "dataclasses",
+        "executemany",
+        "Hunyadi",
+        "Levente",
+        "mediumblob",
+        "mediumtext",
+        "ntop",
+        "oracledb",
+        "pyodbc",
+        "pysqlsync",
+        "resultset",
+        "sdist",
+        "setinputsizes",
+        "tinyblob",
+        "tinyint",
+        "tinytext",
+        "truststore",
+        "upserted",
+        "userenv",
+        "varbinary",
+        "varbyte",
+        "varchar"
+    ]
 }

@@ -10,23 +10,10 @@ from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.dialect.oracle.mutation import OracleMutator
 from pysqlsync.formation.inspection import is_ip_address_type
 from pysqlsync.formation.object_types import Column
-from pysqlsync.formation.py_to_sql import (
-    ArrayMode,
-    DataclassConverter,
-    DataclassConverterOptions,
-    EnumMode,
-    NamespaceMapping,
-    StructMode,
-)
+from pysqlsync.formation.py_to_sql import ArrayMode, DataclassConverter, DataclassConverterOptions, EnumMode, NamespaceMapping, StructMode
 from pysqlsync.util.typing import override
 
-from .data_types import (
-    OracleIntegerType,
-    OracleTimestampType,
-    OracleTimeType,
-    OracleVariableBinaryType,
-    OracleVariableCharacterType,
-)
+from .data_types import OracleIntegerType, OracleTimestampType, OracleTimeType, OracleVariableBinaryType, OracleVariableCharacterType
 from .object_types import OracleObjectFactory
 
 MIN_DATETIME = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)

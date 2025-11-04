@@ -6,4 +6,4 @@ This module defines dependencies required for Oracle.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import oracledb  # noqa: F401
+import oracledb  # pyright: ignore[reportUnusedImport] # noqa: F401

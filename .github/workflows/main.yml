@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Set up build dependencies
         run: |
@@ -32,7 +32,7 @@ jobs:
       - name: Run sanity checks
         run: |
           ./check.sh
-  
+
       - name: Build PyPI package
         run: |
           python -m build
@@ -72,7 +72,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -148,7 +148,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +188,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
 
     steps:
       - name: Install Microsoft ODBC

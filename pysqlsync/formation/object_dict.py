@@ -20,7 +20,7 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
         if not isinstance(value, ObjectDict):
             return False
 
-        return self._items == value._items
+        return self._items == value._items  # pyright: ignore[reportUnknownMemberType]
 
     def __getitem__(self, key: str) -> ObjectItem:
         return self._items[key]

@@ -6,4 +6,4 @@ This module defines dependencies required for PostgreSQL.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import asyncpg  # noqa: F401
+import asyncpg  # pyright: ignore[reportUnusedImport] # noqa: F401

@@ -6,4 +6,4 @@ This module defines dependencies required to support the query engine Trino.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import aiotrino  # noqa: F401
+import aiotrino  # pyright: ignore[reportUnusedImport] # noqa: F401

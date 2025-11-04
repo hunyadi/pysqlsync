@@ -4,14 +4,7 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Optional
 
-from strong_typing.auxiliary import (
-    IntegerRange,
-    MaxLength,
-    Precision,
-    Signed,
-    Storage,
-    TimePrecision,
-)
+from strong_typing.auxiliary import IntegerRange, MaxLength, Precision, Signed, Storage, TimePrecision
 from strong_typing.inspection import dataclass_fields, is_dataclass_instance
 
 from .id_types import LocalId, SupportsQualifiedId
@@ -41,7 +34,7 @@ def constant(v: Any) -> str:
             timestamp = v
         return quote(timestamp.isoformat(sep=" "))
     elif isinstance(v, tuple):
-        values = ", ".join(constant(value) for value in v)
+        values = ", ".join(constant(value) for value in v)  # pyright: ignore[reportUnknownVariableType]
         return f"({values})"
     elif is_dataclass_instance(v):
         values = ", ".join(constant(getattr(v, field.name)) for field in dataclass_fields(type(v)))

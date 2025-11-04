@@ -46,14 +46,14 @@ class MSSQLVariableCharacterType(SqlVariableCharacterType):
 
     def __str__(self) -> str:
         if self.encoding is MSSQLEncoding.UTF16:
-            chartype = "nvarchar"
+            char_type = "nvarchar"
         else:
-            chartype = "varchar"
+            char_type = "varchar"
 
         if self.limit is not None and self.limit > 0 and self.limit != 2147483647:
-            return f"{chartype}({self.limit})"
+            return f"{char_type}({self.limit})"
         else:
-            return f"{chartype}(max)"
+            return f"{char_type}(max)"
 
 
 class MSSQLDateTimeType(SqlTimestampType):

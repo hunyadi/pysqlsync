@@ -6,4 +6,4 @@ This module defines dependencies required for AWS Redshift.
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import redshift_connector  # noqa: F401
+import redshift_connector  # pyright: ignore[reportUnusedImport] # noqa: F401

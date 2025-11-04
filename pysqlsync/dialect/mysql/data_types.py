@@ -1,8 +1,4 @@
-from pysqlsync.model.data_types import (
-    SqlTimestampType,
-    SqlVariableBinaryType,
-    SqlVariableCharacterType,
-)
+from pysqlsync.model.data_types import SqlTimestampType, SqlVariableBinaryType, SqlVariableCharacterType
 
 
 class MySQLDateTimeType(SqlTimestampType):

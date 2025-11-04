@@ -3,14 +3,9 @@ import unittest
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from typing import Optional
+from typing import Any, Optional
 
-from pysqlsync.data.exchange import (
-    AsyncTextReader,
-    TextReader,
-    TextWriter,
-    fields_to_types,
-)
+from pysqlsync.data.exchange import AsyncTextReader, TextReader, TextWriter, fields_to_types
 
 
 @dataclass
@@ -45,7 +40,7 @@ class TestExchange(unittest.TestCase):
             self.assertEqual(columns, ("id", "code", "timestamp"))
             self.assertEqual(field_types, (int, str, datetime))
 
-            rows = reader.read_records()
+            rows: list[tuple[Any, ...]] = reader.read_records()
             self.assertSequenceEqual(rows, content)
 
         with BytesIO(data) as stream:
@@ -136,7 +131,7 @@ class TestAsyncExchange(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(columns, ("id", "code", "timestamp"))
             self.assertEqual(field_types, (int, str, datetime))
 
-            rows = await reader.read_records()
+            rows: list[tuple[Any, ...]] = await reader.read_records()
             self.assertSequenceEqual(rows, content)
 
         async with AsyncBytesIO(data) as stream:

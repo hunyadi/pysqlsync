@@ -31,7 +31,7 @@ class MSSQLConnection(BaseConnection):
     @thread_dispatch
     def open(self) -> BaseContext:
         LOGGER.info("connecting to %s", self.params)
-        params = {
+        params: dict[str, Optional[str]] = {
             "DRIVER": "{ODBC Driver 18 for SQL Server}",
             "APP": "pysqlsync",
             "SERVER": (f"{self.params.host},{self.params.port}" if self.params.port is not None else self.params.host),
