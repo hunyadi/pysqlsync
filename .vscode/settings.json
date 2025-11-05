@@ -22,6 +22,7 @@
         "bytea",
         "dataclass",
         "dataclasses",
+        "errorlevel",
         "executemany",
         "Hunyadi",
         "Levente",
