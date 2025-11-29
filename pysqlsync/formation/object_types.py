@@ -21,7 +21,7 @@ class StatementList(list[str]):
     def append(self, __object: Optional[str]) -> None:
         if __object is None:
             return
-        if isinstance(__object, str) and not __object.strip():
+        if isinstance(__object, str) and not __object.strip():  # pyright: ignore[reportUnnecessaryIsInstance]
             raise ValueError("empty statement")
         return super().append(__object)
 

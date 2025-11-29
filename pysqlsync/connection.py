@@ -45,7 +45,7 @@ class ConnectionSSLMode(enum.Enum):
 def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
     "Creates an SSL context to pass to a database connection object."
 
-    if ssl_mode is None or ssl_mode is ConnectionSSLMode.disable:
+    if ssl_mode is ConnectionSSLMode.disable:
         return None
     elif ssl_mode is ConnectionSSLMode.prefer or ssl_mode is ConnectionSSLMode.allow or ssl_mode is ConnectionSSLMode.require:
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)

@@ -28,6 +28,7 @@ from .formation.py_to_sql import ArrayMode, DataclassConverter, EnumMode, Struct
 from .model.data_types import SqlJsonType, SqlVariableCharacterType
 from .model.id_types import LocalId, QualifiedId, SupportsQualifiedId
 from .python_types import dataclass_to_code, module_to_code
+from .util.typing import override
 
 D = TypeVar("D", bound=DataclassInstance)
 E = TypeVar("E", bound=enum.Enum)
@@ -516,6 +517,12 @@ class BaseConnection(abc.ABC):
 
 class RecordTransformer:
     @abc.abstractmethod
+    def is_identity(self) -> bool:
+        "True if the transformer does nothing."
+
+        ...
+
+    @abc.abstractmethod
     async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
         """
         Returns a callable function object that performs a transformation on a value.
@@ -536,6 +543,10 @@ class ScalarTransformer(RecordTransformer):
         fn: Optional[Callable[[Any], Any]],
     ) -> None:
         self.fn = fn
+
+    @override
+    def is_identity(self) -> bool:
+        return self.fn is None
 
     async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
         return self.fn
@@ -558,6 +569,10 @@ class BaseEnumTransformer(RecordTransformer):
         self.table = table
         self.generator = generator
         self.index = index
+
+    @override
+    def is_identity(self) -> bool:
+        return False
 
     async def _merge_lookup_table(self, values: set[str]) -> dict[str, int]:
         "Merges new values into a lookup table and returns the entire updated table."
@@ -747,7 +762,7 @@ def to_data_source(records: RecordSource) -> DataSource:
 
     if isinstance(records, Iterable):
         return IterableDataSource(records)
-    elif isinstance(records, AsyncIterable):
+    elif isinstance(records, AsyncIterable):  # pyright: ignore[reportUnnecessaryIsInstance]
         return AsyncIterableDataSource(records)
     else:
         raise TypeError("expected: `Iterable` or `AsyncIterable` of records")
@@ -1084,7 +1099,7 @@ class BaseContext(abc.ABC):
             transformer = self._get_transformer(table, generator, index, field_type, field_name)
             transformers.append(transformer)
 
-        if all(transformer is None for transformer in transformers):
+        if all(transformer.is_identity() for transformer in transformers):
             if len(indices) == len(field_types):
                 return source
             else:
@@ -1194,7 +1209,7 @@ def _module_or_list(module: Optional[types.ModuleType], modules: Optional[list[t
         raise TypeError("disallowed: both parameters `module` and `modules`")
 
     if modules is not None:
-        if not isinstance(modules, list):
+        if not isinstance(modules, list):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("expected: list of modules for parameter `modules`")
         entity_modules = modules
     elif module is not None:

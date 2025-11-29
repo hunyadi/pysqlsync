@@ -41,7 +41,7 @@ def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[
     if not is_dataclass_type(signature):
         raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
-    names = [name for name in signature.__dataclass_fields__.keys()]
+    names = [name for name in signature.__dataclass_fields__.keys()]  # pyright: ignore[reportUnknownMemberType]
     return [signature(**{name: record.__getattribute__(name) for name in names}) for record in records]
 
 
