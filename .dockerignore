@@ -1,4 +1,7 @@
-.mypy_cache
+/.mypy_cache
+/.ruff_cache
+/.venv
+/build
 __pycache__
 *.egg-info
 *.log

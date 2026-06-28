@@ -27,6 +27,10 @@ TEST_INTEGRATION=1 TEST_ORACLE=1 $PYTHON -m unittest discover
 docker stop $CONTAINER && docker rm $CONTAINER
 
 # Microsoft SQL Server
+# requires on Linux:
+#   sudo apt install unixodbc
+# requires on MacOS:
+#   brew install unixodbc
 CONTAINER=sql1
 docker ps -q --filter "name=$CONTAINER" | xargs -r docker stop
 docker ps -aq --filter "name=$CONTAINER" | xargs -r docker rm

@@ -5,7 +5,7 @@ import sys
 import types
 import uuid
 from ipaddress import IPv4Address, IPv6Address
-from typing import Any, Optional
+from typing import Any, Optional, TypeGuard
 
 from strong_typing.core import JsonType
 from strong_typing.inspection import (
@@ -23,7 +23,6 @@ from strong_typing.inspection import (
 )
 
 from ..model.properties import get_field_properties, is_primary_key_type
-from ..util.typing import TypeGuard
 
 
 def is_simple_type(typ: Any) -> bool:

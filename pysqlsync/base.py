@@ -721,7 +721,9 @@ class TransformerDataSource(CompositeDataSource):
             for transformer in self.transformers:
                 fns.append(await transformer.get(batch))
             yield [
-                tuple(((fn(field) if field is not None else None) if fn is not None else field) for fn, field in zip(fns, record))
+                tuple(
+                    ((fn(field) if field is not None else None) if fn is not None else field) for fn, field in zip(fns, record, strict=True)
+                )
                 for record in batch
             ]
 
@@ -751,7 +753,7 @@ class SelectorTransformerDataSource(CompositeDataSource):
             yield [
                 tuple(
                     ((fn(field) if field is not None else None) if fn is not None else field)
-                    for fn, field in zip(fns, (record[i] for i in indices))
+                    for fn, field in zip(fns, (record[i] for i in indices), strict=True)
                 )
                 for record in batch
             ]
@@ -1091,7 +1093,7 @@ class BaseContext(abc.ABC):
 
         indices: list[int] = []
         transformers: list[RecordTransformer] = []
-        for index, field_type, field_name in zip(range(len(field_types)), field_types, field_names):
+        for index, field_type, field_name in zip(range(len(field_types)), field_types, field_names, strict=True):
             if field_type is type(None) or not field_name:
                 continue
 

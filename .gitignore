@@ -1,5 +1,8 @@
-__pycache__
+/.mypy_cache
+/.ruff_cache
+/.venv
 /build
 /dist
 /docs
 /*.egg-info
+__pycache__

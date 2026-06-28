@@ -2,9 +2,7 @@ import asyncio
 import functools
 import inspect
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Coroutine, TypeVar
-
-from .typing import ParamSpec
+from typing import Callable, Coroutine, ParamSpec, TypeVar
 
 R = TypeVar("R")
 P = ParamSpec("P")

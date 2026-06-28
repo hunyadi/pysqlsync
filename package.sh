@@ -11,7 +11,6 @@ done
 $PYTHON_EXECUTABLE -m build --sdist --wheel
 
 # Verify if the package builds successfully for all Python target versions
-docker build --build-arg PYTHON_VERSION=3.9 .
 docker build --build-arg PYTHON_VERSION=3.10 .
 docker build --build-arg PYTHON_VERSION=3.11 .
 docker build --build-arg PYTHON_VERSION=3.12 .

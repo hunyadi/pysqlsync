@@ -14,13 +14,12 @@ authors = [
 maintainers = [
     { name = "Levente Hunyadi", email = "hunyadi@gmail.com" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -33,22 +32,21 @@ classifiers = [
     "Typing :: Typed"
 ]
 dependencies = [
-    "json_strong_typing >= 0.4.2",
-    "certifi >= 2025.11.12; python_version<'3.10'",
-    "truststore >= 0.10; python_version>='3.10'",
+    "json_strong_typing >= 0.4.3",
+    "truststore >= 0.10",
     "typing_extensions >= 4.15; python_version < '3.12'"
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 tsv = [
-    "tsv2py >= 0.7"
+    "tsv2py >= 0.8"
 ]
 postgresql = [
-    "asyncpg >= 0.30"
+    "asyncpg >= 0.31"
 ]
 oracle = [
-    "oracledb >= 3.4"
+    "oracledb >= 4.0"
 ]
 mysql = [
     "aiomysql >= 0.3",

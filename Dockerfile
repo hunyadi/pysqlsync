@@ -1,4 +1,4 @@
-ARG PYTHON_VERSION=3.9
+ARG PYTHON_VERSION=3.10
 FROM python:${PYTHON_VERSION}-slim
 RUN apt-get update && apt-get install -y unixodbc-dev
 COPY dist/*.whl dist/

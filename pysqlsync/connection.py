@@ -8,15 +8,11 @@ This module helps create a secure sockets layer (SSL) context.
 
 import enum
 import ssl
-import sys
 from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import quote
 
-if sys.version_info >= (3, 10):
-    import truststore
-else:
-    import certifi
+import truststore
 
 
 @enum.unique
@@ -53,18 +49,12 @@ def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
     elif ssl_mode is ConnectionSSLMode.verify_ca:
-        if sys.version_info >= (3, 10):
-            ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        else:
-            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=certifi.where())
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_REQUIRED
         return ctx
     elif ssl_mode is ConnectionSSLMode.verify_full:
-        if sys.version_info >= (3, 10):
-            ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        else:
-            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=certifi.where())
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ctx.check_hostname = True
         ctx.verify_mode = ssl.CERT_REQUIRED
         return ctx

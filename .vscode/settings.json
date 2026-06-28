@@ -35,14 +35,17 @@
         "resultset",
         "sdist",
         "setinputsizes",
+        "setuptools",
         "tinyblob",
         "tinyint",
         "tinytext",
+        "Trino",
         "truststore",
         "upserted",
         "userenv",
         "varbinary",
         "varbyte",
         "varchar"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

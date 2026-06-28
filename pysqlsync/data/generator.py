@@ -210,7 +210,7 @@ class RandomGenerator:
 
         if value_properties.nullable:
             optional_generator = self.create(field_type, cls)
-            return lambda k: (optional_generator(k) if random.uniform(0.0, 1.0) > 0.1 else None)
+            return lambda k: optional_generator(k) if random.uniform(0.0, 1.0) > 0.1 else None
         elif plain_type is bool:
             return lambda _: random_bool()
         elif plain_type is int:
