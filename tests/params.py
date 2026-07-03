@@ -128,7 +128,7 @@ def configure() -> None:
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    ch = logging.FileHandler(os.path.join(os.path.dirname(__file__), "test.log"), "w")
+    ch = logging.FileHandler(os.path.join(os.path.dirname(__file__), "test.log"), "w", encoding="utf-8")
     ch.setLevel(logging.DEBUG)
     logger.addHandler(ch)
 

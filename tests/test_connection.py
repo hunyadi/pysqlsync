@@ -37,6 +37,8 @@ class TestConnection(TestEngineBase, TimedAsyncioTestCase):
         async with self.engine.create_connection(self.parameters, options) as conn:
             if self.engine.name == "oracle":
                 await conn.execute('CREATE TABLE "DataTable" ("id" number PRIMARY KEY, "data" clob);')
+            elif self.engine.name == "mssql":
+                await conn.execute('CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" varchar(max));')
             else:
                 await conn.execute('CREATE TABLE "DataTable" ("id" int PRIMARY KEY, "data" text);')
             await conn.execute('DROP TABLE "DataTable";')

@@ -171,6 +171,7 @@ jobs:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: Y
+          MSSQL_COLLATION: "Latin1_General_100_CI_AS_SC_UTF8"
           MSSQL_SA_PASSWORD: "<?YourStrong@Passw0rd>"
           SQLCMDPASSWORD: "<?YourStrong@Passw0rd>"
         ports:

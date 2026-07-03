@@ -154,6 +154,61 @@ def random_alphanumeric_str(min_len: int, max_len: int) -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=random.randint(min_len, max_len)))
 
 
+_DIACRITICS = (
+    "àáâãäåāăąèéêëēęìíîïīįòóôõöøőōùúûüűūųýÿçćčďðģğķļĺľłñńņňřŕśşšșťţþțźżžæœßı"
+    "ÀÁÂÃÄÅĀĂĄÈÉÊËĒĘÌÍÎÏĪĮÒÓÔÕÖØŐŌÙÚÛÜŰŪŲÝŸÇĆČĎÐĢĞĶĻĹĽŁÑŃŅŇŘŔŚŞŠȘŤŢÞȚŹŻŽÆŒẞİ"
+)
+
+_EMOJIS = "😂❤️🔥🥰🙏👍🎉😉💀"
+
+UTF8_CHARS = string.ascii_letters + string.digits + _DIACRITICS + _EMOJIS
+UTF8_CHARS_MAX_BYTE_LEN = {k: [ch for ch in UTF8_CHARS if len(ch.encode("utf-8")) <= k] for k in range(1, 5)}
+
+
+def random_utf8_str(min_len: int, max_len: int) -> str:
+    """
+    Creates a random string of UTF-8 characters.
+
+    Languages covered:
+    * French
+    * Spanish
+    * Portuguese
+    * German
+    * Italian
+    * Nordic
+    * Czech
+    * Slovak
+    * Polish
+    * Hungarian
+    * Romanian
+    * Latvian
+    * Lithuanian
+    * Turkish
+    * Welsh
+    * Icelandic
+
+    :param min_len: The minimum number of bytes the string should comprise of.
+    :param max_len: The maximum number of bytes the string should comprise of.
+    """
+
+    if min_len < 0 or max_len < 0:
+        raise ValueError("length bounds must be non-negative")
+    if min_len > max_len:
+        raise ValueError("min_len must be <= max_len")
+
+    target_len = random.randint(min_len, max_len)
+    current_len = 0
+
+    chars: list[str] = []
+    while current_len < target_len:
+        max_char_byte_len = min(target_len - current_len, 4)
+        ch = random.choice(UTF8_CHARS_MAX_BYTE_LEN[max_char_byte_len])
+        chars.append(ch)
+        current_len += len(ch.encode("utf-8"))
+
+    return "".join(chars)
+
+
 P = TypeVar("P")
 R = TypeVar("R")
 
@@ -241,7 +296,7 @@ class RandomGenerator:
             min_length = min_length_tag.value if min_length_tag is not None else 1
             max_length_tag = get_annotation(field_type, MaxLength)
             max_length = max_length_tag.value if max_length_tag is not None else 255
-            return lambda _: random_alphanumeric_str(min_length, max_length)
+            return lambda _: random_utf8_str(min_length, max_length)
         elif plain_type is decimal.Decimal:
             precision = get_annotation(field_type, Precision)
             significant_digits = precision.significant_digits if precision else 10

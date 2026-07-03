@@ -31,11 +31,17 @@ docker stop $CONTAINER && docker rm $CONTAINER
 #   sudo apt install unixodbc
 # requires on MacOS:
 #   brew install unixodbc
+# requires on Windows subsystem for Linux (WSL):
+#   curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+#   sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc
+
 CONTAINER=sql1
 docker ps -q --filter "name=$CONTAINER" | xargs -r docker stop
 docker ps -aq --filter "name=$CONTAINER" | xargs -r docker rm
 docker run -d \
-    -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<?YourStrong@Passw0rd>" \
+    -e "ACCEPT_EULA=Y" \
+    -e "MSSQL_COLLATION=Latin1_General_100_CI_AS_SC_UTF8" \
+    -e "MSSQL_SA_PASSWORD=<?YourStrong@Passw0rd>" \
     --hostname sql1 -p 1433:1433 \
     --name $CONTAINER mcr.microsoft.com/mssql/server:2022-latest
 sleep 30
