@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+Copyright 2023-2026, Levente Hunyadi
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 from typing import Optional, Sequence
 
 from pysqlsync.base import BaseContext

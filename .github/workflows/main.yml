@@ -3,6 +3,17 @@ name: pysqlsync database integration tests
 
 on:
   workflow_dispatch:
+    inputs:
+      publish-to-github:
+        type: boolean
+        description: "Publish to GitHub"
+        required: true
+        default: false
+      publish-to-pypi:
+        type: boolean
+        description: "Publish to PyPI"
+        required: true
+        default: false
 
 defaults:
   run:
@@ -17,10 +28,10 @@ jobs:
 
     steps:
       - name: Fetch source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -38,7 +49,7 @@ jobs:
           python -m build
 
       - name: Save PyPI package as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pysqlsync-dist
           path: dist/**
@@ -75,7 +86,7 @@ jobs:
         python-version: ["3.10", "3.14"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -112,7 +123,7 @@ jobs:
         python-version: ["3.14"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -151,7 +162,7 @@ jobs:
         python-version: ["3.10", "3.14"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -195,7 +206,7 @@ jobs:
       - name: Install Microsoft ODBC
         run: sudo ACCEPT_EULA=Y apt-get install msodbcsql18 -y
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -205,3 +216,58 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           options-extras: mssql
+
+  github-release:
+    name: GitHub release signed with Sigstore
+
+    if: ${{ inputs.publish-to-github }}
+    needs: build
+
+    permissions:
+      contents: write # mandatory for making GitHub Releases
+      id-token: write # mandatory for Sigstore
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the distribution
+        uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Sign the distribution with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.4.0
+        with:
+          inputs: |
+            ./dist/*.tar.gz
+            ./dist/*.whl
+      - name: Upload artifact signatures to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # Upload to GitHub Release using the `gh` CLI.
+        # `dist/` contains the built packages, and the
+        # sigstore-produced signatures and certificates.
+        run: >-
+          gh release create
+          `ls -1 dist/*.tar.gz | grep -Eo '[0-9]+[.][0-9]+[.][0-9]+'` dist/**
+          --repo '${{ github.repository }}' --notes ''
+
+  pypi-publish:
+    name: Publish to PyPI
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pysqlsync
+    permissions:
+      id-token: write # mandatory for trusted publishing
+
+    if: ${{ inputs.publish-to-pypi }}
+    needs: build
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the distribution
+        uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -55,12 +55,6 @@ mysql = [
 mssql = [
     "pyodbc >= 5.3"
 ]
-snowflake = [
-    "snowflake-connector-python >= 3.18"
-]
-trino = [
-    "aiotrino >= 0.3"
-]
 
 [project.urls]
 "Homepage" = "https://github.com/hunyadi/pysqlsync"

@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+Copyright 2023-2026, Levente Hunyadi
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 from typing import Any, AsyncIterator, BinaryIO, Callable, Generic, Iterable, Optional, Protocol, TypeVar
 
 from strong_typing.inspection import DataclassInstance, dataclass_fields

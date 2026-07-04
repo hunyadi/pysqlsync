@@ -27,9 +27,3 @@ types-PyMySQL >= 1.1
 
 # Microsoft SQL Server
 pyodbc >= 5.3
-
-# Snowflake
-snowflake-connector-python >= 3.18
-
-# Trino
-aiotrino >= 0.3

@@ -3,6 +3,8 @@ pysqlsync: Synchronize schema and large volumes of data.
 
 This module helps create a secure sockets layer (SSL) context.
 
+Copyright 2023-2026, Levente Hunyadi
+
 :see: https://github.com/hunyadi/pysqlsync
 """
 

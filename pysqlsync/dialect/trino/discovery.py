@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+Copyright 2023-2026, Levente Hunyadi
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
 from pysqlsync.formation.discovery import AnsiExplorer

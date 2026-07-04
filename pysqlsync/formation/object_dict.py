@@ -1,3 +1,11 @@
+"""
+pysqlsync: Synchronize schema and large volumes of data.
+
+Copyright 2023-2026, Levente Hunyadi
+
+:see: https://github.com/hunyadi/pysqlsync
+"""
+
 from collections.abc import ItemsView, KeysView, Mapping, ValuesView
 from typing import Generic, Iterable, Iterator, Optional, TypeVar, Union, overload
 
