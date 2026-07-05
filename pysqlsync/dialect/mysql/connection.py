@@ -131,4 +131,6 @@ class MySQLContext(BaseContext):
         )
         if tables:
             table_list = ", ".join(quoted_id(table) for table in tables)
+            await self.execute("SET FOREIGN_KEY_CHECKS = 0;")
             await self.execute(f"DROP TABLE IF EXISTS {table_list};")
+            await self.execute("SET FOREIGN_KEY_CHECKS = 1;")

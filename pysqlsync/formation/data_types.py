@@ -51,25 +51,25 @@ class SqlDiscovery:
         type_schema: Optional[str] = None,
     ) -> Optional[SqlDataType]:
         name = type_name.lower()
-        if name in ["bool", "boolean"]:
+        if name in ("bool", "boolean"):
             return SqlBooleanType()
-        elif name in ["tinyint", "tinyint(1)", "int1"]:
+        elif name in ("tinyint", "tinyint(1)", "int1"):
             return SqlIntegerType(1)
-        elif name in ["smallint", "int2"]:
+        elif name in ("smallint", "int2"):
             return SqlIntegerType(2)
-        elif name in ["integer", "int", "int4"]:
+        elif name in ("integer", "int", "int4"):
             return SqlIntegerType(4)
-        elif name in ["bigint", "int8"]:
+        elif name in ("bigint", "int8"):
             return SqlIntegerType(8)
-        elif name in ["decimal", "number", "numeric"]:
+        elif name in ("decimal", "number", "numeric"):
             return SqlDecimalType()
-        elif name in ["real", "float4"]:
+        elif name in ("real", "float4"):
             return SqlRealType()
-        elif name in ["double", "double precision", "float8"]:
+        elif name in ("double", "double precision", "float8"):
             return SqlDoubleType()
         elif name == "float":
             return SqlFloatType()
-        elif name in ["timestamp", "timestamp without time zone"]:
+        elif name in ("timestamp", "timestamp without time zone"):
             return SqlTimestampType(None, False)
         elif name == "timestamp with time zone":
             return SqlTimestampType(None, True)
@@ -77,19 +77,19 @@ class SqlDiscovery:
             return SqlTimestampType()
         elif name == "date":
             return SqlDateType()
-        elif name in ["time", "time without time zone"]:
+        elif name in ("time", "time without time zone"):
             return SqlTimeType(None, False)
         elif name == "time with time zone":
             return SqlTimeType(None, True)
-        elif name in ["char", "character"]:
+        elif name in ("char", "character"):
             return SqlFixedCharacterType()
-        elif name in ["varchar", "character varying", "text"]:
+        elif name in ("varchar", "character varying", "text"):
             return SqlVariableCharacterType()
         elif name == "binary":
             return SqlFixedBinaryType()
-        elif name in ["varbinary", "binary varying", "bytea"]:
+        elif name in ("varbinary", "binary varying", "bytea"):
             return SqlVariableBinaryType()
-        elif name in ["json", "jsonb"]:  # PostgreSQL-specific
+        elif name in ("json", "jsonb"):  # PostgreSQL-specific
             return SqlJsonType()
         elif name == "uuid":  # PostgreSQL-specific
             return SqlUuidType()

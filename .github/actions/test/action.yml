@@ -6,22 +6,22 @@ inputs:
   python-version:
     description: Python version to run tests with
     required: true
-    default: '3.14'
+    default: "3.14"
   options-extras:
     description: Extras to pass to `pip install`
     required: false
-    default: ''
+    default: ""
 
 runs:
   using: composite
   steps:
     - name: Set up Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
 
     - name: Fetch PyPI package
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         merge-multiple: true
 
@@ -38,7 +38,7 @@ runs:
       shell: bash
 
     - name: Fetch unit and/or integration tests
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         # include `.github` to allow post-run for this composite action
         sparse-checkout: |

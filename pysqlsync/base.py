@@ -589,12 +589,14 @@ class BaseEnumTransformer(RecordTransformer):
 
         value_name = self.table.get_value_columns()[0].name
         index_name = self.table.get_primary_column().name
-        LOGGER.debug("adding new enumeration values: %s", values)
+        LOGGER.debug("adding %d new enumeration values: %s", len(values), values)
         results = await self.context.query_all(
             tuple[str, int],
             f"SELECT {value_name}, {index_name} FROM {self.table.name}",
         )
-        return dict(results)
+        enum_dict = dict(results)
+        LOGGER.debug("fetched total of %d enumeration values: %s", len(enum_dict), enum_dict)
+        return enum_dict
 
 
 class EnumTransformer(BaseEnumTransformer):

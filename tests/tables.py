@@ -138,8 +138,8 @@ class EnumSetTable:
 @dataclass
 class ExtensibleEnumTable:
     id: PrimaryKey[int]
-    state: Union[ExtensibleEnum, Annotated[str, MaxLength(64)]]
-    optional_state: Union[ExtensibleEnum, Annotated[str, MaxLength(64)], None]
+    state: Union[ExtensibleEnum, Annotated[str, MaxLength(16)]]
+    optional_state: Union[ExtensibleEnum, Annotated[str, MaxLength(16)], None]
 
 
 @dataclass

@@ -169,6 +169,7 @@ _DIACRITICS = (
 
 _EMOJIS = "😂❤️🔥🥰🙏👍🎉😉💀"
 
+ALPHANUMERIC_CHARS = string.ascii_lowercase + string.digits
 UTF8_CHARS = string.ascii_letters + string.digits + _DIACRITICS + _EMOJIS
 UTF8_CHARS_MAX_BYTE_LEN = {k: [ch for ch in UTF8_CHARS if len(ch.encode("utf-8")) <= k] for k in range(1, 5)}
 
@@ -205,16 +206,20 @@ def random_utf8_str(min_len: int, max_len: int) -> str:
         raise ValueError("min_len must be <= max_len")
 
     target_len = random.randint(min_len, max_len)
-    current_len = 0
 
-    chars: list[str] = []
-    while current_len < target_len:
-        max_char_byte_len = min(target_len - current_len, 4)
-        ch = random.choice(UTF8_CHARS_MAX_BYTE_LEN[max_char_byte_len])
-        chars.append(ch)
-        current_len += len(ch.encode("utf-8"))
-
-    return "".join(chars)
+    if target_len > 4:
+        chars: list[str] = []
+        current_len = 0
+        while current_len < target_len:
+            max_char_byte_len = min(target_len - current_len, 4)
+            ch = random.choice(UTF8_CHARS_MAX_BYTE_LEN[max_char_byte_len])
+            chars.append(ch)
+            current_len += len(ch.encode("utf-8"))
+        return "".join(chars)
+    else:
+        # short strings may compare equal under international collation rules (e.g. 'h' and 'H', 'ß' and 'ss'),
+        # use only lowercase ASCII characters and digits to avoid false positives
+        return "".join(random.choices(ALPHANUMERIC_CHARS, k=target_len))
 
 
 P = TypeVar("P")

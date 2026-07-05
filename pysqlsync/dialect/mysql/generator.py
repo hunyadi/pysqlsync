@@ -88,7 +88,11 @@ class MySQLGenerator(BaseGenerator):
         value_list = ", ".join("%s" for _column in columns)
         statements.append(f"({column_list}) VALUES ({value_list})")
         statements.append("ON DUPLICATE KEY UPDATE")
-        defs = [f"{key} = {key}" for key in table.primary_key]
+        unique_columns = table.get_unique_columns()
+        if unique_columns:
+            defs = [f"{column.name} = {column.name}" for column in unique_columns]
+        else:
+            defs = [f"{key} = {key}" for key in table.primary_key]
         statements.append(",\n".join(defs))
         statements.append(";")
         return "\n".join(statements)

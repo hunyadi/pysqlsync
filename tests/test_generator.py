@@ -196,7 +196,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
 
     def test_create_numeric_table(self) -> None:
         self.maxDiff = None
-        for dialect in ["postgresql", "mssql", "mysql"]:
+        for dialect in ("postgresql", "mssql", "mysql"):
             with self.subTest(dialect=dialect):
                 self.assertMatchSQLCreate(
                     dialect,
@@ -215,7 +215,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
 
     def test_create_default_numeric_table(self) -> None:
         self.maxDiff = None
-        for dialect in ["postgresql", "mysql"]:
+        for dialect in ("postgresql", "mysql"):
             with self.subTest(dialect=dialect):
                 self.assertMatchSQLCreate(
                     dialect,
@@ -246,7 +246,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
 
     def test_create_fixed_precision_float_table(self) -> None:
         self.maxDiff = None
-        for dialect in ["postgresql", "mssql", "mysql"]:
+        for dialect in ("postgresql", "mssql", "mysql"):
             with self.subTest(dialect=dialect):
                 self.assertMatchSQLCreate(
                     dialect,
@@ -263,7 +263,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
 
     def test_create_decimal_table(self) -> None:
         self.maxDiff = None
-        for dialect in ["postgresql", "mssql", "mysql"]:
+        for dialect in ("postgresql", "mssql", "mysql"):
             with self.subTest(dialect=dialect):
                 self.assertMatchSQLCreate(
                     dialect,
@@ -571,7 +571,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'CONSTRAINT "pk_IPAddressTable" PRIMARY KEY ("id")\n'
             ");",
         )
-        for dialect in ["mssql", "mysql"]:
+        for dialect in ("mssql", "mysql"):
             with self.subTest(dialect=dialect):
                 self.assertMatchSQLCreate(
                     dialect,
@@ -740,7 +740,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             'INSERT INTO "DataTable"\n("id", "data") VALUES ($1, $2)\nON CONFLICT ("id") DO UPDATE SET\n"data" = EXCLUDED."data"\n;',
         )
 
-        for dialect in ["mssql", "oracle"]:
+        for dialect in ("mssql", "oracle"):
             with self.subTest(dialect=dialect):
                 generator = self.engine.create_generator(self.options)
                 value_list = f"({generator.placeholder(1)}, {generator.placeholder(2)})"
@@ -776,7 +776,7 @@ class TestGenerator(TestEngineBase, unittest.TestCase):
             ";",
         )
 
-        for dialect in ["mssql", "oracle"]:
+        for dialect in ("mssql", "oracle"):
             with self.subTest(dialect=dialect):
                 generator = self.engine.create_generator(self.options)
                 value_list = f"({generator.placeholder(1)}, {generator.placeholder(2)}, {generator.placeholder(3)})"

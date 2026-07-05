@@ -221,7 +221,12 @@ jobs:
     name: GitHub release signed with Sigstore
 
     if: ${{ inputs.publish-to-github }}
-    needs: build
+    needs:
+      - build
+      - test-postgresql
+      - test-oracle
+      - test-mysql
+      - test-mssql
 
     permissions:
       contents: write # mandatory for making GitHub Releases
@@ -260,7 +265,12 @@ jobs:
       id-token: write # mandatory for trusted publishing
 
     if: ${{ inputs.publish-to-pypi }}
-    needs: build
+    needs:
+      - build
+      - test-postgresql
+      - test-oracle
+      - test-mysql
+      - test-mssql
 
     runs-on: ubuntu-latest
     steps:

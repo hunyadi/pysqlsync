@@ -96,7 +96,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(state, conn.connection.generator.state)
 
     async def test_modes(self) -> None:
-        for combination in [
+        for combination in (
             TestOptions(EnumMode.TYPE, ArrayMode.ARRAY, StructMode.TYPE),
             TestOptions(EnumMode.TYPE, ArrayMode.JSON, StructMode.JSON),
             TestOptions(EnumMode.INLINE, ArrayMode.JSON, StructMode.JSON),
@@ -104,7 +104,7 @@ class TestSynchronize(TestEngineBase, unittest.IsolatedAsyncioTestCase):
             TestOptions(EnumMode.RELATION, ArrayMode.JSON, StructMode.JSON),
             TestOptions(EnumMode.CHECK, ArrayMode.ARRAY, StructMode.TYPE),
             TestOptions(EnumMode.CHECK, ArrayMode.JSON, StructMode.JSON),
-        ]:
+        ):
             options = GeneratorOptions(
                 enum_mode=combination.enum_mode,
                 array_mode=combination.array_mode,

@@ -134,7 +134,7 @@ class OracleExplorer(Explorer):
         columns: list[Column] = []
         for col in column_records:
             char_length: Optional[int]
-            if col.data_type in ["BLOB", "CLOB"]:
+            if col.data_type in ("BLOB", "CLOB"):
                 char_length = None
             else:
                 char_length = col.char_length or col.data_length

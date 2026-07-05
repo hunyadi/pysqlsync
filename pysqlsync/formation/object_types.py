@@ -485,6 +485,11 @@ class Table(DatabaseObject, QualifiedObject):
 
         return False
 
+    def get_unique_columns(self) -> list[Column]:
+        "Returns a list of columns with a UNIQUE constraint."
+
+        return [column for column in self.columns.values() if self.is_unique_column(column)]
+
     def is_lookup_column(self, column: Column) -> bool:
         "True if the column may be used to look up a record by its value."
 

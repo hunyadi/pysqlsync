@@ -23,9 +23,12 @@ if __name__ == "__main__":
 class TestDiscovery(TestEngineBase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         async with self.engine.create_connection(self.parameters) as conn:
+            # the following three statements may raise a warning on MySQL, which is normal:
+            # > Warning: Unknown table 'DATABASE_NAME.TABLE_NAME'
             await conn.drop_table_if_exists(QualifiedId(None, tables.NumericTable.__name__))
             await conn.drop_table_if_exists(QualifiedId(None, tables.Person.__name__))
             await conn.drop_table_if_exists(QualifiedId(None, tables.Address.__name__))
+
             await conn.drop_schema(LocalId("sample"))
 
     async def test_table(self) -> None:
