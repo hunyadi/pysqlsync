@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-__version__ = "0.8.4"
+__version__ = "1.0.0"
 __author__ = "Levente Hunyadi"
 __copyright__ = "Copyright 2023-2026, Levente Hunyadi"
 __license__ = "MIT"
