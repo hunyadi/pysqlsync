@@ -7,7 +7,7 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 from collections.abc import ItemsView, KeysView, Mapping, ValuesView
-from typing import Generic, Iterable, Iterator, Optional, TypeVar, Union, overload
+from typing import Generic, Iterable, Iterator, TypeVar, overload
 
 from ..model.id_types import SupportsName
 
@@ -43,12 +43,12 @@ class ObjectDict(Generic[ObjectItem], Mapping[str, ObjectItem]):
         return repr(list(self._items.values()))
 
     @overload
-    def get(self, key: str, /) -> Optional[ObjectItem]: ...
+    def get(self, key: str, /) -> ObjectItem | None: ...
 
     @overload
-    def get(self, key: str, /, default: Union[ObjectItem, T]) -> Union[ObjectItem, T]: ...
+    def get(self, key: str, /, default: ObjectItem | T) -> ObjectItem | T: ...
 
-    def get(self, key: str, /, default: Optional[T] = None) -> Union[None, ObjectItem, T]:
+    def get(self, key: str, /, default: T | None = None) -> ObjectItem | T | None:
         return self._items.get(key, default)
 
     def add(self, item: ObjectItem) -> None:

@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import datetime
 import ipaddress
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
 from pysqlsync.formation.inspection import is_ip_address_type
@@ -69,7 +69,7 @@ class MySQLGenerator(BaseGenerator):
         return r"%s"
 
     @override
-    def get_table_insert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_insert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -80,7 +80,7 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_merge_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_merge_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -98,7 +98,7 @@ class MySQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_upsert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order)]
@@ -123,7 +123,7 @@ class MySQLGenerator(BaseGenerator):
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Callable[[Any], Any] | None:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):

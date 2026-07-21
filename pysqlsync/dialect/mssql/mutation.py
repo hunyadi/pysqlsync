@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import typing
-from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import Column, ColumnFormationError, StatementList, Table, join_or_none
@@ -16,7 +15,7 @@ from .object_types import MSSQLColumn
 
 
 class MSSQLMutator(Mutator):
-    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_stmt(self, source: Column, target: Column) -> str | None:
         if source.identity != target.identity:
             raise ColumnFormationError(
                 "operation not permitted; cannot add or drop identity property",
@@ -29,7 +28,7 @@ class MSSQLMutator(Mutator):
         else:
             return None
 
-    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
+    def mutate_table_stmt(self, source: Table, target: Table) -> str | None:
         statements = StatementList()
 
         constraints: list[str] = []

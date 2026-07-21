@@ -105,7 +105,7 @@ def safe_id(id: str) -> str:
 
 @dataclass
 class SqlConverterOptions:
-    namespaces: dict[Optional[str], types.ModuleType]
+    namespaces: dict[str | None, types.ModuleType]
 
 
 class SqlConverter:

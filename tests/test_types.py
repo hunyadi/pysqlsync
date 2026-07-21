@@ -2,7 +2,7 @@ import datetime
 import enum
 import unittest
 from dataclasses import dataclass
-from typing import Annotated, ClassVar, Optional, TypeVar
+from typing import Annotated, ClassVar, TypeVar
 
 from strong_typing.inspection import DataclassField
 
@@ -41,7 +41,7 @@ class Example:
     var_int: TypeWrapper[int]
     var_str: str
     var_def: int = 23
-    var_opt: Optional[str] = None
+    var_opt: str | None = None
 
 
 @dataclass
@@ -120,7 +120,7 @@ class TestTypes(unittest.TestCase):
     def test_flatten(self) -> None:
         fields, docstring = flatten_dataclass(Nested)
         fields.insert(0, DataclassField("account_uuid", str))
-        fields.append(DataclassField("commit_time", Optional[datetime.datetime], None))
+        fields.append(DataclassField("commit_time", datetime.datetime | None, None))
         TransformedNested = make_dataclass("TransformedNested", fields, docstring=docstring, module=tables)
         self.assertIsNotNone(getattr(tables, "TransformedNested", None))
         self.assertMultiLineEqual(

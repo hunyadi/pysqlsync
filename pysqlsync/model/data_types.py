@@ -10,7 +10,7 @@ import datetime
 import decimal
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Optional
+from typing import Any
 
 from strong_typing.auxiliary import IntegerRange, MaxLength, Precision, Signed, Storage, TimePrecision
 from strong_typing.inspection import dataclass_fields, is_dataclass_instance
@@ -95,8 +95,8 @@ class SqlBooleanType(SqlDataType):
 class SqlIntegerType(SqlDataType):
     width: int
     signed: bool = True
-    minimum: Optional[int] = None
-    maximum: Optional[int] = None
+    minimum: int | None = None
+    maximum: int | None = None
 
     def __str__(self) -> str:
         if self.width == 1:
@@ -130,7 +130,7 @@ class SqlFloatType(SqlDataType):
     :param precision: Numeric precision in base 2.
     """
 
-    precision: Optional[int] = None
+    precision: int | None = None
 
     def __str__(self) -> str:
         if self.precision is not None:
@@ -168,8 +168,8 @@ class SqlDecimalType(SqlDataType):
     :param scale: Scale in base 10.
     """
 
-    precision: Optional[int] = None
-    scale: Optional[int] = None
+    precision: int | None = None
+    scale: int | None = None
 
     def __str__(self) -> str:
         if self.precision is not None and self.scale is not None:
@@ -189,7 +189,7 @@ class SqlDecimalType(SqlDataType):
 
 @dataclass
 class SqlFixedBinaryType(SqlDataType):
-    storage: Optional[int] = None
+    storage: int | None = None
 
     def __str__(self) -> str:
         storage = f"({self.storage})" if self.storage is not None else ""
@@ -198,7 +198,7 @@ class SqlFixedBinaryType(SqlDataType):
 
 @dataclass
 class SqlVariableBinaryType(SqlDataType):
-    storage: Optional[int] = None
+    storage: int | None = None
 
     def __str__(self) -> str:
         if self.storage is not None:
@@ -215,7 +215,7 @@ class SqlVariableBinaryType(SqlDataType):
 
 @dataclass
 class SqlFixedCharacterType(SqlDataType):
-    limit: Optional[int] = None
+    limit: int | None = None
 
     def __str__(self) -> str:
         limit = f"({self.limit})" if self.limit is not None else ""
@@ -224,7 +224,7 @@ class SqlFixedCharacterType(SqlDataType):
 
 @dataclass
 class SqlVariableCharacterType(SqlDataType):
-    limit: Optional[int] = None
+    limit: int | None = None
 
     def __str__(self) -> str:
         if self.limit is not None:
@@ -241,7 +241,7 @@ class SqlVariableCharacterType(SqlDataType):
 
 @dataclass
 class SqlTimestampType(SqlDataType):
-    precision: Optional[int] = None
+    precision: int | None = None
     with_time_zone: bool = False
 
     def __str__(self) -> str:
@@ -270,7 +270,7 @@ class SqlDateType(SqlDataType):
 
 @dataclass
 class SqlTimeType(SqlDataType):
-    precision: Optional[int] = None
+    precision: int | None = None
     with_time_zone: bool = False
 
     def __str__(self) -> str:
@@ -350,7 +350,7 @@ def compatible_type(data_types: list[SqlDataType]) -> SqlDataType:
     return reduce(_compatible_type, data_types)
 
 
-def max_or_none(left: Optional[int], right: Optional[int]) -> Optional[int]:
+def max_or_none(left: int | None, right: int | None) -> int | None:
     if left is None or right is None:
         return None
     else:

@@ -7,7 +7,7 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import enum
-from typing import Any, Optional
+from typing import Any
 
 import pyodbc
 
@@ -46,9 +46,9 @@ class MSSQLEncoding(enum.Enum):
 
 
 class MSSQLVariableCharacterType(SqlVariableCharacterType):
-    encoding: Optional[MSSQLEncoding] = None
+    encoding: MSSQLEncoding | None = None
 
-    def __init__(self, limit: Optional[int] = None, encoding: Optional[MSSQLEncoding] = None) -> None:
+    def __init__(self, limit: int | None = None, encoding: MSSQLEncoding | None = None) -> None:
         super().__init__(limit)
         self.encoding = encoding
 

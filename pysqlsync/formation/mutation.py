@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from ..model.data_types import SqlEnumType, SqlIntegerType, SqlVariableCharacterType, constant, quote
 from ..model.id_types import SupportsName
@@ -48,18 +47,18 @@ class Mutator:
 
     options: MutatorOptions
 
-    def __init__(self, options: Optional[MutatorOptions] = None) -> None:
+    def __init__(self, options: MutatorOptions | None = None) -> None:
         self.options = options or MutatorOptions()
 
     def check_identity(self, source: SupportsName, target: SupportsName) -> None:
         if source.name != target.name:
             raise FormationError(f"object mismatch: {source.name} != {target.name}")
 
-    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> Optional[str]:
+    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> str | None:
         enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
         return f'INSERT INTO {table.name} ("value") VALUES {enum_values};'
 
-    def mutate_enum_stmt(self, source: EnumType, target: EnumType) -> Optional[str]:
+    def mutate_enum_stmt(self, source: EnumType, target: EnumType) -> str | None:
         self.check_identity(source, target)
 
         removed_values = [value for value in source.values if value not in target.values]
@@ -72,7 +71,7 @@ class Mutator:
         else:
             return None
 
-    def mutate_struct_stmt(self, source: StructType, target: StructType) -> Optional[str]:
+    def mutate_struct_stmt(self, source: StructType, target: StructType) -> str | None:
         self.check_identity(source, target)
 
         statements: list[str] = []
@@ -86,10 +85,10 @@ class Mutator:
         else:
             return None
 
-    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> str | None:
         return None
 
-    def is_column_migrated(self, source: Column, target: Column) -> Optional[bool]:
+    def is_column_migrated(self, source: Column, target: Column) -> bool | None:
         """
         True if the column requires data migration, false if no migration is needed.
 
@@ -112,13 +111,13 @@ class Mutator:
 
         return None  # undecided (converts to False in a Boolean expression)
 
-    def mutate_column_type(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_type(self, source: Column, target: Column) -> str | None:
         if source.data_type != target.data_type:
             return f"SET DATA TYPE {target.data_type}"
         else:
             return None
 
-    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_stmt(self, source: Column, target: Column) -> str | None:
         if source == target:
             return None
 
@@ -148,10 +147,10 @@ class Mutator:
         else:
             return None
 
-    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
+    def mutate_table_stmt(self, source: Table, target: Table) -> str | None:
         self.check_identity(source, target)
 
-        statements: list[Optional[str]] = []
+        statements: list[str | None] = []
 
         create_columns = list(target.columns.difference(source.columns))
         common_columns = list(source.columns.intersection(target.columns))
@@ -182,7 +181,7 @@ class Mutator:
             statements.append(source.alter_table_stmt(create_stmts))
 
         # accumulate object mutation statements
-        alter_stmts: list[Optional[str]] = []
+        alter_stmts: list[str | None] = []
 
         # migrate data when data type changes
         try:
@@ -233,7 +232,7 @@ class Mutator:
 
         return join_or_none(statements)
 
-    def mutate_namespace_stmt(self, source: Namespace, target: Namespace) -> Optional[str]:
+    def mutate_namespace_stmt(self, source: Namespace, target: Namespace) -> str | None:
         self.check_identity(source, target)
 
         statements: StatementList = StatementList()
@@ -294,7 +293,7 @@ class Mutator:
 
         return join_or_none(statements)
 
-    def mutate_catalog_stmt(self, source: Catalog, target: Catalog) -> Optional[str]:
+    def mutate_catalog_stmt(self, source: Catalog, target: Catalog) -> str | None:
         statements: StatementList = StatementList()
 
         source.sort()

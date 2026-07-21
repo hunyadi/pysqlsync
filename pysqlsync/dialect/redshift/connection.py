@@ -11,7 +11,7 @@ import logging
 import re
 import typing
 from io import BytesIO
-from typing import Iterable, Optional, TypeVar
+from typing import Iterable, TypeVar
 
 import redshift_connector
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -125,7 +125,7 @@ class RedshiftContext(BaseContext):
         source: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         order = tuple(name for name in field_names if name) if field_names else None
         columns = [col.name for col in table.get_columns(order)]

@@ -6,8 +6,6 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Optional
-
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import Column, EnumType, StatementList, StructType, Table, deleted, join_or_none
 from pysqlsync.model.data_types import SqlIntegerType, SqlUserDefinedType, quote
@@ -19,7 +17,7 @@ from .object_types import sql_quoted_string
 
 class PostgreSQLMutator(Mutator):
     @override
-    def is_column_migrated(self, source: Column, target: Column) -> Optional[bool]:
+    def is_column_migrated(self, source: Column, target: Column) -> bool | None:
         is_migrated = super().is_column_migrated(source, target)
         if is_migrated is not None:
             return is_migrated
@@ -31,11 +29,11 @@ class PostgreSQLMutator(Mutator):
 
         return None  # undecided (converts to False in a Boolean expression)
 
-    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> Optional[str]:
+    def migrate_enum_stmt(self, enum_type: EnumType, table: Table) -> str | None:
         enum_values = ", ".join(f"({quote(v)})" for v in enum_type.values)
         return f'INSERT INTO {table.name} ("value") VALUES {enum_values} ON CONFLICT ("value") DO NOTHING;'
 
-    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> str | None:
         ref = target_table.get_constraint(target.name)
         return (
             f"UPDATE {source_table.name} data_table\n"
@@ -44,7 +42,7 @@ class PostgreSQLMutator(Mutator):
             f'WHERE data_table.{LocalId(deleted(source.name.id))}::VARCHAR = enum_table."value";'
         )
 
-    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
+    def mutate_table_stmt(self, source: Table, target: Table) -> str | None:
         statements: StatementList = StatementList()
         statements.append(super().mutate_table_stmt(source, target))
 
@@ -70,13 +68,13 @@ class PostgreSQLMutator(Mutator):
 
         return join_or_none(statements)
 
-    def mutate_column_type(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_type(self, source: Column, target: Column) -> str | None:
         if source.data_type != target.data_type:
             return f"SET DATA TYPE {target.data_type} USING {source.name}::{target.data_type}"
         else:
             return None
 
-    def mutate_struct_stmt(self, source: StructType, target: StructType) -> Optional[str]:
+    def mutate_struct_stmt(self, source: StructType, target: StructType) -> str | None:
         statements: StatementList = StatementList()
         statements.append(super().mutate_struct_stmt(source, target))
 

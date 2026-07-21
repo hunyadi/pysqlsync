@@ -17,7 +17,7 @@ import logging
 import types
 import typing
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, Callable, Iterable, Optional, Sized, TypeVar, Union, overload
+from typing import Any, AsyncIterable, Callable, Iterable, Sized, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -37,7 +37,7 @@ E = TypeVar("E", bound=enum.Enum)
 T = TypeVar("T")
 
 RecordType = tuple[Any, ...]
-RecordSource = Union[Iterable[RecordType], AsyncIterable[RecordType]]
+RecordSource = Iterable[RecordType] | AsyncIterable[RecordType]
 
 LOGGER = logging.getLogger("pysqlsync")
 
@@ -90,11 +90,11 @@ class ClassRef:
 
     def __init__(
         self,
-        entity_type: Optional[type[DataclassInstance]] = None,
+        entity_type: type[DataclassInstance] | None = None,
         *,
-        module: Optional[types.ModuleType] = None,
-        module_name: Optional[str] = None,
-        entity_name: Optional[str] = None,
+        module: types.ModuleType | None = None,
+        module_name: str | None = None,
+        entity_name: str | None = None,
     ) -> None:
         if module_name is None:
             if module is not None:
@@ -130,10 +130,10 @@ class GeneratorOptions:
     :param auto_default: Automatically assign a default value to non-nullable types.
     """
 
-    enum_mode: Optional[EnumMode] = None
-    struct_mode: Optional[StructMode] = None
-    array_mode: Optional[ArrayMode] = None
-    namespaces: dict[types.ModuleType, Optional[str]] = dataclasses.field(default_factory=dict[types.ModuleType, Optional[str]])
+    enum_mode: EnumMode | None = None
+    struct_mode: StructMode | None = None
+    array_mode: ArrayMode | None = None
+    namespaces: dict[types.ModuleType, str | None] = dataclasses.field(default_factory=dict[types.ModuleType, str | None])
     foreign_constraints: bool = True
     initialize_tables: bool = False
     synchronization: MutatorOptions = dataclasses.field(default_factory=MutatorOptions)
@@ -160,8 +160,8 @@ class BaseGenerator(abc.ABC):
     def __init__(
         self,
         options: GeneratorOptions,
-        factory: Optional[ObjectFactory] = None,
-        mutator: Optional[Mutator] = None,
+        factory: ObjectFactory | None = None,
+        mutator: Mutator | None = None,
     ) -> None:
         self.options = options
         self.factory = factory if factory is not None else ObjectFactory()
@@ -173,11 +173,11 @@ class BaseGenerator(abc.ABC):
 
     def _check_mode(
         self,
-        mode: Optional[E],
+        mode: E | None,
         *,
-        matches: Optional[E] = None,
-        include: Optional[list[E]] = None,
-        exclude: Optional[list[E]] = None,
+        matches: E | None = None,
+        include: list[E] | None = None,
+        exclude: list[E] | None = None,
     ) -> None:
         if mode is None:
             return
@@ -198,42 +198,42 @@ class BaseGenerator(abc.ABC):
     def check_enum_mode(
         self,
         *,
-        matches: Optional[EnumMode] = None,
-        include: Optional[list[EnumMode]] = None,
-        exclude: Optional[list[EnumMode]] = None,
+        matches: EnumMode | None = None,
+        include: list[EnumMode] | None = None,
+        exclude: list[EnumMode] | None = None,
     ) -> None:
         self._check_mode(self.options.enum_mode, matches=matches, include=include, exclude=exclude)
 
     def check_struct_mode(
         self,
         *,
-        matches: Optional[StructMode] = None,
-        include: Optional[list[StructMode]] = None,
-        exclude: Optional[list[StructMode]] = None,
+        matches: StructMode | None = None,
+        include: list[StructMode] | None = None,
+        exclude: list[StructMode] | None = None,
     ) -> None:
         self._check_mode(self.options.struct_mode, matches=matches, include=include, exclude=exclude)
 
     def check_array_mode(
         self,
         *,
-        matches: Optional[ArrayMode] = None,
-        include: Optional[list[ArrayMode]] = None,
-        exclude: Optional[list[ArrayMode]] = None,
+        matches: ArrayMode | None = None,
+        include: list[ArrayMode] | None = None,
+        exclude: list[ArrayMode] | None = None,
     ) -> None:
         self._check_mode(self.options.array_mode, matches=matches, include=include, exclude=exclude)
 
     @overload
-    def create(self, *, tables: list[type[DataclassInstance]]) -> Optional[str]: ...
+    def create(self, *, tables: list[type[DataclassInstance]]) -> str | None: ...
 
     @overload
-    def create(self, *, modules: list[types.ModuleType]) -> Optional[str]: ...
+    def create(self, *, modules: list[types.ModuleType]) -> str | None: ...
 
     def create(
         self,
         *,
-        tables: Optional[list[type[DataclassInstance]]] = None,
-        modules: Optional[list[types.ModuleType]] = None,
-    ) -> Optional[str]:
+        tables: list[type[DataclassInstance]] | None = None,
+        modules: list[types.ModuleType] | None = None,
+    ) -> str | None:
         """
         Creates tables, structs, enumerations, constraints, etc. corresponding to entity class definitions.
 
@@ -277,7 +277,7 @@ class BaseGenerator(abc.ABC):
             # should never be triggered; either `tables` or `modules` must be defined at this point
             raise NotImplementedError("match condition not exhaustive")
 
-    def drop(self) -> Optional[str]:
+    def drop(self) -> str | None:
         """
         Drops all objects currently synced with the generator.
 
@@ -291,7 +291,7 @@ class BaseGenerator(abc.ABC):
         self.state = target
         return statement
 
-    def get_mutate_stmt(self, target: Catalog) -> Optional[str]:
+    def get_mutate_stmt(self, target: Catalog) -> str | None:
         "Returns a SQL statement to mutate a source state into a target state."
 
         return self.mutator.mutate_catalog_stmt(self.state, target)
@@ -305,7 +305,7 @@ class BaseGenerator(abc.ABC):
         """
         ...
 
-    def get_table_insert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_insert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         """
         Returns a SQL statement to insert new records in a database table.
 
@@ -338,7 +338,7 @@ class BaseGenerator(abc.ABC):
 
         return statements
 
-    def get_table_merge_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_merge_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         """
         Returns a SQL statement to insert or ignore records in a database table.
 
@@ -356,7 +356,7 @@ class BaseGenerator(abc.ABC):
         statements.append(";")
         return "\n".join(statements)
 
-    def get_table_upsert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_upsert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         """
         Returns a SQL statement to insert or update records in a database table.
 
@@ -449,7 +449,7 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Callable[[Any], Any] | None:
         "Returns a callable function object that transforms a value type into the expected column type."
 
         if isinstance(column.data_type, SqlJsonType) or (
@@ -504,9 +504,9 @@ class BaseConnection(abc.ABC):
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         await self.close()
 
@@ -525,7 +525,7 @@ class RecordTransformer:
         ...
 
     @abc.abstractmethod
-    async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
+    async def get(self, records: Iterable[RecordType]) -> Callable[[Any], Any] | None:
         """
         Returns a callable function object that performs a transformation on a value.
 
@@ -538,11 +538,11 @@ class RecordTransformer:
 class ScalarTransformer(RecordTransformer):
     "A context-free transformer that mutates a scalar value into another."
 
-    fn: Optional[Callable[[Any], Any]]
+    fn: Callable[[Any], Any] | None
 
     def __init__(
         self,
-        fn: Optional[Callable[[Any], Any]],
+        fn: Callable[[Any], Any] | None,
     ) -> None:
         self.fn = fn
 
@@ -550,7 +550,7 @@ class ScalarTransformer(RecordTransformer):
     def is_identity(self) -> bool:
         return self.fn is None
 
-    async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
+    async def get(self, records: Iterable[RecordType]) -> Callable[[Any], Any] | None:
         return self.fn
 
 
@@ -602,11 +602,11 @@ class BaseEnumTransformer(RecordTransformer):
 class EnumTransformer(BaseEnumTransformer):
     "A transformer that looks up an assigned integer value based on the enumeration string value."
 
-    async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
+    async def get(self, records: Iterable[RecordType]) -> Callable[[Any], Any] | None:
         "Returns a callable function object that looks up an assigned integer value based on the enumeration string value."
 
         # a single enumeration value represented as a string
-        values: set[Optional[str]] = set()
+        values: set[str | None] = set()
         for record in records:
             values.add(record[self.index])
         values.discard(None)  # do not insert NULL into referenced table
@@ -617,11 +617,11 @@ class EnumTransformer(BaseEnumTransformer):
 class EnumListTransformer(BaseEnumTransformer):
     "A transformer that looks up assigned integer values based on a list of enumeration string values."
 
-    async def get(self, records: Iterable[RecordType]) -> Optional[Callable[[Any], Any]]:
+    async def get(self, records: Iterable[RecordType]) -> Callable[[Any], Any] | None:
         "Returns a callable function object that looks up assigned integer values based on a list of enumeration string values."
 
         # a list of enumeration values represented as a list of strings
-        values: set[Optional[str]] = set()
+        values: set[str | None] = set()
         for record in records:
             values.update(record[self.index])
         values.discard(None)  # do not insert NULL into referenced table
@@ -721,7 +721,7 @@ class TransformerDataSource(CompositeDataSource):
 
     async def batches(self) -> AsyncIterable[list[RecordType]]:
         async for batch in self.source.batches():
-            fns: list[Optional[Callable[[Any], Any]]] = []
+            fns: list[Callable[[Any], Any] | None] = []
             for transformer in self.transformers:
                 fns.append(await transformer.get(batch))
             yield [
@@ -751,7 +751,7 @@ class SelectorTransformerDataSource(CompositeDataSource):
     async def batches(self) -> AsyncIterable[list[RecordType]]:
         indices = self.indices
         async for batch in self.source.batches():
-            fns: list[Optional[Callable[[Any], Any]]] = []
+            fns: list[Callable[[Any], Any] | None] = []
             for transformer in self.transformers:
                 fns.append(await transformer.get(batch))
             yield [
@@ -839,7 +839,7 @@ class BaseContext(abc.ABC):
         statement: str,
         source: DataSource,
         table: Table,
-        order: Optional[tuple[str, ...]] = None,
+        order: tuple[str, ...] | None = None,
     ) -> None:
         "Executes a SQL statement with several records of data, passing type information."
 
@@ -869,7 +869,7 @@ class BaseContext(abc.ABC):
 
         ...
 
-    async def current_schema(self) -> Optional[str]:
+    async def current_schema(self) -> str | None:
         func = self.connection.generator.get_current_schema_stmt()
         return await self.query_one(str, f"SELECT {func};")
 
@@ -896,7 +896,7 @@ class BaseContext(abc.ABC):
     @overload
     def get_table(self, __table: type[DataclassInstance]) -> Table: ...
 
-    def get_table(self, __table_or_ref: Union[ClassRef, type[DataclassInstance]]) -> Table:
+    def get_table(self, __table_or_ref: ClassRef | type[DataclassInstance]) -> Table:
         if isinstance(__table_or_ref, ClassRef):
             table_id = self.get_table_id(__table_or_ref)
         elif is_dataclass_type(__table_or_ref):
@@ -971,7 +971,7 @@ class BaseContext(abc.ABC):
         records: RecordSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         """
         Inserts rows in a database table, ignoring duplicate keys.
@@ -1002,7 +1002,7 @@ class BaseContext(abc.ABC):
         source: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         """
         Inserts rows in a database table, ignoring duplicate keys.
@@ -1021,7 +1021,7 @@ class BaseContext(abc.ABC):
         records: RecordSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         """
         Inserts or updates rows in a database table.
@@ -1056,7 +1056,7 @@ class BaseContext(abc.ABC):
         source: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         """
         Inserts or updates rows in a database table.
@@ -1076,7 +1076,7 @@ class BaseContext(abc.ABC):
         source: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> DataSource:
         """
         Creates a record generator for a database table.
@@ -1208,7 +1208,7 @@ class BaseContext(abc.ABC):
         await self._execute_typed(statement, source, table, order)
 
 
-def _module_or_list(module: Optional[types.ModuleType], modules: Optional[list[types.ModuleType]]) -> list[types.ModuleType]:
+def _module_or_list(module: types.ModuleType | None, modules: list[types.ModuleType] | None) -> list[types.ModuleType]:
     if module is None and modules is None:
         raise TypeError("required: one of parameters `module` and `modules`")
     if module is not None and modules is not None:
@@ -1237,7 +1237,7 @@ class Explorer(abc.ABC):
     def __init__(self, conn: BaseContext) -> None:
         self.conn = conn
 
-    def get_qualified_id(self, namespace: Optional[str], id: str) -> SupportsQualifiedId:
+    def get_qualified_id(self, namespace: str | None, id: str) -> SupportsQualifiedId:
         return QualifiedId(namespace, id)
 
     @abc.abstractmethod
@@ -1271,8 +1271,8 @@ class Explorer(abc.ABC):
     async def discover(
         self,
         *,
-        module: Optional[types.ModuleType] = None,
-        modules: Optional[list[types.ModuleType]] = None,
+        module: types.ModuleType | None = None,
+        modules: list[types.ModuleType] | None = None,
     ) -> None:
         """
         Assumes a database model based on the state of the database.
@@ -1316,8 +1316,8 @@ class Explorer(abc.ABC):
     async def synchronize(
         self,
         *,
-        module: Optional[types.ModuleType] = None,
-        modules: Optional[list[types.ModuleType]] = None,
+        module: types.ModuleType | None = None,
+        modules: list[types.ModuleType] | None = None,
     ) -> None:
         """
         Synchronizes a current source state with a desired target state.
@@ -1371,14 +1371,14 @@ class BaseEngine(abc.ABC):
     @abc.abstractmethod
     def get_explorer_type(self) -> type[Explorer]: ...
 
-    def create_connection(self, params: ConnectionParameters, options: Optional[GeneratorOptions] = None) -> BaseConnection:
+    def create_connection(self, params: ConnectionParameters, options: GeneratorOptions | None = None) -> BaseConnection:
         "Opens a connection to a database server."
 
         generator_options = options if options is not None else GeneratorOptions()
         connection_type = self.get_connection_type()
         return connection_type(self.create_generator(generator_options), params)
 
-    def create_generator(self, options: Optional[GeneratorOptions] = None) -> BaseGenerator:
+    def create_generator(self, options: GeneratorOptions | None = None) -> BaseGenerator:
         "Instantiates a generator that can emit SQL statements."
 
         generator_options = options if options is not None else GeneratorOptions()

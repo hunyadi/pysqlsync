@@ -10,7 +10,7 @@ import dataclasses
 import logging
 import ssl
 import typing
-from typing import Iterable, Optional, TypeVar
+from typing import Iterable, TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -53,7 +53,7 @@ class PostgreSQLConnection(BaseConnection):
         else:
             raise ValueError(f"unsupported SSL mode: {ssl_mode}")
 
-    async def _open(self, ctx: Optional[ssl.SSLContext] = None) -> BaseContext:
+    async def _open(self, ctx: ssl.SSLContext | None = None) -> BaseContext:
         conn = await asyncpg.connect(
             host=self.params.host,
             port=self.params.port,
@@ -127,7 +127,7 @@ class PostgreSQLContext(BaseContext):
         source: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         record_generator = await self._generate_records(table, source, field_types=field_types, field_names=field_names)
         order = tuple(name for name in field_names if name) if field_names else None

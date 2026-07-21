@@ -6,7 +6,7 @@ import os.path
 import sys
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
 from strong_typing.auxiliary import MaxLength
 
@@ -40,7 +40,7 @@ class UserTable:
     uuid: uuid.UUID
     name: str
     short_name: Annotated[str, MaxLength(255)]
-    homepage_url: Optional[str] = None
+    homepage_url: str | None = None
 
 
 # END

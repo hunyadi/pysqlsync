@@ -9,7 +9,6 @@ Copyright 2023-2026, Levente Hunyadi
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
 from pysqlsync.formation.constraints import ForeignFactory, UniqueFactory
@@ -81,7 +80,7 @@ class OracleExplorer(Explorer):
         )
         self.factory = OracleObjectFactory()
 
-    def get_qualified_id(self, namespace: Optional[str], id: str) -> SupportsQualifiedId:
+    def get_qualified_id(self, namespace: str | None, id: str) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -133,7 +132,7 @@ class OracleExplorer(Explorer):
 
         columns: list[Column] = []
         for col in column_records:
-            char_length: Optional[int]
+            char_length: int | None
             if col.data_type in ("BLOB", "CLOB"):
                 char_length = None
             else:
@@ -215,7 +214,7 @@ class OracleExplorer(Explorer):
     async def get_namespace(self, namespace_id: LocalId) -> Namespace:
         return await self._get_namespace(namespace_id)
 
-    async def _get_namespace(self, namespace_id: Optional[LocalId] = None) -> Namespace:
+    async def _get_namespace(self, namespace_id: LocalId | None = None) -> Namespace:
         if namespace_id is not None:
             condition = f"table_name LIKE '{escape_like(namespace_id.id, '~')}~_~_%' ESCAPE '~'"
         else:

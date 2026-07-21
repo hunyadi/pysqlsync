@@ -3,7 +3,7 @@ import unittest
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from typing import Any, Optional
+from typing import Any
 
 from pysqlsync.data.exchange import AsyncTextReader, TextReader, TextWriter, fields_to_types
 
@@ -98,9 +98,9 @@ class AsyncBytesIO:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         pass
 

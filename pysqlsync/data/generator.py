@@ -16,7 +16,7 @@ import uuid
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from socket import AF_INET, AF_INET6, inet_ntop
 from struct import pack
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from strong_typing.auxiliary import IntegerRange, MaxLength, MinLength, Precision
 from strong_typing.inspection import (
@@ -79,7 +79,7 @@ def random_date(start: datetime.date, end: datetime.date) -> datetime.date:
     return start + datetime.timedelta(days=random.randrange(days))
 
 
-def random_time(start: Optional[datetime.time] = None, end: Optional[datetime.time] = None) -> datetime.time:
+def random_time(start: datetime.time | None = None, end: datetime.time | None = None) -> datetime.time:
     """
     Returns a random time between two time objects.
     """
@@ -114,9 +114,9 @@ def shuffled(items: list[T]) -> list[T]:
 def random_enum_generator(
     enum_type: type[E],
     *,
-    count: Optional[int] = None,
-    min_count: Optional[int] = None,
-    max_count: Optional[int] = None,
+    count: int | None = None,
+    min_count: int | None = None,
+    max_count: int | None = None,
 ) -> Callable[[], list[E]]:
     values = [e for e in enum_type]
     if count is not None:

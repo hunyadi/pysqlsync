@@ -9,7 +9,6 @@ Copyright 2023-2026, Levente Hunyadi
 import random
 import string
 from dataclasses import dataclass
-from typing import Optional, Union
 
 from pysqlsync.formation.object_types import (
     Column,
@@ -53,9 +52,9 @@ class MSSQLColumn(Column):
         name: LocalId,
         data_type: SqlDataType,
         nullable: bool,
-        default: Union[MSSQLDefault, str, None] = None,
+        default: MSSQLDefault | str | None = None,
         identity: bool = False,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         super().__init__(
             name,
@@ -96,13 +95,13 @@ class MSSQLTable(Table):
     def alter_table_stmt(self, statements: list[str]) -> str:
         return "\n".join(f"ALTER TABLE {self.name} {statement};" for statement in statements)
 
-    def add_constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> str | None:
         statements: list[str] = []
         if self.table_constraints:
             statements.append(f"ALTER TABLE {self.name} ADD\n" + ",\n".join(f"CONSTRAINT {c.spec}" for c in self.table_constraints) + ";")
         return join_or_none(statements)
 
-    def drop_constraints_stmt(self) -> Optional[str]:
+    def drop_constraints_stmt(self) -> str | None:
         statements: list[str] = []
         if self.table_constraints:
             statements.append(
@@ -117,7 +116,7 @@ class MSSQLEnumTable(EnumTable, MSSQLTable):
 
 
 class MSSQLNamespace(Namespace):
-    def create_schema_stmt(self) -> Optional[str]:
+    def create_schema_stmt(self) -> str | None:
         if self.name.local_id:
             # Microsoft SQL Server requires a separate batch for creating a schema
             return f"IF NOT EXISTS ( SELECT * FROM sys.schemas WHERE name = N{quote(self.name.id)} ) EXEC('CREATE SCHEMA {self.name}');"

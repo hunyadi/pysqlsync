@@ -1,6 +1,5 @@
 import enum
 from dataclasses import dataclass
-from typing import Optional
 
 from pysqlsync.model.key_types import PrimaryKey
 
@@ -47,4 +46,4 @@ class CountryEnum(enum.Enum):
 class DataclassEnumTable:
     id: PrimaryKey[int]
     country: CountryEnum
-    optional_country: Optional[CountryEnum]
+    optional_country: CountryEnum | None

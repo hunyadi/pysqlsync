@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import logging
 import re
 import typing
-from typing import Iterable, Optional, TypeVar
+from typing import Iterable, TypeVar
 
 import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -93,7 +93,7 @@ class OracleContext(BaseContext):
         statement: str,
         source: DataSource,
         table: Table,
-        order: Optional[tuple[str, ...]] = None,
+        order: tuple[str, ...] | None = None,
     ) -> None:
         async for batch in source.batches():
             await self._internal_execute_typed(statement, batch, table, order)
@@ -110,7 +110,7 @@ class OracleContext(BaseContext):
         statement: str,
         records: Iterable[RecordType],
         table: Table,
-        order: Optional[tuple[str, ...]] = None,
+        order: tuple[str, ...] | None = None,
     ) -> None:
         statement = statement.rstrip("\r\n\t\v ;")
         with self.native_connection.cursor() as cur:
@@ -133,7 +133,7 @@ class OracleContext(BaseContext):
                 return resultset_unwrap_tuple(signature, records)
 
     @override
-    async def current_schema(self) -> Optional[str]:
+    async def current_schema(self) -> str | None:
         return None
 
     @override

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 
 from pysqlsync.model.key_types import PrimaryKey
@@ -9,7 +8,7 @@ from pysqlsync.model.key_types import PrimaryKey
 class Address:
     id: PrimaryKey[int]
     city: str
-    state: Optional[str] = None
+    state: str | None = None
 
 
 @dataclass

@@ -7,7 +7,7 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import typing
-from typing import Iterable, Optional, TypeVar
+from typing import Iterable, TypeVar
 
 import aiotrino
 from strong_typing.inspection import is_dataclass_type
@@ -78,7 +78,7 @@ class TrinoContext(BaseContext):
         records: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         raise NotImplementedError("operation not supported for Trino")
 
@@ -89,6 +89,6 @@ class TrinoContext(BaseContext):
         records: DataSource,
         *,
         field_types: tuple[type, ...],
-        field_names: Optional[tuple[str, ...]] = None,
+        field_names: tuple[str, ...] | None = None,
     ) -> None:
         raise NotImplementedError("operation not supported for Trino")

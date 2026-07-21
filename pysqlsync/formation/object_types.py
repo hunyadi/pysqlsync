@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import abc
 import copy
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, overload
+from typing import Any, Iterable, overload
 
 from strong_typing.inspection import is_dataclass_instance
 from strong_typing.topological import topological_sort
@@ -26,23 +26,23 @@ def deleted(name: str) -> str:
 
 
 class StatementList(list[str]):
-    def append(self, __object: Optional[str]) -> None:
+    def append(self, __object: str | None) -> None:
         if __object is None:
             return
         if isinstance(__object, str) and not __object.strip():  # pyright: ignore[reportUnnecessaryIsInstance]
             raise ValueError("empty statement")
         return super().append(__object)
 
-    def extend(self, __iterable: Iterable[Optional[str]]) -> None:
+    def extend(self, __iterable: Iterable[str | None]) -> None:
         for item in __iterable:
             self.append(item)
 
 
-def join(statements: Iterable[Optional[str]]) -> str:
+def join(statements: Iterable[str | None]) -> str:
     return "\n".join(s for s in statements if s is not None)
 
 
-def join_or_none(statements: Iterable[Optional[str]]) -> Optional[str]:
+def join_or_none(statements: Iterable[str | None]) -> str | None:
     return join(statements) or None
 
 
@@ -141,7 +141,7 @@ class StructMember:
 
     name: LocalId
     data_type: SqlDataType
-    description: Optional[str] = None
+    description: str | None = None
 
     def __str__(self) -> str:
         return f"{self.name} {self.data_type}"
@@ -157,13 +157,13 @@ class StructType(DatabaseObject, QualifiedObject):
     """
 
     members: ObjectDict[StructMember]
-    description: Optional[str]
+    description: str | None
 
     def __init__(
         self,
         name: SupportsQualifiedId,
         members: list[StructMember],
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         super().__init__(name)
         self.members = ObjectDict(members)
@@ -199,9 +199,9 @@ class Column(DatabaseObject):
     name: LocalId
     data_type: SqlDataType
     nullable: bool
-    default: Optional[str]
+    default: str | None
     identity: bool
-    description: Optional[str]
+    description: str | None
 
     @classmethod
     def create(
@@ -210,9 +210,9 @@ class Column(DatabaseObject):
         data_type: SqlDataType,
         *,
         nullable: bool,
-        default: Optional[str] = None,
+        default: str | None = None,
         identity: bool = False,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> "Column":
         return cls(
             name,
@@ -394,7 +394,7 @@ class Table(DatabaseObject, QualifiedObject):
     columns: ObjectDict[Column]
     primary_key: tuple[LocalId, ...]
     constraints: ObjectDict[Constraint]
-    description: Optional[str]
+    description: str | None
 
     def __init__(
         self,
@@ -402,8 +402,8 @@ class Table(DatabaseObject, QualifiedObject):
         columns: Iterable[Column],
         *,
         primary_key: tuple[LocalId, ...],
-        constraints: Optional[Iterable[Constraint]] = None,
-        description: Optional[str] = None,
+        constraints: Iterable[Constraint] | None = None,
+        description: str | None = None,
     ) -> None:
         super().__init__(name)
         self.columns = ObjectDict(columns)
@@ -424,7 +424,7 @@ class Table(DatabaseObject, QualifiedObject):
     def primary_key_constraint_id(self) -> LocalId:
         return LocalId(f"pk_{self.name.compact_id.replace('.', '_')}")
 
-    def get_columns(self, field_names: Optional[tuple[str, ...]] = None) -> list[Column]:
+    def get_columns(self, field_names: tuple[str, ...] | None = None) -> list[Column]:
         "Returns columns of a table in a desired order."
 
         if field_names is not None:
@@ -462,7 +462,7 @@ class Table(DatabaseObject, QualifiedObject):
 
         raise KeyError(f"no primary column in table: {self.name}")
 
-    def get_value_columns(self, field_names: Optional[tuple[str, ...]] = None) -> list[Column]:
+    def get_value_columns(self, field_names: tuple[str, ...] | None = None) -> list[Column]:
         """
         Returns columns that have to be supplied an explicit value for a newly inserted row.
 
@@ -570,13 +570,13 @@ class Table(DatabaseObject, QualifiedObject):
     def alter_table_stmt(self, statements: list[str]) -> str:
         return f"ALTER TABLE {self.name}\n" + ",\n".join(statements) + ";"
 
-    def add_constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> str | None:
         if self.table_constraints:
             return self.alter_table_stmt([f"ADD CONSTRAINT {c.spec}" for c in self.table_constraints])
         else:
             return None
 
-    def drop_constraints_stmt(self) -> Optional[str]:
+    def drop_constraints_stmt(self) -> str | None:
         if self.table_constraints:
             return f"ALTER TABLE {self.name}\n" + ",\n".join(f"DROP CONSTRAINT {c.name}" for c in self.table_constraints) + "\n;"
         else:
@@ -597,8 +597,8 @@ class EnumTable(Table):
         *,
         values: list[Any],
         primary_key: tuple[LocalId, ...],
-        constraints: Optional[list[Constraint]] = None,
-        description: Optional[str] = None,
+        constraints: list[Constraint] | None = None,
+        description: str | None = None,
     ) -> None:
         super().__init__(
             name,
@@ -668,11 +668,11 @@ class Namespace(DatabaseObject):
 
     def __init__(
         self,
-        name: Optional[LocalId] = None,
+        name: LocalId | None = None,
         *,
-        enums: Optional[list[EnumType]] = None,
-        structs: Optional[list[StructType]] = None,
-        tables: Optional[list[Table]] = None,
+        enums: list[EnumType] | None = None,
+        structs: list[StructType] | None = None,
+        tables: list[Table] | None = None,
     ) -> None:
         self.name = name or LocalId("")
         self.enums = ObjectDict(enums or [])
@@ -691,13 +691,13 @@ class Namespace(DatabaseObject):
             items.update(t.get_referenced_tables())
         return set(LocalId(i.scope_id) for i in items if i.scope_id is not None)
 
-    def create_schema_stmt(self) -> Optional[str]:
+    def create_schema_stmt(self) -> str | None:
         if self.name.local_id:
             return f"CREATE SCHEMA {self.name};"
         else:
             return None
 
-    def drop_schema_stmt(self) -> Optional[str]:
+    def drop_schema_stmt(self) -> str | None:
         if self.name.local_id:
             return f"DROP SCHEMA {self.name};"
         else:
@@ -709,24 +709,24 @@ class Namespace(DatabaseObject):
     def drop_stmt(self) -> str:
         return join([self.drop_objects_stmt(), self.drop_schema_stmt()])
 
-    def create_objects_stmt(self) -> Optional[str]:
+    def create_objects_stmt(self) -> str | None:
         items: list[str] = []
         items.extend(str(e) for e in self.enums.values())
         items.extend(str(s) for s in self.structs.values())
         items.extend(t.create_stmt() for t in self.tables.values())
         return join_or_none(items)
 
-    def drop_objects_stmt(self) -> Optional[str]:
+    def drop_objects_stmt(self) -> str | None:
         items: list[str] = []
         items.extend(t.drop_stmt() for t in reversed(list(self.tables.values())))
         items.extend(s.drop_stmt() for s in reversed(list(self.structs.values())))
         items.extend(e.drop_stmt() for e in reversed(list(self.enums.values())))
         return join_or_none(items)
 
-    def add_constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> str | None:
         return join_or_none(table.add_constraints_stmt() for table in self.tables.values())
 
-    def drop_constraints_stmt(self) -> Optional[str]:
+    def drop_constraints_stmt(self) -> str | None:
         return join_or_none(table.drop_constraints_stmt() for table in self.tables.values())
 
     def merge(self, op: "Namespace") -> None:
@@ -774,7 +774,7 @@ class Catalog(DatabaseObject):
 
     def __init__(
         self,
-        namespaces: Optional[list[Namespace]] = None,
+        namespaces: list[Namespace] | None = None,
     ) -> None:
         self.namespaces = ObjectDict(namespaces or [])
 
@@ -809,17 +809,17 @@ class Catalog(DatabaseObject):
 
     def create_stmt(self) -> str:
         self.sort()
-        items: list[Optional[str]] = []
+        items: list[str | None] = []
         items.extend(n.create_schema_stmt() for n in self.namespaces.values())
         items.extend(n.create_objects_stmt() for n in self.namespaces.values())
         return join(items)
 
-    def add_constraints_stmt(self) -> Optional[str]:
+    def add_constraints_stmt(self) -> str | None:
         return join_or_none(n.add_constraints_stmt() for n in self.namespaces.values())
 
     def drop_stmt(self) -> str:
         self.sort()
-        items: list[Optional[str]] = []
+        items: list[str | None] = []
         items.extend(n.drop_objects_stmt() for n in reversed(list(self.namespaces.values())))
         items.extend(n.drop_schema_stmt() for n in reversed(list(self.namespaces.values())))
         return join(items)

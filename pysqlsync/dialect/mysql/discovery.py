@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.constraints import ForeignFactory
@@ -54,7 +53,7 @@ class MySQLExplorer(AnsiExplorer):
         )
 
     @override
-    def get_qualified_id(self, namespace: Optional[str], id: str) -> SupportsQualifiedId:
+    def get_qualified_id(self, namespace: str | None, id: str) -> SupportsQualifiedId:
         return PrefixedId(namespace, id)
 
     def split_composite_id(self, name: str) -> SupportsQualifiedId:
@@ -137,7 +136,7 @@ class MySQLExplorer(AnsiExplorer):
             )
         return constraints.fetch()
 
-    async def get_table_description(self, table_id: SupportsQualifiedId) -> Optional[str]:
+    async def get_table_description(self, table_id: SupportsQualifiedId) -> str | None:
         return (
             await self.conn.query_one(
                 str,

@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import datetime
 import ipaddress
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from strong_typing.auxiliary import int8, int16, int32, int64
 from strong_typing.core import JsonType
@@ -90,7 +90,7 @@ class OracleGenerator(BaseGenerator):
         return super().get_field_extractor(column, field_name, field_type)
 
     @override
-    def get_value_transformer(self, column: Column, field_type: type) -> Optional[Callable[[Any], Any]]:
+    def get_value_transformer(self, column: Column, field_type: type) -> Callable[[Any], Any] | None:
         if field_type is uuid.UUID:
             return lambda field: field.bytes
         elif is_ip_address_type(field_type):

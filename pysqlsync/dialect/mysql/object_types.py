@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from pysqlsync.formation.object_types import (
     Column,
@@ -22,7 +21,7 @@ from pysqlsync.model.id_types import LocalId
 
 class MySQLTable(Table):
     @property
-    def short_description(self) -> Optional[str]:
+    def short_description(self) -> str | None:
         if self.description is None:
             return None
 
@@ -54,7 +53,7 @@ class MySQLColumn(Column):
         return f"{self.data_type}{charset}{nullable}{default}{identity}{description}"
 
     @property
-    def comment(self) -> Optional[str]:
+    def comment(self) -> str | None:
         if self.description is not None:
             description = self.description if "\n" not in self.description else self.description[: self.description.index("\n")]
 

@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import re
-from typing import Optional
 
 from pysqlsync.formation.object_types import (
     EnumTable,
@@ -76,13 +75,13 @@ class PostgreSQLStructType(StructType):
 
 
 class PostgreSQLNamespace(Namespace):
-    def create_schema_stmt(self) -> Optional[str]:
+    def create_schema_stmt(self) -> str | None:
         if self.name.local_id:
             return f"CREATE SCHEMA IF NOT EXISTS {self.name};"
         else:
             return None
 
-    def drop_schema_stmt(self) -> Optional[str]:
+    def drop_schema_stmt(self) -> str | None:
         if self.name.local_id:
             return f"DROP SCHEMA IF EXISTS {self.name} CASCADE;"
         else:

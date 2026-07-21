@@ -10,7 +10,6 @@ import datetime
 import re
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Optional
 
 from pysqlsync.base import BaseContext, Explorer
 from pysqlsync.formation.constraints import ForeignFactory, UniqueFactory
@@ -23,7 +22,7 @@ from .data_types import PostgreSQLJsonType
 from .object_types import PostgreSQLObjectFactory
 
 
-def to_default_expr(expr: Optional[str]) -> Optional[str]:
+def to_default_expr(expr: str | None) -> str | None:
     "Converts a PostgreSQL-specific default expression into a standard default expression."
 
     if expr is None:

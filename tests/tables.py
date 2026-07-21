@@ -3,7 +3,7 @@ import ipaddress
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 from uuid import UUID
 
 from strong_typing.auxiliary import MaxLength, Precision, TimePrecision, float32, float64, int8, int16, int32, int64
@@ -29,7 +29,7 @@ class WorkflowState(enum.Enum):
 class BooleanTable:
     id: PrimaryKey[int]
     boolean: bool
-    nullable_boolean: Optional[bool]
+    nullable_boolean: bool | None
 
 
 @dataclass
@@ -37,9 +37,9 @@ class DefaultBooleanTable:
     id: PrimaryKey[int]
     boolean_false: bool = False
     boolean_true: bool = True
-    nullable_boolean_null: Optional[bool] = None
-    nullable_boolean_false: Optional[bool] = False
-    nullable_boolean_true: Optional[bool] = True
+    nullable_boolean_null: bool | None = None
+    nullable_boolean_false: bool | None = False
+    nullable_boolean_true: bool | None = True
 
 
 @dataclass
@@ -52,7 +52,7 @@ class NumericTable:
     integer_64: int64
 
     integer: int
-    nullable_integer: Optional[int]
+    nullable_integer: int | None
 
 
 @dataclass
@@ -72,8 +72,8 @@ class FixedPrecisionFloatTable:
     id: PrimaryKey[int]
     float_32: float32
     float_64: float64
-    optional_float_32: Optional[float32]
-    optional_float_64: Optional[float64]
+    optional_float_32: float32 | None
+    optional_float_64: float64 | None
 
 
 @dataclass
@@ -87,7 +87,7 @@ class VariablePrecisionFloatTable:
 class DecimalTable:
     id: PrimaryKey[int]
     decimal_value: Decimal
-    optional_decimal: Optional[Decimal]
+    optional_decimal: Decimal | None
     decimal_precision: Annotated[Decimal, Precision(5, 2)]
 
 
@@ -95,9 +95,9 @@ class DecimalTable:
 class StringTable:
     id: PrimaryKey[int]
     arbitrary_length_string: str
-    nullable_arbitrary_length_string: Optional[str]
+    nullable_arbitrary_length_string: str | None
     maximum_length_string: Annotated[str, MaxLength(128)]
-    nullable_maximum_length_string: Optional[Annotated[str, MaxLength(128)]]
+    nullable_maximum_length_string: Annotated[str, MaxLength(128)] | None
 
 
 @dataclass
@@ -106,7 +106,7 @@ class DateTimeTable:
     iso_date_time: datetime
     iso_date: date
     iso_time: time
-    optional_date_time: Optional[datetime]
+    optional_date_time: datetime | None
     timestamp_precision: Annotated[datetime, TimePrecision(6)]
 
 
@@ -120,7 +120,7 @@ class DefaultDateTimeTable:
 class EnumTable:
     id: PrimaryKey[int]
     state: WorkflowState
-    optional_state: Optional[WorkflowState]
+    optional_state: WorkflowState | None
 
 
 @dataclass
@@ -138,8 +138,8 @@ class EnumSetTable:
 @dataclass
 class ExtensibleEnumTable:
     id: PrimaryKey[int]
-    state: Union[ExtensibleEnum, Annotated[str, MaxLength(16)]]
-    optional_state: Union[ExtensibleEnum, Annotated[str, MaxLength(16)], None]
+    state: ExtensibleEnum | Annotated[str, MaxLength(16)]
+    optional_state: ExtensibleEnum | Annotated[str, MaxLength(16)] | None
 
 
 @dataclass
@@ -147,9 +147,9 @@ class IPAddressTable:
     id: PrimaryKey[int]
     ipv4: ipaddress.IPv4Address
     ipv6: ipaddress.IPv6Address
-    ipv4_or_ipv6: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-    optional_ipv4: Optional[ipaddress.IPv4Address]
-    optional_ipv6: Optional[ipaddress.IPv6Address]
+    ipv4_or_ipv6: ipaddress.IPv4Address | ipaddress.IPv6Address
+    optional_ipv4: ipaddress.IPv4Address | None
+    optional_ipv6: ipaddress.IPv6Address | None
 
 
 @dataclass
@@ -157,8 +157,8 @@ class LiteralTable:
     id: PrimaryKey[int]
     single: Literal["value"]
     multiple: Literal["one", "of", "many"]
-    union: Union[Literal["unknown"], Annotated[str, MaxLength(255)]]
-    unbounded: Union[Literal["unknown"], str]
+    union: Literal["unknown"] | Annotated[str, MaxLength(255)]
+    unbounded: Literal["unknown"] | str
 
 
 @dataclass
@@ -200,7 +200,7 @@ class Location:
 class Address:
     id: PrimaryKey[int]
     city: str
-    state: Optional[str] = None
+    state: str | None = None
 
 
 @dataclass

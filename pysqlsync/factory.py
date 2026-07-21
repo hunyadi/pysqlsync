@@ -13,7 +13,6 @@ import importlib.resources
 import logging
 import re
 import typing
-from typing import Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from strong_typing.inspection import get_module_classes
@@ -84,7 +83,7 @@ def get_parameters(url: str) -> tuple[str, ConnectionParameters]:
 
     parts = urlparse(url, allow_fragments=False)
 
-    ssl: Optional[ConnectionSSLMode] = None
+    ssl: ConnectionSSLMode | None = None
     if parts.query:
         query = parse_qs(parts.query, strict_parsing=True)
         if "ssl" in query:

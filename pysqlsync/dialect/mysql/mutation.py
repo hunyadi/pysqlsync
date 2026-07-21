@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import typing
-from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import Column, StatementList, Table, deleted, join_or_none
@@ -18,7 +17,7 @@ from .object_types import MySQLColumn, MySQLTable
 
 
 class MySQLMutator(Mutator):
-    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> Optional[str]:
+    def migrate_column_stmt(self, source_table: Table, source: Column, target_table: Table, target: Column) -> str | None:
         statements: list[str] = []
         ref = target_table.get_constraint(target.name)
         if isinstance(source.data_type, SqlEnumType):
@@ -36,7 +35,7 @@ class MySQLMutator(Mutator):
         )
         return "\n".join(statements)
 
-    def mutate_table_stmt(self, source: Table, target: Table) -> Optional[str]:
+    def mutate_table_stmt(self, source: Table, target: Table) -> str | None:
         source = typing.cast(MySQLTable, source)
         target = typing.cast(MySQLTable, target)
 
@@ -57,7 +56,7 @@ class MySQLMutator(Mutator):
 
         return join_or_none(statements)
 
-    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_stmt(self, source: Column, target: Column) -> str | None:
         source = typing.cast(MySQLColumn, source)
         target = typing.cast(MySQLColumn, target)
 

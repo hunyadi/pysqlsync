@@ -6,7 +6,7 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Any, AsyncIterator, BinaryIO, Callable, Generic, Iterable, Optional, Protocol, TypeVar
+from typing import Any, AsyncIterator, BinaryIO, Callable, Generic, Iterable, Protocol, TypeVar
 
 from strong_typing.inspection import DataclassInstance, dataclass_fields
 from tsv.helper import AutoDetectParser, Generator
@@ -39,7 +39,7 @@ class TextWriter(Generic[D]):
         self,
         stream: BinaryIO,
         entity_type: type[D],
-        field_mapping: Optional[dict[str, str]] = None,
+        field_mapping: dict[str, str] | None = None,
     ) -> None:
         """
         Initializes a TSV writer.
@@ -70,7 +70,7 @@ class TextWriter(Generic[D]):
 
 def fields_to_types(
     entity_type: type[DataclassInstance],
-    field_mapping: Optional[dict[str, str]] = None,
+    field_mapping: dict[str, str] | None = None,
 ) -> dict[str, type]:
     """
     Creates a mapping for a TSV reader.

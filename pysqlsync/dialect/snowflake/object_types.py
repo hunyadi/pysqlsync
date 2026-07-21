@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import re
-from typing import Optional
 
 from pysqlsync.formation.object_types import Column, ObjectFactory, Table
 from pysqlsync.model.data_types import SqlTimestampType
@@ -75,7 +74,7 @@ class SnowflakeColumn(Column):
         return f"{self.data_type}{nullable}{default}{identity}{description}"
 
     @property
-    def comment(self) -> Optional[str]:
+    def comment(self) -> str | None:
         if self.description is not None:
             return sql_quoted_string(self.description)
         else:

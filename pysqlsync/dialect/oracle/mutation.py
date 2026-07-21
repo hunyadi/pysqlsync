@@ -7,7 +7,6 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import typing
-from typing import Optional
 
 from pysqlsync.formation.mutation import Mutator
 from pysqlsync.formation.object_types import Column
@@ -16,7 +15,7 @@ from .object_types import OracleColumn
 
 
 class OracleMutator(Mutator):
-    def mutate_column_stmt(self, source: Column, target: Column) -> Optional[str]:
+    def mutate_column_stmt(self, source: Column, target: Column) -> str | None:
         source_column = typing.cast(OracleColumn, source)
         target_column = typing.cast(OracleColumn, target)
 

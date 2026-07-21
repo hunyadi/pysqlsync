@@ -8,7 +8,7 @@ Copyright 2023-2026, Levente Hunyadi
 
 import abc
 from dataclasses import dataclass
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 ID_QUOTE_CHAR = '"'
 
@@ -51,7 +51,7 @@ class SupportsQualifiedId(Protocol):
 
     @property
     @abc.abstractmethod
-    def scope_id(self) -> Optional[str]:
+    def scope_id(self) -> str | None:
         "Unquoted scope identifier."
         ...
 
@@ -107,11 +107,11 @@ class LocalId:
 
 @dataclass(frozen=True)
 class PrefixedId:
-    namespace: Optional[str]
+    namespace: str | None
     id: str
 
     @property
-    def scope_id(self) -> Optional[str]:
+    def scope_id(self) -> str | None:
         return None
 
     @property
@@ -140,11 +140,11 @@ class PrefixedId:
 
 @dataclass(frozen=True)
 class QualifiedId:
-    namespace: Optional[str]
+    namespace: str | None
     id: str
 
     @property
-    def scope_id(self) -> Optional[str]:
+    def scope_id(self) -> str | None:
         return self.namespace
 
     @property
@@ -179,7 +179,7 @@ class GlobalId:
     id: str
 
     @property
-    def scope_id(self) -> Optional[str]:
+    def scope_id(self) -> str | None:
         return None
 
     @property

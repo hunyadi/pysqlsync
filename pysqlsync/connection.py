@@ -11,7 +11,6 @@ Copyright 2023-2026, Levente Hunyadi
 import enum
 import ssl
 from dataclasses import dataclass
-from typing import Optional
 from urllib.parse import quote
 
 import truststore
@@ -40,7 +39,7 @@ class ConnectionSSLMode(enum.Enum):
     verify_full = "verify-full"
 
 
-def create_context(ssl_mode: ConnectionSSLMode) -> Optional[ssl.SSLContext]:
+def create_context(ssl_mode: ConnectionSSLMode) -> ssl.SSLContext | None:
     "Creates an SSL context to pass to a database connection object."
 
     if ssl_mode is ConnectionSSLMode.disable:
@@ -77,12 +76,12 @@ class ConnectionParameters:
     :param ssl: Connection mode for trusted connections.
     """
 
-    host: Optional[str] = None
-    port: Optional[int] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-    database: Optional[str] = None
-    ssl: Optional[ConnectionSSLMode] = None
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    password: str | None = None
+    database: str | None = None
+    ssl: ConnectionSSLMode | None = None
 
     def __str__(self) -> str:
         host = self.host or "localhost"

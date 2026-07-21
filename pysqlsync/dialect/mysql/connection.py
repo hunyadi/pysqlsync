@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import logging
 import ssl
 import typing
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 import aiomysql
 import pymysql
@@ -57,7 +57,7 @@ class MySQLConnection(BaseConnection):
         else:
             raise ValueError(f"unsupported SSL mode: {ssl_mode}")
 
-    async def _open(self, ctx: Optional[ssl.SSLContext] = None) -> BaseContext:
+    async def _open(self, ctx: ssl.SSLContext | None = None) -> BaseContext:
         sql_mode = ",".join(
             [
                 "ANSI_QUOTES",
@@ -116,7 +116,7 @@ class MySQLContext(BaseContext):
             return resultset_unwrap_tuple(signature, records)
 
     @override
-    async def current_schema(self) -> Optional[str]:
+    async def current_schema(self) -> str | None:
         return None
 
     @override

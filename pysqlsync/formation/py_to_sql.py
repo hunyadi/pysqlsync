@@ -17,7 +17,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Annotated, Any, Callable, Iterable, Optional, TypeVar
+from typing import Annotated, Any, Callable, Iterable, TypeVar
 
 from strong_typing.auxiliary import MaxLength, float32, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64
 from strong_typing.core import JsonType
@@ -163,9 +163,7 @@ def unwrap_extensible_enum_type(typ: TypeLike, cls: type) -> type[enum.Enum]:
     raise TypeError("extensible enum types are of the form `E | str` where `E` is a subclass of `enum.Enum`")
 
 
-def dataclass_fields_as_required(
-    cls: type[DataclassInstance], pred: Optional[Callable[[TypeLike], bool]] = None
-) -> Iterable[DataclassField]:
+def dataclass_fields_as_required(cls: type[DataclassInstance], pred: Callable[[TypeLike], bool] | None = None) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
         props = get_field_properties(field.type)
         ref = evaluate_member_type(props.field_type, cls)
@@ -199,9 +197,9 @@ class NamespaceMapping:
     :param dictionary: Maps a Python module to a SQL namespace, or `None` to use the default namespace.
     """
 
-    dictionary: dict[types.ModuleType, Optional[str]]
+    dictionary: dict[types.ModuleType, str | None]
 
-    def __init__(self, dictionary: Optional[dict[types.ModuleType, Optional[str]]] = None) -> None:
+    def __init__(self, dictionary: dict[types.ModuleType, str | None] | None = None) -> None:
         if dictionary is not None:
             if len(set(dictionary.values())) != len(dictionary):
                 raise ValueError("expected: a one-to-one mapping between Python modules and database schema names")
@@ -209,7 +207,7 @@ class NamespaceMapping:
         else:
             self.dictionary = {}
 
-    def get(self, name: str) -> Optional[str]:
+    def get(self, name: str) -> str | None:
         module = sys.modules[name]
         if module in self.dictionary:
             return self.dictionary[module]  # include special return value `None`
@@ -305,7 +303,7 @@ class DataclassConverter:
     def __init__(
         self,
         *,
-        options: Optional[DataclassConverterOptions] = None,
+        options: DataclassConverterOptions | None = None,
     ):
         if options is not None:
             self.options = options
@@ -467,7 +465,7 @@ class DataclassConverter:
 
         return self.simple_type_to_sql_data_type(int32)
 
-    def _get_relationship(self, field_type: TypeLike) -> Optional[tuple[type, TypeLike]]:
+    def _get_relationship(self, field_type: TypeLike) -> tuple[type, TypeLike] | None:
         """
         Returns relationship type and field type if the field expands into a separate relation (join table).
 
@@ -735,7 +733,7 @@ class DataclassConverter:
             description=doc.full_description,
         )
 
-    def create_check_constraint(self, column: Column) -> Optional[str]:
+    def create_check_constraint(self, column: Column) -> str | None:
         conditions: list[str] = []
         data_type = column.data_type
         if isinstance(data_type, SqlIntegerType):
@@ -1095,7 +1093,7 @@ class DataclassConverter:
 def dataclass_to_table(
     cls: type[DataclassInstance],
     *,
-    options: Optional[DataclassConverterOptions] = None,
+    options: DataclassConverterOptions | None = None,
 ) -> Table:
     "Converts a data-class with a primary key into a SQL table type."
 
@@ -1109,7 +1107,7 @@ def dataclass_to_table(
 def dataclass_to_struct(
     cls: type[DataclassInstance],
     *,
-    options: Optional[DataclassConverterOptions] = None,
+    options: DataclassConverterOptions | None = None,
 ) -> StructType:
     "Converts a data-class without a primary key into a SQL struct type."
 
@@ -1123,7 +1121,7 @@ def dataclass_to_struct(
 def module_to_catalog(
     module: types.ModuleType,
     *,
-    options: Optional[DataclassConverterOptions] = None,
+    options: DataclassConverterOptions | None = None,
 ) -> Catalog:
     return modules_to_catalog([module], options=options)
 
@@ -1131,7 +1129,7 @@ def module_to_catalog(
 def modules_to_catalog(
     modules: list[types.ModuleType],
     *,
-    options: Optional[DataclassConverterOptions] = None,
+    options: DataclassConverterOptions | None = None,
 ) -> Catalog:
     "Converts the entire contents of a Python module into a SQL namespace (schema)."
 

@@ -6,8 +6,6 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Optional
-
 from strong_typing.core import JsonType
 
 from pysqlsync.base import BaseGenerator, GeneratorOptions
@@ -65,7 +63,7 @@ class PostgreSQLGenerator(BaseGenerator):
         return f"${index}"
 
     @override
-    def get_table_insert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_insert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -76,7 +74,7 @@ class PostgreSQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_merge_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_merge_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order) if not column.identity]
@@ -88,7 +86,7 @@ class PostgreSQLGenerator(BaseGenerator):
         return "\n".join(statements)
 
     @override
-    def get_table_upsert_stmt(self, table: Table, order: Optional[tuple[str, ...]] = None) -> str:
+    def get_table_upsert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
         columns = [column for column in table.get_columns(order)]

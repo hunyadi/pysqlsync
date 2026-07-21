@@ -9,7 +9,6 @@ Copyright 2023-2026, Levente Hunyadi
 import copy
 import dataclasses
 import re
-from typing import Optional
 
 from ..model.data_types import (
     SqlBooleanType,
@@ -42,14 +41,14 @@ class SqlDiscoveryOptions:
 class SqlDiscovery:
     options: SqlDiscoveryOptions
 
-    def __init__(self, options: Optional[SqlDiscoveryOptions] = None) -> None:
+    def __init__(self, options: SqlDiscoveryOptions | None = None) -> None:
         self.options = options if options is not None else SqlDiscoveryOptions()
 
     def sql_data_type_from_name(
         self,
         type_name: str,
-        type_schema: Optional[str] = None,
-    ) -> Optional[SqlDataType]:
+        type_schema: str | None = None,
+    ) -> SqlDataType | None:
         name = type_name.lower()
         if name in ("bool", "boolean"):
             return SqlBooleanType()
@@ -99,7 +98,7 @@ class SqlDiscovery:
 
         return None
 
-    def sql_data_type_from_def(self, type_def: str) -> Optional[SqlDataType]:
+    def sql_data_type_from_def(self, type_def: str) -> SqlDataType | None:
         m = re.fullmatch(r"^(?:decimal|number|numeric)[(](\d+),\s*(\d+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             return SqlDecimalType(int(m.group(1)), int(m.group(2)))
@@ -144,16 +143,16 @@ class SqlDiscovery:
         self,
         *,
         type_name: str,
-        type_schema: Optional[str] = None,
-        type_def: Optional[str] = None,
-        character_maximum_length: Optional[int] = None,
-        numeric_precision: Optional[int] = None,
-        numeric_scale: Optional[int] = None,
-        datetime_precision: Optional[int] = None,
+        type_schema: str | None = None,
+        type_def: str | None = None,
+        character_maximum_length: int | None = None,
+        numeric_precision: int | None = None,
+        numeric_scale: int | None = None,
+        datetime_precision: int | None = None,
     ) -> SqlDataType:
         "Determines the column type from SQL column attribute data extracted from the information schema table."
 
-        sql_type: Optional[SqlDataType] = None
+        sql_type: SqlDataType | None = None
         if type_schema is None or type_schema == "pg_catalog" or type_schema == "SYS":
             sql_type = copy.copy(self.options.substitutions.get(type_name))
 

@@ -4,7 +4,6 @@ import ipaddress
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Optional
 from uuid import UUID
 
 from strong_typing.auxiliary import int64
@@ -72,7 +71,7 @@ class EventRecord:
     expires_on: date
     interaction_duration: float
     url: str
-    user_agent: Optional[str]
+    user_agent: str | None
     http_method: HTTPMethod
     http_status: HTTPStatus
     http_version: HTTPVersion

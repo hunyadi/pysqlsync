@@ -8,7 +8,7 @@ Copyright 2023-2026, Levente Hunyadi
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Sequence
 
 from ..base import BaseContext, DiscoveryError, Explorer
 from ..model.data_types import escape_like, quote
@@ -26,10 +26,10 @@ class AnsiColumnMeta:
     data_type: str
     nullable: bool
     column_default: str
-    character_maximum_length: Optional[int]
-    numeric_precision: Optional[int]
-    numeric_scale: Optional[int]
-    datetime_precision: Optional[int]
+    character_maximum_length: int | None
+    numeric_precision: int | None
+    numeric_scale: int | None
+    datetime_precision: int | None
 
 
 @dataclass
@@ -58,8 +58,8 @@ class AnsiExplorer(Explorer):
     discovery: SqlDiscovery
     factory: ObjectFactory
 
-    _has_constraints: Optional[bool] = None
-    _has_column_extended_info: Optional[bool] = None
+    _has_constraints: bool | None = None
+    _has_column_extended_info: bool | None = None
 
     def __init__(self, conn: BaseContext, discovery: SqlDiscovery, factory: ObjectFactory) -> None:
         super().__init__(conn)
@@ -297,7 +297,7 @@ class AnsiExplorer(Explorer):
             )
         return constraints.fetch()
 
-    async def get_table_description(self, table_id: SupportsQualifiedId) -> Optional[str]:
+    async def get_table_description(self, table_id: SupportsQualifiedId) -> str | None:
         return None
 
     async def get_table(self, table_id: SupportsQualifiedId) -> Table:
@@ -324,7 +324,7 @@ class AnsiExplorer(Explorer):
             primary_key = (columns[0].name,)
             return self.factory.table_class(name=table_id, columns=columns, primary_key=primary_key)
 
-    async def get_namespace_qualified(self, namespace_id: Optional[LocalId] = None) -> Namespace:
+    async def get_namespace_qualified(self, namespace_id: LocalId | None = None) -> Namespace:
         """
         Constructs a database object model of a namespace (database schema).
 
@@ -356,7 +356,7 @@ class AnsiExplorer(Explorer):
         else:
             return self.factory.namespace_class()
 
-    async def get_namespace_flat(self, namespace_id: Optional[LocalId] = None) -> Namespace:
+    async def get_namespace_flat(self, namespace_id: LocalId | None = None) -> Namespace:
         """
         Constructs a database object model of a namespace (database schema).
 
