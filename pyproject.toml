@@ -34,7 +34,7 @@ classifiers = [
 dependencies = [
     "json_strong_typing >= 0.4.3",
     "truststore >= 0.10",
-    "typing_extensions >= 4.15; python_version < '3.12'"
+    "typing_extensions >= 4.16; python_version < '3.12'"
 ]
 dynamic = ["version"]
 
@@ -50,10 +50,17 @@ oracle = [
 ]
 mysql = [
     "aiomysql >= 0.3",
-    "PyMySQL[rsa] >= 1.1"
+    "PyMySQL[rsa] >= 1.2"
 ]
 mssql = [
     "pyodbc >= 5.3"
+]
+dev = [
+    "asyncpg-stubs >= 0.31",
+    "build >= 1.5",
+    "mypy >= 2.3",
+    "ruff >= 0.16",
+    "types-PyMySQL >= 1.2"
 ]
 
 [project.urls]

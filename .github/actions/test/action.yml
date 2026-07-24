@@ -28,13 +28,13 @@ runs:
     - name: Install PyPI package without extras
       if: ${{ ! inputs.options-extras }}
       run: |
-        for FILE in `ls *.whl`; do python -m pip install $FILE; done
+        for FILE in `ls *.whl`; do python -m pip --disable-pip-version-check install $FILE'[tsv]'; done
       shell: bash
 
     - name: Install PyPI package with extras
       if: ${{ inputs.options-extras }}
       run: |
-        for FILE in `ls *.whl`; do python -m pip install $FILE'[${{ inputs.options-extras }}]'; done
+        for FILE in `ls *.whl`; do python -m pip --disable-pip-version-check install $FILE'[tsv,${{ inputs.options-extras }}]'; done
       shell: bash
 
     - name: Fetch unit and/or integration tests
@@ -45,11 +45,6 @@ runs:
           .
           .github
           tests
-
-    - name: Install test requirements
-      run: |
-        python -m pip --disable-pip-version-check install -r requirements-test.txt
-      shell: bash
 
     - name: Run unit and/or integration tests
       run: |

@@ -46,9 +46,7 @@ parameters = ConnectionParameters(
     password=None,
     database="levente.hunyadi",
 )
-options = GeneratorOptions(
-    enum_mode=EnumMode.RELATION, namespaces={tables: "example"}
-)
+options = GeneratorOptions(enum_mode=EnumMode.RELATION, namespaces={tables: "example"})
 
 data = [
     UserTable(
