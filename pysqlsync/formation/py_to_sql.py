@@ -17,7 +17,7 @@ import sys
 import types
 import typing
 import uuid
-from typing import Annotated, Any, Callable, Iterable, TypeVar
+from typing import Annotated, Any, Callable, Final, Iterable, TypeVar
 
 from strong_typing.auxiliary import MaxLength, float32, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64
 from strong_typing.core import JsonType
@@ -102,7 +102,7 @@ from .object_types import (
 
 T = TypeVar("T")
 
-ENUM_NAME_LENGTH: int = 64
+ENUM_NAME_LENGTH: Final[int] = 64
 "Maximum length for an enumeration string value."
 
 ENUM_LABEL_TYPE = Annotated[str, MaxLength(ENUM_NAME_LENGTH)]

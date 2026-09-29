@@ -16,7 +16,7 @@ import uuid
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from socket import AF_INET, AF_INET6, inet_ntop
 from struct import pack
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Final, TypeVar
 
 from strong_typing.auxiliary import IntegerRange, MaxLength, MinLength, Precision
 from strong_typing.inspection import (
@@ -162,16 +162,16 @@ def random_alphanumeric_str(min_len: int, max_len: int) -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=random.randint(min_len, max_len)))
 
 
-_DIACRITICS = (
+_DIACRITICS: Final[str] = (
     "àáâãäåāăąèéêëēęìíîïīįòóôõöøőōùúûüűūųýÿçćčďðģğķļĺľłñńņňřŕśşšșťţþțźżžæœßı"
     "ÀÁÂÃÄÅĀĂĄÈÉÊËĒĘÌÍÎÏĪĮÒÓÔÕÖØŐŌÙÚÛÜŰŪŲÝŸÇĆČĎÐĢĞĶĻĹĽŁÑŃŅŇŘŔŚŞŠȘŤŢÞȚŹŻŽÆŒẞİ"
 )
 
-_EMOJIS = "😂❤️🔥🥰🙏👍🎉😉💀"
+_EMOJIS: Final[str] = "😂❤️🔥🥰🙏👍🎉😉💀"
 
-ALPHANUMERIC_CHARS = string.ascii_lowercase + string.digits
-UTF8_CHARS = string.ascii_letters + string.digits + _DIACRITICS + _EMOJIS
-UTF8_CHARS_MAX_BYTE_LEN = {k: [ch for ch in UTF8_CHARS if len(ch.encode("utf-8")) <= k] for k in range(1, 5)}
+ALPHANUMERIC_CHARS: Final[str] = string.ascii_lowercase + string.digits
+UTF8_CHARS: Final[str] = string.ascii_letters + string.digits + _DIACRITICS + _EMOJIS
+UTF8_CHARS_MAX_BYTE_LEN: Final[dict[int, list[str]]] = {k: [ch for ch in UTF8_CHARS if len(ch.encode("utf-8")) <= k] for k in range(1, 5)}
 
 
 def random_utf8_str(min_len: int, max_len: int) -> str:

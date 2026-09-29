@@ -6,7 +6,7 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Annotated, TypeVar
+from typing import Annotated, Final, TypeVar
 
 T = TypeVar("T")
 
@@ -39,7 +39,7 @@ class DefaultTag:
         return "DEFAULT"
 
 
-DEFAULT = DefaultTag()
+DEFAULT: Final[DefaultTag] = DefaultTag()
 
 PrimaryKey = Annotated[T, PrimaryKeyTag()]
 Identity = Annotated[T | DefaultTag, IdentityTag()]

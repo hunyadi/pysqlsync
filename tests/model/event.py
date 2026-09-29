@@ -4,6 +4,7 @@ import ipaddress
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Final
 from uuid import UUID
 
 from strong_typing.auxiliary import int64
@@ -54,7 +55,7 @@ else:
         TRACE = "TRACE"
 
 
-HTTPStatus: type[enum.Enum] = enum.Enum(  # type: ignore
+HTTPStatus: Final[type[enum.Enum]] = enum.Enum(  # type: ignore
     "HTTPStatus", {e.name: str(e.value) for e in http.HTTPStatus}
 )
 

@@ -17,7 +17,7 @@ import logging
 import types
 import typing
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, Callable, Iterable, Sized, TypeVar, overload
+from typing import Any, AsyncIterable, Callable, Final, Iterable, Sized, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -41,7 +41,7 @@ RecordSource = Iterable[RecordType] | AsyncIterable[RecordType]
 
 LOGGER = logging.getLogger("pysqlsync")
 
-_JSON_ENCODER = json.JSONEncoder(
+_JSON_ENCODER: Final = json.JSONEncoder(
     ensure_ascii=False,
     check_circular=False,
     allow_nan=False,
@@ -50,7 +50,7 @@ _JSON_ENCODER = json.JSONEncoder(
 )
 
 # number of records consumed from an asynchronous iterator before a batch is dispatched to a database
-BATCH_SIZE = 100000
+BATCH_SIZE: int = 100000
 
 
 class ClassRef:

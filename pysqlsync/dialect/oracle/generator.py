@@ -9,7 +9,7 @@ Copyright 2023-2026, Levente Hunyadi
 import datetime
 import ipaddress
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, Final
 
 from strong_typing.auxiliary import int8, int16, int32, int64
 from strong_typing.core import JsonType
@@ -24,8 +24,8 @@ from pysqlsync.util.typing import override
 from .data_types import OracleIntegerType, OracleTimestampType, OracleTimeType, OracleVariableBinaryType, OracleVariableCharacterType
 from .object_types import OracleObjectFactory
 
-MIN_DATETIME = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
-MIN_DATE = datetime.date.min
+MIN_DATETIME: Final[datetime.datetime] = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+MIN_DATE: Final[datetime.date] = datetime.date.min
 
 
 class OracleGenerator(BaseGenerator):

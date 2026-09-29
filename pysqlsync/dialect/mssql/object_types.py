@@ -6,9 +6,10 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-import random
 import string
 from dataclasses import dataclass
+from random import Random
+from typing import Final
 
 from pysqlsync.formation.object_types import (
     Column,
@@ -22,7 +23,7 @@ from pysqlsync.model.data_types import SqlDataType, quote
 from pysqlsync.model.id_types import LocalId
 from pysqlsync.util.typing import override
 
-ID_GENERATOR = random.Random()
+ID_GENERATOR: Final[Random] = Random()
 
 
 @dataclass

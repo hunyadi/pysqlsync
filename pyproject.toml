@@ -32,9 +32,9 @@ classifiers = [
     "Typing :: Typed"
 ]
 dependencies = [
-    "json_strong_typing >= 0.4.3",
+    "json-strong-typing >= 0.4.3",
     "truststore >= 0.10",
-    "typing_extensions >= 4.16; python_version < '3.12'"
+    "typing-extensions >= 4.16; python_version < '3.12'"
 ]
 dynamic = ["version"]
 
@@ -57,7 +57,7 @@ mssql = [
 ]
 dev = [
     "asyncpg-stubs >= 0.31",
-    "build >= 1.5",
+    "build >= 1.6",
     "mypy >= 2.3",
     "ruff >= 0.16",
     "types-PyMySQL >= 1.2"

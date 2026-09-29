@@ -7,11 +7,12 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import re
+from typing import Final
 
 from pysqlsync.formation.object_types import Column, Namespace, ObjectFactory, Table
 from pysqlsync.model.id_types import LocalId
 
-_sql_quoted_str_table = str.maketrans(
+_sql_quoted_str_table: Final[dict[int, str]] = str.maketrans(
     {
         "\\": "\\\\",
         "'": "\\'",

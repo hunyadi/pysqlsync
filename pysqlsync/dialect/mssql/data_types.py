@@ -7,7 +7,7 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import enum
-from typing import Any
+from typing import Any, Final
 
 import pyodbc
 
@@ -27,6 +27,9 @@ from pysqlsync.model.data_types import (
     SqlVariableBinaryType,
     SqlVariableCharacterType,
 )
+
+MAX_VARCHAR_SIZE: Final[int] = 8000
+MAX_NVARCHAR_SIZE: Final[int] = 4000
 
 
 class MSSQLBooleanType(SqlBooleanType):
@@ -52,13 +55,21 @@ class MSSQLVariableCharacterType(SqlVariableCharacterType):
         super().__init__(limit)
         self.encoding = encoding
 
+    def _max_size(self) -> int:
+        "Returns the widest fixed-width size this column's type family accepts."
+
+        if self.encoding is MSSQLEncoding.UTF16:
+            return MAX_NVARCHAR_SIZE
+        else:
+            return MAX_VARCHAR_SIZE
+
     def __str__(self) -> str:
         if self.encoding is MSSQLEncoding.UTF16:
             char_type = "nvarchar"
         else:
             char_type = "varchar"
 
-        if self.limit is not None and self.limit > 0 and self.limit != 2147483647:
+        if self.limit is not None and self.limit > 0 and self.limit <= self._max_size():
             return f"{char_type}({self.limit})"
         else:
             return f"{char_type}(max)"
@@ -70,6 +81,20 @@ class MSSQLDateTimeType(SqlTimestampType):
 
     def __str__(self) -> str:
         return "datetime2"
+
+
+def _wide_char_transport_size(limit: int | None) -> int:
+    """
+    Returns the ODBC column size to declare for the transport of a wide (Unicode) character string.
+
+    :param limit: The column's declared character limit, or `None` if unbounded.
+    :returns: The limit if it fits a fixed-width wide type, or 0 to bind as a LOB.
+    """
+
+    if limit is not None and limit <= MAX_NVARCHAR_SIZE:
+        return limit
+    else:
+        return 0
 
 
 def sql_to_odbc_type(data_type: SqlDataType) -> tuple[int, int, int]:
@@ -110,9 +135,9 @@ def sql_to_odbc_type(data_type: SqlDataType) -> tuple[int, int, int]:
         return pyodbc.SQL_TYPE_TIME, data_type.precision or 6, 0
 
     elif isinstance(data_type, SqlFixedCharacterType):
-        return pyodbc.SQL_WCHAR, data_type.limit or 0, 0
+        return pyodbc.SQL_WCHAR, _wide_char_transport_size(data_type.limit), 0
     elif isinstance(data_type, SqlVariableCharacterType):
-        return pyodbc.SQL_WVARCHAR, data_type.limit or 0, 0
+        return pyodbc.SQL_WVARCHAR, _wide_char_transport_size(data_type.limit), 0
     elif isinstance(data_type, SqlFixedBinaryType):
         return pyodbc.SQL_BINARY, data_type.storage or 0, 0
     elif isinstance(data_type, SqlVariableBinaryType):
