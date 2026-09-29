@@ -74,7 +74,11 @@ class MSSQLBase(TestEngineBase):
 
 
 class MySQLBase(TestEngineBase):
-    "Base class for testing MySQL features."
+    """
+    Base class for testing MySQL features.
+
+    Requires a case-sensitive OS due to mixed-case table names in test suite.
+    """
 
     @property
     def engine(self) -> BaseEngine:
