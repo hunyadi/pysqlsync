@@ -9,8 +9,8 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import typing
-from collections.abc import Sequence
-from typing import Any, Iterable, TypeVar
+from collections.abc import Iterable, Sequence
+from typing import Any, TypeVar
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
 
@@ -29,7 +29,7 @@ def resultset_unwrap_dict(signature: type[D], records: Iterable[dict[str, Any]])
     if not is_dataclass_type(signature):
         raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
-    return [signature(**{name: value for name, value in record.items()}) for record in records]
+    return [signature(**dict(record.items())) for record in records]
 
 
 def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[D]:
@@ -43,7 +43,7 @@ def resultset_unwrap_object(signature: type[D], records: Iterable[Any]) -> list[
     if not is_dataclass_type(signature):
         raise TypeError(f"expected: data-class type as result-set signature; got: {signature}")
 
-    names = [name for name in signature.__dataclass_fields__.keys()]  # pyright: ignore[reportUnknownMemberType]
+    names = list(signature.__dataclass_fields__.keys())  # pyright: ignore[reportUnknownMemberType]
     return [signature(**{name: record.__getattribute__(name) for name in names}) for record in records]
 
 

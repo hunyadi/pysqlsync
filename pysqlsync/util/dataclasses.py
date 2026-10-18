@@ -25,7 +25,7 @@ def make_dataclass(
     :param docstring: The doc-string to set on the newly created type.
     """
 
-    field_names = set(field.name for field in fields)
+    field_names = {field.name for field in fields}
 
     if docstring is not None:
         docstring.params = {name: param for name, param in docstring.params.items() if name in field_names}

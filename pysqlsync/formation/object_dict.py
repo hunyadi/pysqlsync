@@ -6,8 +6,8 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from collections.abc import ItemsView, KeysView, Mapping, ValuesView
-from typing import Generic, Iterable, Iterator, TypeVar, overload
+from collections.abc import ItemsView, Iterable, Iterator, KeysView, Mapping, ValuesView
+from typing import Generic, TypeVar, overload
 
 from ..model.id_types import SupportsName
 

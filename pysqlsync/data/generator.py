@@ -13,10 +13,11 @@ import random
 import string
 import typing
 import uuid
+from collections.abc import Callable
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from socket import AF_INET, AF_INET6, inet_ntop
 from struct import pack
-from typing import Any, Callable, Final, TypeVar
+from typing import Any, Final, TypeVar
 
 from strong_typing.auxiliary import IntegerRange, MaxLength, MinLength, Precision
 from strong_typing.inspection import (
@@ -101,7 +102,7 @@ def random_enum(enum_type: type[E]) -> E:
     Chooses an enumeration value randomly out of the possible set of values.
     """
 
-    values = [e for e in enum_type]
+    values = list(enum_type)
     return random.choice(values)
 
 
@@ -118,7 +119,7 @@ def random_enum_generator(
     min_count: int | None = None,
     max_count: int | None = None,
 ) -> Callable[[], list[E]]:
-    values = [e for e in enum_type]
+    values = list(enum_type)
     if count is not None:
         if count >= len(values):
             return lambda: shuffled(values)

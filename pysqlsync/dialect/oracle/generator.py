@@ -9,7 +9,8 @@ Copyright 2023-2026, Levente Hunyadi
 import datetime
 import ipaddress
 import uuid
-from typing import Any, Callable, Final
+from collections.abc import Callable
+from typing import Any, Final
 
 from strong_typing.auxiliary import int8, int16, int32, int64
 from strong_typing.core import JsonType

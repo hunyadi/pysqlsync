@@ -6,7 +6,8 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Any, AsyncIterator, BinaryIO, Callable, Generic, Iterable, Protocol, TypeVar
+from collections.abc import AsyncIterator, Callable, Iterable
+from typing import Any, BinaryIO, Generic, Protocol, TypeVar
 
 from strong_typing.inspection import DataclassInstance, dataclass_fields
 from tsv.helper import AutoDetectParser, Generator

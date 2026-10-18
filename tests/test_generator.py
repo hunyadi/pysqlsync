@@ -21,8 +21,10 @@ from tests.params import (
 
 def masked_equal(actual: str, expected: str, *, mask_char: str = "#", mask_min_count: int = 3) -> bool:
     """
-    Compares two strings with a mask. Strings are equal if all characters are equal, except for sequences of mask
-    characters in the expected string, which allow any corresponding character in the actual string.
+    Compares two strings with a mask.
+
+    Strings are equal if all characters are equal, except for sequences of mask characters in the expected string, which allow any
+    corresponding character in the actual string.
 
     :param actual: String to test.
     :param expected: Masked string to compare against.

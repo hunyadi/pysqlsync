@@ -10,7 +10,8 @@ import dataclasses
 import logging
 import ssl
 import typing
-from typing import Iterable, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 import asyncpg
 from strong_typing.inspection import DataclassInstance, is_dataclass_type

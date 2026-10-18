@@ -89,7 +89,7 @@ class PostgreSQLGenerator(BaseGenerator):
     def get_table_upsert_stmt(self, table: Table, order: tuple[str, ...] | None = None) -> str:
         statements: list[str] = []
         statements.append(f"INSERT INTO {table.name}")
-        columns = [column for column in table.get_columns(order)]
+        columns = table.get_columns(order)
         column_list = ", ".join(str(column.name) for column in columns)
         value_list = ", ".join(self.placeholder(index) for index, _ in enumerate(columns, start=1))
         statements.append(f"({column_list}) VALUES ({value_list})")

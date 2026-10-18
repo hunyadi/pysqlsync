@@ -8,7 +8,8 @@ Copyright 2023-2026, Levente Hunyadi
 
 import logging
 import typing
-from typing import Iterable, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 import pyodbc
 from strong_typing.inspection import is_dataclass_type

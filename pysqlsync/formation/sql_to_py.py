@@ -98,7 +98,7 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
 
 
 def safe_id(id: str) -> str:
-    "Apply PEP 8: single trailing underscore to avoid conflicts with Python keyword"
+    "Apply PEP 8: single trailing underscore to avoid conflicts with Python keyword."
 
     return f"{id}_" if keyword.iskeyword(id) else id
 
@@ -134,7 +134,7 @@ class SqlConverter:
         if (column.name,) == table.primary_key:
             field_type = PrimaryKey[(field_type,)]  # type: ignore
         elif column.nullable:
-            field_type = Optional[field_type]
+            field_type = Optional[field_type]  # noqa: UP045
 
         for c in table.constraints.values():
             if not isinstance(c, ReferenceConstraint):
@@ -147,7 +147,7 @@ class SqlConverter:
                 field_type = self.qual_to_module(c.reference.table)
             elif isinstance(c, DiscriminatedConstraint):
                 union_types = tuple(self.qual_to_module(r.table) for r in c.references)
-                field_type = Union[union_types]
+                field_type = Union[union_types]  # noqa: UP007
 
         # use cast to ensure compatibility with signature of `make_dataclass`
         data_type = typing.cast(type, field_type)

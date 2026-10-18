@@ -173,7 +173,7 @@ def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:
     if is_type_optional(plain_type):
         # nullable type
         required_type = reference_to_key(unwrap_optional_type(plain_type), cls)
-        return Optional[required_type]
+        return Optional[required_type]  # noqa: UP045
     elif is_entity_type(plain_type):
         # foreign key reference
         return dataclass_primary_key_type(plain_type)

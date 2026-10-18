@@ -7,8 +7,8 @@ Copyright 2023-2026, Levente Hunyadi
 """
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from ..base import BaseContext, DiscoveryError, Explorer
 from ..model.data_types import escape_like, quote
@@ -201,22 +201,21 @@ class AnsiExplorer(Explorer):
             "ORDER BY ordinal_position",
         )
 
-        columns: list[Column] = []
-        for col in column_meta:
-            columns.append(
-                self.factory.column_class.create(
-                    LocalId(col.column_name),
-                    self.discovery.sql_data_type_from_spec(
-                        type_name=col.data_type,
-                        character_maximum_length=col.character_maximum_length,
-                        numeric_precision=col.numeric_precision,
-                        numeric_scale=col.numeric_scale,
-                        datetime_precision=col.datetime_precision,
-                    ),
-                    nullable=bool(col.nullable),
-                    default=col.column_default,
-                )
+        columns: list[Column] = [
+            self.factory.column_class.create(
+                LocalId(col.column_name),
+                self.discovery.sql_data_type_from_spec(
+                    type_name=col.data_type,
+                    character_maximum_length=col.character_maximum_length,
+                    numeric_precision=col.numeric_precision,
+                    numeric_scale=col.numeric_scale,
+                    datetime_precision=col.datetime_precision,
+                ),
+                nullable=bool(col.nullable),
+                default=col.column_default,
             )
+            for col in column_meta
+        ]
         return columns
 
     async def get_table_primary_key(self, table_id: SupportsQualifiedId) -> tuple[LocalId, ...]:

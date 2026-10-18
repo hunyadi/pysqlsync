@@ -16,8 +16,9 @@ import json
 import logging
 import types
 import typing
+from collections.abc import AsyncIterable, Callable, Iterable, Sized
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, Callable, Final, Iterable, Sized, TypeVar, overload
+from typing import Any, Final, TypeVar, overload
 
 from strong_typing.inspection import DataclassInstance, is_dataclass_type, is_type_enum
 from strong_typing.name import python_type_to_str
@@ -363,7 +364,7 @@ class BaseGenerator(abc.ABC):
         This statement uses identity column values for lookup.
         """
 
-        columns = [column for column in table.get_columns(order)]
+        columns = table.get_columns(order)
         statements: list[str] = self._get_merge_preamble(table, columns)
 
         insert_columns = [column for column in columns if not column.identity]
@@ -580,11 +581,11 @@ class BaseEnumTransformer(RecordTransformer):
         "Merges new values into a lookup table and returns the entire updated table."
 
         if not values:
-            return dict()
+            return {}
 
         await self.context.execute_all(
             self.context.connection.generator.get_table_merge_stmt(self.table),
-            list((value,) for value in values),
+            [(value,) for value in values],
         )
 
         value_name = self.table.get_value_columns()[0].name
@@ -721,9 +722,7 @@ class TransformerDataSource(CompositeDataSource):
 
     async def batches(self) -> AsyncIterable[list[RecordType]]:
         async for batch in self.source.batches():
-            fns: list[Callable[[Any], Any] | None] = []
-            for transformer in self.transformers:
-                fns.append(await transformer.get(batch))
+            fns: list[Callable[[Any], Any] | None] = [await transformer.get(batch) for transformer in self.transformers]
             yield [
                 tuple(
                     ((fn(field) if field is not None else None) if fn is not None else field) for fn, field in zip(fns, record, strict=True)
@@ -751,9 +750,7 @@ class SelectorTransformerDataSource(CompositeDataSource):
     async def batches(self) -> AsyncIterable[list[RecordType]]:
         indices = self.indices
         async for batch in self.source.batches():
-            fns: list[Callable[[Any], Any] | None] = []
-            for transformer in self.transformers:
-                fns.append(await transformer.get(batch))
+            fns: list[Callable[[Any], Any] | None] = [await transformer.get(batch) for transformer in self.transformers]
             yield [
                 tuple(
                     ((fn(field) if field is not None else None) if fn is not None else field)
@@ -923,7 +920,11 @@ class BaseContext(abc.ABC):
             await self.execute(statement)
 
     async def drop_objects(self) -> None:
-        "Drops all objects currently synced with the generator. (This function is mainly for unit tests.)"
+        """
+        Drops all objects currently synced with the generator.
+
+        (This function is mainly for unit tests.)
+        """
 
         generator = self.connection.generator
         statement = generator.drop()

@@ -1,6 +1,5 @@
 import time
 import types
-from typing import Type
 
 
 class TimerError(Exception):
@@ -39,7 +38,7 @@ class Timer:
 
     def __exit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> None:

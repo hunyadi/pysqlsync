@@ -53,14 +53,14 @@ def make_entity(cls: type[DataclassInstance], key: str) -> type[DataclassInstanc
     target_fields: list[tuple[str, Any, dataclasses.Field[Any]]] = [
         (key_field.name, primary_key_type, dataclasses.field(default=key_field.default))
     ]
-    for value_field in value_fields:
-        target_fields.append(
-            (
-                value_field.name,
-                value_field.type,
-                dataclasses.field(default=value_field.default),
-            )
+    target_fields.extend(
+        (
+            value_field.name,
+            value_field.type,
+            dataclasses.field(default=value_field.default),
         )
+        for value_field in value_fields
+    )
 
     class_name = cls.__name__
     class_module = cls.__module__

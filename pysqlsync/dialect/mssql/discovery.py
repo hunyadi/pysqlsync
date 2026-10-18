@@ -6,7 +6,7 @@ Copyright 2023-2026, Levente Hunyadi
 :see: https://github.com/hunyadi/pysqlsync
 """
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from pysqlsync.base import BaseContext
 from pysqlsync.formation.data_types import SqlDiscovery, SqlDiscoveryOptions
@@ -59,19 +59,17 @@ class MSSQLExplorer(AnsiExplorer):
         )
         default_values = {col_name: MSSQLDefault(con_name, expr) for col_name, con_name, expr in default_columns}
 
-        columns: list[MSSQLColumn] = []
-        for col in plain_columns:
-            columns.append(
-                MSSQLColumn(
-                    name=col.name,
-                    data_type=col.data_type,
-                    nullable=col.nullable,
-                    default=default_values.get(col.name.id),
-                    identity=col.name.id in identity_columns,
-                    description=col.description,
-                )
+        columns: list[MSSQLColumn] = [
+            MSSQLColumn(
+                name=col.name,
+                data_type=col.data_type,
+                nullable=col.nullable,
+                default=default_values.get(col.name.id),
+                identity=col.name.id in identity_columns,
+                description=col.description,
             )
-
+            for col in plain_columns
+        ]
         return columns
 
     async def get_namespace_current(self) -> Namespace:

@@ -9,7 +9,8 @@ Copyright 2023-2026, Levente Hunyadi
 import logging
 import re
 import typing
-from typing import Iterable, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 import oracledb
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -79,7 +80,7 @@ class OracleContext(BaseContext):
                 for s in re.split(r";$", statement, flags=re.MULTILINE):
                     try:
                         cur.execute(s)
-                    except Exception as e:
+                    except Exception as e:  # noqa: PERF203
                         raise QueryException(s) from e
 
     @override

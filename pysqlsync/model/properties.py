@@ -85,12 +85,12 @@ def tsv_type(plain_type: TypeLike) -> type:
     if is_type_enum(plain_type):
         return str
     elif is_type_literal(plain_type):
-        literal_types = set(tsv_type(t) for t in unwrap_literal_types(plain_type))
+        literal_types = {tsv_type(t) for t in unwrap_literal_types(plain_type)}
         if len(literal_types) != 1:
             raise TypeError(f"inconsistent literal value types: {literal_types}")
         return literal_types.pop()
     elif is_type_union(plain_type):
-        union_types = set(tsv_type(t) for t in unwrap_union_types(plain_type))
+        union_types = {tsv_type(t) for t in unwrap_union_types(plain_type)}
         if len(union_types) != 1:
             if len(union_types) == 2 and ipaddress.IPv4Address in union_types and ipaddress.IPv6Address in union_types:
                 return typing.cast(type, plain_type)
@@ -188,7 +188,7 @@ def get_field_properties(field_type: TypeLike) -> FieldProperties:
         union_types = list(unwrap_union_types(plain_type))
         if DefaultTag in union_types:
             union_types.remove(DefaultTag)
-            plain_type = Union[tuple(union_types)]  # may cease to become a union type
+            plain_type = Union[tuple(union_types)]  # may cease to become a union type  # noqa: UP007
 
     # check if field is nullable
     if is_type_optional(plain_type):

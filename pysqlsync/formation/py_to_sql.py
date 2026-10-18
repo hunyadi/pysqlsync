@@ -17,7 +17,8 @@ import sys
 import types
 import typing
 import uuid
-from typing import Annotated, Any, Callable, Final, Iterable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Annotated, Any, Final, TypeVar
 
 from strong_typing.auxiliary import MaxLength, float32, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64
 from strong_typing.core import JsonType
@@ -582,7 +583,7 @@ class DataclassConverter:
             member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(unwrap_annotated_type(typ))]
             if all(is_entity_type(t) for t in member_types):
                 # discriminated union type
-                primary_key_types = set(dataclass_primary_key_type(t) for t in member_types)
+                primary_key_types = {dataclass_primary_key_type(t) for t in member_types}
                 if len(primary_key_types) > 1:
                     raise TypeError(f"mismatching key types in discriminated union of: {member_types}")
                 common_key_type = primary_key_types.pop()
@@ -693,17 +694,17 @@ class DataclassConverter:
 
         # relationships for enumeration types ignore foreign constraints option and always create a foreign key
         if self.options.enum_mode is EnumMode.RELATION:
-            for enum_field in dataclass_fields_as_required(cls, is_type_enum):
-                constraints.append(
-                    ForeignConstraint(
-                        LocalId(self.create_foreign_key_name(cls, enum_field.name)),
-                        (LocalId(enum_field.name),),
-                        ConstraintReference(
-                            self.create_qualified_id(enum_field.type.__module__, enum_field.type.__name__),
-                            (LocalId("id"),),
-                        ),
+            constraints.extend(
+                ForeignConstraint(
+                    LocalId(self.create_foreign_key_name(cls, enum_field.name)),
+                    (LocalId(enum_field.name),),
+                    ConstraintReference(
+                        self.create_qualified_id(enum_field.type.__module__, enum_field.type.__name__),
+                        (LocalId("id"),),
                     ),
                 )
+                for enum_field in dataclass_fields_as_required(cls, is_type_enum)
+            )
 
         if self.options.check_constraints and self.options.enum_mode is EnumMode.CHECK:
             for enum_field in dataclass_fields_as_required(cls, is_type_enum):
@@ -842,10 +843,10 @@ class DataclassConverter:
         constraints: list[Constraint] = []
 
         enum_type = unwrap_annotated_type(enum_type)
-        enum_member_types: set[type] = set(type(e.value) for e in enum_type)
+        enum_member_types: set[type] = {type(e.value) for e in enum_type}
         if len(enum_member_types) > 1:
             raise TypeError(
-                f"inconsistent member types in enumeration `{enum_type.__name__}`: {sorted(list(e.__name__ for e in enum_member_types))}"
+                f"inconsistent member types in enumeration `{enum_type.__name__}`: {sorted(e.__name__ for e in enum_member_types)}"
             )
         enum_member_type = enum_member_types.pop()
         unadorned_member_type = unwrap_annotated_type(enum_member_type)
@@ -956,7 +957,7 @@ class DataclassConverter:
                 for enum_field in dataclass_fields_as_required(entity, is_type_enum_set):
                     regular_enum_types.add(unwrap_generic_set(enum_field.type))
 
-        for enum_type in sorted(list(regular_enum_types), key=lambda e: e.__name__):
+        for enum_type in sorted(regular_enum_types, key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))
 
@@ -969,7 +970,7 @@ class DataclassConverter:
             ):
                 enum_type = unwrap_extensible_enum_type(enum_field.type, entity)
                 extensible_enum_types.add(enum_type)
-        for enum_type in sorted(list(extensible_enum_types), key=lambda e: e.__name__):
+        for enum_type in sorted(extensible_enum_types, key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
             table_defs.append(self._enum_table(enum_type))
 

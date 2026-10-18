@@ -30,14 +30,15 @@ LOGGER = logging.getLogger("pysqlsync.mysql")
 
 
 # fixes an issue with aiomysql 0.3.x that relies on an implementation detail in PyMySQL
-if not callable(getattr(aiomysql.connection, "escape_bytes_prefixed", None)):
+_escape_bytes_prefixed = getattr(aiomysql.connection, "escape_bytes_prefixed", None)
+if _escape_bytes_prefixed is not None and not callable(_escape_bytes_prefixed):
 
-    def _escape_bytes_prefixed(value: bytes) -> str:
+    def escape_bytes_prefixed(value: bytes) -> str:
         return f"X'{value.hex()}'"
 
     # PyMySQL 1.2.x keeps the name importable for aiomysql 0.3.x but binds it to a placeholder string, not a function,
     # breaking `aiomysql.Connection.escape()` for `bytes` parameters, which calls `escape_bytes_prefixed` internally.
-    aiomysql.connection.escape_bytes_prefixed = _escape_bytes_prefixed
+    aiomysql.connection.escape_bytes_prefixed = escape_bytes_prefixed
 
 
 def quoted_id(identifier: str) -> str:

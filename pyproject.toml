@@ -25,6 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Database :: Database Engines/Servers",
     "Topic :: Software Development :: Code Generators",
@@ -43,7 +44,7 @@ tsv = [
     "tsv2py >= 0.8"
 ]
 postgresql = [
-    "asyncpg >= 0.31"
+    "asyncpg >= 0.32"
 ]
 oracle = [
     "oracledb >= 4.0"
@@ -56,10 +57,10 @@ mssql = [
     "pyodbc >= 5.3"
 ]
 dev = [
-    "asyncpg-stubs >= 0.31",
+    "asyncpg-stubs >= 0.32",
     "build >= 1.6",
-    "mypy >= 2.3",
-    "ruff >= 0.16",
+    "mypy >= 2.4",
+    "ruff >= 0.17",
     "types-PyMySQL >= 1.2"
 ]
 
@@ -85,4 +86,5 @@ version = { attr = "pysqlsync.__version__" }
 line-length = 140
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "I", "Q"]
+select = ["B", "C4", "D205", "D400", "E", "F", "I", "ISC", "PERF", "Q", "TID", "UP", "W"]
+ignore = ["TID252", "UP015"]

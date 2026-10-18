@@ -4,7 +4,7 @@ import ipaddress
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Final
+from typing import TYPE_CHECKING, Final
 from uuid import UUID
 
 from strong_typing.auxiliary import int64
@@ -42,7 +42,7 @@ if sys.version_info >= (3, 11):
 else:
 
     class HTTPMethod(enum.Enum):
-        "HTTP methods and descriptions"
+        "HTTP methods and descriptions."
 
         CONNECT = "CONNECT"
         DELETE = "DELETE"
@@ -55,9 +55,16 @@ else:
         TRACE = "TRACE"
 
 
-HTTPStatus: Final[type[enum.Enum]] = enum.Enum(  # type: ignore
-    "HTTPStatus", {e.name: str(e.value) for e in http.HTTPStatus}
-)
+if TYPE_CHECKING:
+
+    class HTTPStatus(enum.Enum):
+        CONTINUE = 100
+        OK = 200
+        MULTIPLE_CHOICES = 300
+        BAD_REQUEST = 400
+        INTERNAL_SERVER_ERROR = 500
+else:
+    HTTPStatus: Final[type[enum.Enum]] = enum.Enum("HTTPStatus", {e.name: e.value for e in http.HTTPStatus})
 
 
 @dataclass

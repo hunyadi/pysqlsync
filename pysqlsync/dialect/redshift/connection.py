@@ -10,8 +10,9 @@ import dataclasses
 import logging
 import re
 import typing
+from collections.abc import Iterable
 from io import BytesIO
-from typing import Iterable, TypeVar
+from typing import TypeVar
 
 import redshift_connector
 from strong_typing.inspection import DataclassInstance, is_dataclass_type
@@ -83,7 +84,7 @@ class RedshiftContext(BaseContext):
             for s in re.split(r";$", statement, flags=re.MULTILINE):
                 try:
                     cursor.execute(s)
-                except Exception as e:
+                except Exception as e:  # noqa: PERF203
                     raise QueryException(s) from e
 
     @override

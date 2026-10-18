@@ -8,8 +8,9 @@ Copyright 2023-2026, Levente Hunyadi
 
 import abc
 import copy
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, overload
+from typing import Any, overload
 
 from strong_typing.inspection import is_dataclass_instance
 from strong_typing.topological import topological_sort
@@ -170,7 +171,7 @@ class StructType(DatabaseObject, QualifiedObject):
         self.description = description
 
     def get_referenced_types(self) -> set[SupportsQualifiedId]:
-        return set(m.data_type.ref for m in self.members.values() if isinstance(m.data_type, SqlUserDefinedType))
+        return {m.data_type.ref for m in self.members.values() if isinstance(m.data_type, SqlUserDefinedType)}
 
     def create_stmt(self) -> str:
         members = ",\n".join(str(m) for m in self.members.values())
@@ -539,7 +540,7 @@ class Table(DatabaseObject, QualifiedObject):
         raise KeyError(f"foreign constraint not found for column: {column_id}")
 
     def get_referenced_types(self) -> set[SupportsQualifiedId]:
-        return set(c.data_type.ref for c in self.columns.values() if isinstance(c.data_type, SqlUserDefinedType))
+        return {c.data_type.ref for c in self.columns.values() if isinstance(c.data_type, SqlUserDefinedType)}
 
     def get_referenced_tables(self) -> set[SupportsQualifiedId]:
         items: set[SupportsQualifiedId] = set()
@@ -689,7 +690,7 @@ class Namespace(DatabaseObject):
         for t in self.tables.values():
             items.update(t.get_referenced_types())
             items.update(t.get_referenced_tables())
-        return set(LocalId(i.scope_id) for i in items if i.scope_id is not None)
+        return {LocalId(i.scope_id) for i in items if i.scope_id is not None}
 
     def create_schema_stmt(self) -> str | None:
         if self.name.local_id:

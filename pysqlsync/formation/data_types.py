@@ -134,7 +134,7 @@ class SqlDiscovery:
         m = re.fullmatch(r"^enum[(](.+)[)]$", type_def, re.IGNORECASE)
         if m is not None:
             value_list = m.group(1)
-            values = [value for value in re.findall(r"'((?:[^']+|'')*)'(?:,|$)", value_list)]
+            values = re.findall(r"'((?:[^']+|'')*)'(?:,|$)", value_list)
             return SqlEnumType(values)
 
         return None

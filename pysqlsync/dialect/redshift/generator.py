@@ -8,7 +8,8 @@ Copyright 2023-2026, Levente Hunyadi
 
 import ipaddress
 import uuid
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from strong_typing.core import JsonType
 
