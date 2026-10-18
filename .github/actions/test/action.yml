@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Set up Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ inputs.python-version }}
 
@@ -38,7 +38,7 @@ runs:
       shell: bash
 
     - name: Fetch unit and/or integration tests
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # include `.github` to allow post-run for this composite action
         sparse-checkout: |
