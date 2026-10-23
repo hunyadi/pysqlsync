@@ -31,6 +31,7 @@ from strong_typing.inspection import (
     unwrap_union_types,
 )
 from strong_typing.serialization import object_to_json
+from typing_extensions import TypeForm
 
 from pysqlsync.formation.inspection import is_struct_type, reference_to_key
 from pysqlsync.model.properties import get_field_properties
@@ -164,7 +165,9 @@ def random_alphanumeric_str(min_len: int, max_len: int) -> str:
 
 
 _DIACRITICS: Final[str] = (
+    # spellchecker: disable-next-line
     "àáâãäåāăąèéêëēęìíîïīįòóôõöøőōùúûüűūųýÿçćčďðģğķļĺľłñńņňřŕśşšșťţþțźżžæœßı"
+    # spellchecker: disable-next-line
     "ÀÁÂÃÄÅĀĂĄÈÉÊËĒĘÌÍÎÏĪĮÒÓÔÕÖØŐŌÙÚÛÜŰŪŲÝŸÇĆČĎÐĢĞĶĻĹĽŁÑŃŅŇŘŔŚŞŠȘŤŢÞȚŹŻŽÆŒẞİ"
 )
 
@@ -253,7 +256,7 @@ class RandomGenerator:
         generators = {field.name: self.create(field.type, cls) for field in dataclass_fields(cls)}
         return lambda k: {field_name: generator(k) for field_name, generator in generators.items()}
 
-    def create(self, typ: Any, cls: type[DataclassInstance]) -> Callable[[int], Any]:
+    def create(self, typ: TypeForm[Any] | None, cls: type[DataclassInstance]) -> Callable[[int], Any]:
         """
         Creates a generator for a random value.
 
@@ -261,6 +264,9 @@ class RandomGenerator:
         :param cls: The context in which the type occurs, used for evaluating forward reference types.
         :returns: A callable object that takes a sequence index and returns a random value.
         """
+
+        if typ is None or typ is type(None):
+            return lambda _: None
 
         field_properties = get_field_properties(typ)
         referenced_type = reference_to_key(field_properties.field_type, cls)
@@ -335,7 +341,7 @@ class RandomGenerator:
                 raise TypeError("empty `typing.Literal`")
         elif is_type_union(plain_type):
             union_types = unwrap_union_types(plain_type)
-            union_generators = [self.create(union_type, cls) for union_type in union_types]
+            union_generators = [self.create(typing.cast(TypeForm[Any], union_type), cls) for union_type in union_types]
             return lambda k: random.choice(union_generators)(k)
         elif is_struct_type(plain_type):
             json_generator = self.create_json(plain_type)

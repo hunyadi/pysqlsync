@@ -20,7 +20,8 @@ from uuid import UUID
 
 from strong_typing.auxiliary import Length, MaxLength, Precision, TimePrecision, float32, float64, int16, int32, int64
 from strong_typing.core import JsonType
-from strong_typing.inspection import DataclassInstance, TypeLike
+from strong_typing.inspection import DataclassInstance
+from typing_extensions import TypeForm
 
 from ..model.data_types import (
     SqlArrayType,
@@ -45,7 +46,7 @@ from ..model.key_types import PrimaryKey
 from .object_types import Column, DiscriminatedConstraint, ForeignConstraint, ReferenceConstraint, Table
 
 
-def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
+def sql_type_to_python(sql_type: SqlDataType) -> TypeForm[Any]:
     if isinstance(sql_type, SqlBooleanType):
         return bool
     elif isinstance(sql_type, SqlIntegerType):
@@ -89,7 +90,8 @@ def sql_type_to_python(sql_type: SqlDataType) -> TypeLike:
     elif isinstance(sql_type, SqlJsonType):
         return JsonType
     elif isinstance(sql_type, SqlUserDefinedType):
-        return sql_type.ref.compact_id
+        # treat as forward reference to a pre-defined Python type
+        return sql_type.ref.compact_id  # type: ignore
     elif isinstance(sql_type, SqlArrayType):
         item_type = (sql_type_to_python(sql_type.element_type),)
         return list[item_type]  # type: ignore
@@ -134,7 +136,7 @@ class SqlConverter:
         if (column.name,) == table.primary_key:
             field_type = PrimaryKey[(field_type,)]  # type: ignore
         elif column.nullable:
-            field_type = Optional[field_type]  # noqa: UP045
+            field_type = Optional[field_type]  # type: ignore[assignment]  # noqa: UP045
 
         for c in table.constraints.values():
             if not isinstance(c, ReferenceConstraint):
@@ -144,10 +146,10 @@ class SqlConverter:
                 continue
 
             if isinstance(c, ForeignConstraint):
-                field_type = self.qual_to_module(c.reference.table)
+                field_type = self.qual_to_module(c.reference.table)  # type: ignore[assignment]
             elif isinstance(c, DiscriminatedConstraint):
                 union_types = tuple(self.qual_to_module(r.table) for r in c.references)
-                field_type = Union[union_types]  # noqa: UP007
+                field_type = Union[union_types]  # type: ignore[assignment]  # noqa: UP007
 
         # use cast to ensure compatibility with signature of `make_dataclass`
         data_type = typing.cast(type, field_type)

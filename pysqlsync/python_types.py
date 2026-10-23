@@ -17,7 +17,7 @@ import sys
 import textwrap
 import typing
 from types import ModuleType
-from typing import TextIO
+from typing import Any, TextIO
 
 from strong_typing.docstring import has_docstring, parse_type
 from strong_typing.inspection import (
@@ -27,6 +27,7 @@ from strong_typing.inspection import (
     is_type_enum,
 )
 from strong_typing.name import TypeFormatter
+from typing_extensions import TypeForm
 
 
 def module_to_stream(module: ModuleType, target: TextIO) -> None:
@@ -119,7 +120,7 @@ def dataclass_to_stream(typ: type[DataclassInstance], target: TextIO) -> None:
         if field.default is not dataclasses.MISSING:
             field_initializer["default"] = repr(field.default)
         if field.default_factory is not dataclasses.MISSING:
-            field_initializer["default_factory"] = fmt.python_type_to_str(field.default_factory)
+            field_initializer["default_factory"] = fmt.python_type_to_str(typing.cast(TypeForm[Any], field.default_factory))
         if metadata:
             field_initializer["metadata"] = repr(metadata)
 

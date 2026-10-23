@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from typing import TypeVar
 
 import asyncpg
-from strong_typing.inspection import DataclassInstance, is_dataclass_type
+from strong_typing.inspection import DataclassInstance, evaluate_member_type, is_dataclass_type
 
 from pysqlsync.base import BaseConnection, BaseContext, ClassRef, DataSource
 from pysqlsync.connection import ConnectionSSLMode, create_context
@@ -116,7 +116,9 @@ class PostgreSQLContext(BaseContext):
         result = await self.native_connection.copy_records_to_table(
             schema_name=table_name.scope_id,
             table_name=table_name.local_id,
-            columns=tuple(field.name for field in dataclasses.fields(table) if not is_identity_type(field.type)),
+            columns=tuple(
+                field.name for field in dataclasses.fields(table) if not is_identity_type(evaluate_member_type(field.type, table))
+            ),
             records=records,
         )
         LOGGER.debug(result)

@@ -17,8 +17,8 @@ from typing import Annotated, Any, Union
 
 from strong_typing.inspection import (
     DataclassInstance,
-    TypeLike,
     dataclass_fields,
+    evaluate_member_type,
     get_annotation,
     is_dataclass_type,
     is_type_enum,
@@ -30,23 +30,24 @@ from strong_typing.inspection import (
     unwrap_optional_type,
     unwrap_union_types,
 )
+from typing_extensions import TypeForm
 
 from .key_types import DefaultTag, IdentityTag, PrimaryKeyTag, UniqueTag
 
 
-def is_primary_key_type(field_type: TypeLike) -> bool:
+def is_primary_key_type(field_type: TypeForm[Any]) -> bool:
     "Checks if the field type is marked as the primary key of a table."
 
     return get_annotation(field_type, PrimaryKeyTag) is not None
 
 
-def is_identity_type(field_type: TypeLike) -> bool:
+def is_identity_type(field_type: TypeForm[Any]) -> bool:
     "Checks if the field type is marked as an identity column in a table."
 
     return get_annotation(field_type, IdentityTag) is not None
 
 
-def is_unique_type(field_type: TypeLike) -> bool:
+def is_unique_type(field_type: TypeForm[Any]) -> bool:
     "Checks if the field type is marked as a unique column in a table."
 
     return get_annotation(field_type, UniqueTag) is not None
@@ -77,7 +78,7 @@ def is_constraint(item: Any) -> bool:
     return isinstance(item, (PrimaryKeyTag, IdentityTag, UniqueTag))
 
 
-def tsv_type(plain_type: TypeLike) -> type:
+def tsv_type(plain_type: TypeForm[Any]) -> type[Any]:
     "Python type that represents the TSV storage type for this data."
 
     plain_type = unwrap_annotated_type(plain_type)
@@ -90,10 +91,10 @@ def tsv_type(plain_type: TypeLike) -> type:
             raise TypeError(f"inconsistent literal value types: {literal_types}")
         return literal_types.pop()
     elif is_type_union(plain_type):
-        union_types = {tsv_type(t) for t in unwrap_union_types(plain_type)}
+        union_types = {tsv_type(typing.cast(TypeForm[Any], t)) for t in unwrap_union_types(plain_type) if t is not None}  # pyright: ignore[reportUnnecessaryCast]
         if len(union_types) != 1:
             if len(union_types) == 2 and ipaddress.IPv4Address in union_types and ipaddress.IPv6Address in union_types:
-                return typing.cast(type, plain_type)
+                return typing.cast(type[Any], plain_type)
             raise TypeError(f"inconsistent union types: {union_types}")
         return union_types.pop()
     elif is_dataclass_type(plain_type):
@@ -147,7 +148,7 @@ class FieldProperties:
     :param is_unique: True if values of this type must be unique.
     """
 
-    plain_type: TypeLike
+    plain_type: TypeForm[Any]
     nullable: bool
     metadata: tuple[Any, ...]
     is_primary: bool
@@ -155,12 +156,12 @@ class FieldProperties:
     is_unique: bool
 
     @property
-    def field_type(self) -> TypeLike:
+    def field_type(self) -> TypeForm[Any]:
         "Type without constraint annotations such as identity, primary key, or unique."
 
         if self.metadata:
             # type becomes Annotated[T, ...]
-            return Annotated[(self.plain_type, *self.metadata)]
+            return Annotated[(self.plain_type, *self.metadata)]  # type: ignore[return-value]  # pyright: ignore[reportReturnType, reportUnknownMemberType, reportInvalidTypeForm]
         else:
             # type becomes a regular type
             return self.plain_type
@@ -172,23 +173,24 @@ class FieldProperties:
         return tsv_type(self.plain_type)
 
 
-def _get_field_metadata(field_type: TypeLike) -> list[Any]:
+def _get_field_metadata(field_type: TypeForm[Any]) -> list[Any]:
     # field has a type of Annotated[T, ...]
     return list(getattr(field_type, "__metadata__", ()))
 
 
-def get_field_properties(field_type: TypeLike) -> FieldProperties:
+def get_field_properties(field_type: TypeForm[Any]) -> FieldProperties:
     "Extracts column properties such as primary key, identity or unique constraints."
 
     metadata = _get_field_metadata(field_type)
-    plain_type = unwrap_annotated_type(field_type)
+    plain_type: TypeForm[Any] = unwrap_annotated_type(field_type)
 
     # check if field has DEFAULT as a union type member
     if is_type_union(plain_type):
         union_types = list(unwrap_union_types(plain_type))
         if DefaultTag in union_types:
             union_types.remove(DefaultTag)
-            plain_type = Union[tuple(union_types)]  # may cease to become a union type  # noqa: UP007
+            # may cease to become a union type
+            plain_type = Union[tuple(union_types)]  # type: ignore[assignment]  # pyright: ignore[reportUnknownVariableType, reportAssignmentType, reportInvalidTypeArguments, reportInvalidTypeForm]  # noqa: UP007
 
     # check if field is nullable
     if is_type_optional(plain_type):
@@ -239,4 +241,6 @@ class ClassProperties:
 
 
 def get_class_properties(class_type: type[DataclassInstance]) -> ClassProperties:
-    return ClassProperties(tuple(get_field_properties(field.type) for field in dataclasses.fields(class_type)))
+    return ClassProperties(
+        tuple(get_field_properties(evaluate_member_type(field.type, class_type)) for field in dataclasses.fields(class_type))
+    )

@@ -35,7 +35,7 @@ classifiers = [
 dependencies = [
     "json-strong-typing >= 0.4.3",
     "truststore >= 0.10",
-    "typing-extensions >= 4.16; python_version < '3.12'"
+    "typing-extensions >= 4.16; python_version < '3.15'"
 ]
 dynamic = ["version"]
 
@@ -47,7 +47,7 @@ postgresql = [
     "asyncpg >= 0.32"
 ]
 oracle = [
-    "oracledb >= 4.0"
+    "oracledb >= 26.0"
 ]
 mysql = [
     "aiomysql >= 0.3",
@@ -67,6 +67,21 @@ dev = [
 [project.urls]
 "Homepage" = "https://github.com/hunyadi/pysqlsync"
 "Source" = "https://github.com/hunyadi/pysqlsync"
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+show_column_numbers = true
+strict = true
+strict_bytes = true
+strict_equality = true
+warn_redundant_casts = false
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
 
 [tool.setuptools]
 include-package-data = true

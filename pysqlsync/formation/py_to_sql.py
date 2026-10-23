@@ -18,7 +18,7 @@ import types
 import typing
 import uuid
 from collections.abc import Callable, Iterable
-from typing import Annotated, Any, Final, TypeVar
+from typing import Annotated, Any, Final, ForwardRef, TypeGuard, TypeVar
 
 from strong_typing.auxiliary import MaxLength, float32, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64
 from strong_typing.core import JsonType
@@ -26,7 +26,6 @@ from strong_typing.docstring import Docstring, parse_type
 from strong_typing.inspection import (
     DataclassField,
     DataclassInstance,
-    TypeLike,
     dataclass_fields,
     enum_value_types,
     evaluate_member_type,
@@ -47,6 +46,7 @@ from strong_typing.inspection import (
     unwrap_union_types,
 )
 from strong_typing.topological import type_topological_sort
+from typing_extensions import TypeForm
 
 from ..model.data_types import (
     CompatibilityError,
@@ -81,6 +81,7 @@ from .inspection import (
     get_entity_types,
     is_entity_type,
     is_reference_type,
+    is_sequence_of_entity_type,
     is_simple_type,
     is_struct_type,
     reference_to_key,
@@ -114,10 +115,10 @@ def enum_value_type(enum_type: type[enum.Enum]) -> type:
     if len(value_types) > 1:
         raise TypeError(f"inconsistent enumeration value types for type {enum_type.__name__}: {value_types}")
     value_type = value_types.pop()
-    return value_type if value_type is not str else ENUM_LABEL_TYPE
+    return value_type if value_type is not str else ENUM_LABEL_TYPE  # pyright: ignore[reportReturnType]
 
 
-def is_type_enum_list(typ: TypeLike) -> bool:
+def is_type_enum_list(typ: TypeForm[Any]) -> TypeGuard[type[list[enum.Enum]]]:
     if not is_generic_list(typ):
         return False
 
@@ -125,7 +126,7 @@ def is_type_enum_list(typ: TypeLike) -> bool:
     return is_type_enum(elem_type)
 
 
-def is_type_enum_set(typ: TypeLike) -> bool:
+def is_type_enum_set(typ: TypeForm[Any]) -> TypeGuard[type[set[enum.Enum]]]:
     if not is_generic_set(typ):
         return False
 
@@ -133,7 +134,7 @@ def is_type_enum_set(typ: TypeLike) -> bool:
     return is_type_enum(elem_type)
 
 
-def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
+def is_extensible_enum_type(typ: TypeForm[Any], cls: type) -> bool:
     """
     True if the type represents an extensible enumeration type.
 
@@ -144,27 +145,29 @@ def is_extensible_enum_type(typ: TypeLike, cls: type) -> bool:
     if not is_type_union(typ):
         return False
     typ = unwrap_annotated_type(typ)
-    member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(typ)]
-    for member_type in member_types:
-        if member_type is None:
+    for t in unwrap_union_types(typ):
+        if t is None:
             continue
-
-        member_type = unwrap_annotated_type(member_type)
+        member_type = unwrap_annotated_type(evaluate_member_type(t, cls))
         if member_type is not str and not is_type_enum(member_type):
             return False
     return True
 
 
-def unwrap_extensible_enum_type(typ: TypeLike, cls: type) -> type[enum.Enum]:
+def unwrap_extensible_enum_type(typ: TypeForm[Any], cls: type) -> type[enum.Enum]:
     if is_type_union(typ):
-        member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(typ)]
-        for member_type in member_types:
+        for t in unwrap_union_types(typ):
+            if t is None:
+                continue
+            member_type = evaluate_member_type(t, cls)
             if is_type_enum(member_type):
                 return member_type
     raise TypeError("extensible enum types are of the form `E | str` where `E` is a subclass of `enum.Enum`")
 
 
-def dataclass_fields_as_required(cls: type[DataclassInstance], pred: Callable[[TypeLike], bool] | None = None) -> Iterable[DataclassField]:
+def dataclass_fields_as_required(
+    cls: type[DataclassInstance], pred: Callable[[TypeForm[Any]], bool] | None = None
+) -> Iterable[DataclassField]:
     for field in dataclass_fields(cls):
         props = get_field_properties(field.type)
         ref = evaluate_member_type(props.field_type, cls)
@@ -292,7 +295,9 @@ class DataclassConverterOptions:
     foreign_constraints: bool = True
     check_constraints: bool = True
     initialize_tables: bool = False
-    substitutions: dict[TypeLike, SqlDataType] = dataclasses.field(default_factory=dict[TypeLike, SqlDataType])
+    substitutions: dict[TypeForm[Any] | ForwardRef, SqlDataType] = dataclasses.field(
+        default_factory=dict[TypeForm[Any] | ForwardRef, SqlDataType]
+    )
     factory: ObjectFactory = dataclasses.field(default_factory=ObjectFactory)
     skip_annotations: tuple[type, ...] = ()
     auto_default: bool = False
@@ -337,7 +342,7 @@ class DataclassConverter:
     def create_check_name(self, cls: type, field: str) -> str:
         return f"ch_{self.create_qualified_prefix(cls)}_{field}"
 
-    def simple_type_to_sql_data_type(self, typ: TypeLike) -> SqlDataType:
+    def simple_type_to_sql_data_type(self, typ: TypeForm[Any]) -> SqlDataType:
         substitute = self.options.substitutions.get(typ)
         if substitute is not None:
             return substitute
@@ -348,40 +353,40 @@ class DataclassConverter:
             return SqlIntegerType(8)
         if typ is float:
             return SqlDoubleType()
-        if typ is int8:
+        if typ is int8:  # pyright: ignore[reportUnnecessaryComparison]
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(GlobalId("int1"))
             else:
                 return SqlIntegerType(2)
-        if typ is int16:
+        if typ is int16:  # pyright: ignore[reportUnnecessaryComparison]
             return SqlIntegerType(2)
-        if typ is int32:
+        if typ is int32:  # pyright: ignore[reportUnnecessaryComparison]
             return SqlIntegerType(4)
-        if typ is int64:
+        if typ is int64:  # pyright: ignore[reportUnnecessaryComparison]
             return SqlIntegerType(8)
-        if typ is uint8:
+        if typ is uint8:  # pyright: ignore[reportUnnecessaryComparison]
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(GlobalId("uint1"))
             else:
                 return SqlIntegerType(2)
-        if typ is uint16:
+        if typ is uint16:  # pyright: ignore[reportUnnecessaryComparison]
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(GlobalId("uint2"))
             else:
                 return SqlIntegerType(2)
-        if typ is uint32:
+        if typ is uint32:  # pyright: ignore[reportUnnecessaryComparison]
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(GlobalId("uint4"))
             else:
                 return SqlIntegerType(4)
-        if typ is uint64:
+        if typ is uint64:  # pyright: ignore[reportUnnecessaryComparison]
             if self.options.extra_numeric_types:
                 return SqlUserDefinedType(GlobalId("uint8"))
             else:
                 return SqlIntegerType(8)
-        if typ is float32:
+        if typ is float32:  # pyright: ignore[reportUnnecessaryComparison]
             return SqlRealType()
-        if typ is float64:
+        if typ is float64:  # pyright: ignore[reportUnnecessaryComparison]
             return SqlDoubleType()
         if typ is str:
             return SqlVariableCharacterType()
@@ -397,8 +402,8 @@ class DataclassConverter:
             return SqlIntervalType()
         if typ is uuid.UUID:
             return SqlUuidType()
-        if typ is JsonType:
-            return SqlJsonType()
+        if typ is JsonType:  # type: ignore[comparison-overlap]  # pyright: ignore[reportUnnecessaryComparison]
+            return SqlJsonType()  # type: ignore[unreachable]
         if typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
             return SqlUserDefinedType(GlobalId("inet"))  # PostgreSQL only
 
@@ -466,7 +471,7 @@ class DataclassConverter:
 
         return self.simple_type_to_sql_data_type(int32)
 
-    def _get_relationship(self, field_type: TypeLike) -> tuple[type, TypeLike] | None:
+    def _get_relationship(self, field_type: TypeForm[Any]) -> tuple[type, TypeForm[Any]] | None:
         """
         Returns relationship type and field type if the field expands into a separate relation (join table).
 
@@ -495,7 +500,7 @@ class DataclassConverter:
 
         # relations must be one-to-many
         relation_type: type
-        elem_type: TypeLike
+        elem_type: TypeForm[Any]
         if is_generic_list(field_type):
             relation_type = list
             elem_type = unwrap_generic_list(field_type)
@@ -510,7 +515,7 @@ class DataclassConverter:
         else:
             return None
 
-    def member_to_sql_data_type(self, typ: TypeLike, cls: type) -> SqlDataType:
+    def member_to_sql_data_type(self, typ: TypeForm[Any] | ForwardRef, cls: type[Any]) -> SqlDataType:
         """
         Maps a native Python type into a SQL data type.
 
@@ -522,6 +527,8 @@ class DataclassConverter:
         if substitute is not None:
             return substitute
 
+        if isinstance(typ, typing.ForwardRef):
+            return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_simple_type(typ):
             return self.simple_type_to_sql_data_type(typ)
         if is_entity_type(typ):
@@ -541,10 +548,9 @@ class DataclassConverter:
                 return SqlStructType(inline_types)
             elif self.options.struct_mode is StructMode.JSON:
                 return self.member_to_sql_data_type(JsonType, cls)
-        if isinstance(typ, typing.ForwardRef):
-            return self.member_to_sql_data_type(evaluate_member_type(typ, cls), cls)
         if is_type_literal(typ):
             literal_types = unwrap_literal_types(typ)
+            sql_literal_types: list[SqlDataType]
             if not all(t is str for t in literal_types):
                 sql_literal_types = [self.member_to_sql_data_type(t, cls) for t in literal_types]
             else:
@@ -580,8 +586,8 @@ class DataclassConverter:
         if is_extensible_enum_type(typ, cls):
             return self._enumeration_key_type()
         if is_type_union(typ):
-            member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(unwrap_annotated_type(typ))]
-            if all(is_entity_type(t) for t in member_types):
+            member_types = [evaluate_member_type(t, cls) if t is not None else None for t in unwrap_union_types(unwrap_annotated_type(typ))]
+            if is_sequence_of_entity_type(member_types):
                 # discriminated union type
                 primary_key_types = {dataclass_primary_key_type(t) for t in member_types}
                 if len(primary_key_types) > 1:
@@ -589,7 +595,7 @@ class DataclassConverter:
                 common_key_type = primary_key_types.pop()
                 return self.member_to_sql_data_type(common_key_type, cls)
 
-            sql_member_types = [self.member_to_sql_data_type(t, cls) for t in member_types]
+            sql_member_types = [self.member_to_sql_data_type(t, cls) for t in member_types if t is not None]
             try:
                 return compatible_type(sql_member_types)
             except CompatibilityError:
@@ -611,8 +617,10 @@ class DataclassConverter:
             if is_reference_type(props.plain_type, cls):
                 plain_type = reference_to_key(props.plain_type, cls)
             elif is_type_union(props.plain_type):
-                member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(props.plain_type)]
-                for member_type in member_types:
+                for t in unwrap_union_types(props.plain_type):
+                    if t is None:
+                        continue
+                    member_type = evaluate_member_type(t, cls)
                     if is_simple_type(member_type):
                         plain_type = member_type
                         break
@@ -640,7 +648,7 @@ class DataclassConverter:
                 elif is_type_enum(plain_type):
                     default_expr = next(member.value for member in plain_type)
                 else:
-                    default_expr = plain_type()  # type: ignore
+                    default_expr = plain_type()  # pyright: ignore[reportCallIssue]
                 default_value = constant(default_expr)
             else:
                 default_value = None
@@ -770,32 +778,32 @@ class DataclassConverter:
                         ForeignConstraint(
                             LocalId(self.create_foreign_key_name(cls, field.name)),
                             (LocalId(field.name),),
-                            ConstraintReference(
-                                self.create_qualified_id(field.type.__module__, field.type.__name__),
-                                (LocalId(dataclass_primary_key_name(field.type)),),
-                            ),
+                            self.entity_to_constraint(field.type),
                         )
                     )
 
                 if is_type_union(field.type):
-                    member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(unwrap_annotated_type(field.type))]
-                    if all(is_entity_type(t) for t in member_types):
+                    member_types = [
+                        evaluate_member_type(t, cls) if t is not None else None
+                        for t in unwrap_union_types(unwrap_annotated_type(field.type))
+                    ]
+                    if is_sequence_of_entity_type(member_types):
                         # discriminated keys
                         constraints.append(
                             DiscriminatedConstraint(
                                 LocalId(self.create_discriminated_key_name(cls, field.name)),
                                 (LocalId(field.name),),
-                                [
-                                    ConstraintReference(
-                                        self.create_qualified_id(t.__module__, t.__name__),
-                                        (LocalId(dataclass_primary_key_name(t)),),
-                                    )
-                                    for t in member_types
-                                ],
+                                [self.entity_to_constraint(t) for t in member_types],
                             )
                         )
 
         return constraints
+
+    def entity_to_constraint(self, field_type: type[DataclassInstance]) -> ConstraintReference:
+        return ConstraintReference(
+            self.create_qualified_id(field_type.__module__, field_type.__name__),
+            (LocalId(dataclass_primary_key_name(field_type)),),
+        )
 
     def member_to_field(self, field: DataclassField, cls: type[DataclassInstance], doc: Docstring) -> StructMember:
         "Converts a data-class field into a SQL struct (composite type) field."

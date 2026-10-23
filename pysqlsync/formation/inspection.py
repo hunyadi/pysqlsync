@@ -12,13 +12,13 @@ import inspect
 import sys
 import types
 import uuid
+from collections.abc import Sequence
 from ipaddress import IPv4Address, IPv6Address
 from typing import Any, Optional, TypeGuard
 
 from strong_typing.core import JsonType
 from strong_typing.inspection import (
     DataclassInstance,
-    TypeLike,
     dataclass_fields,
     evaluate_member_type,
     is_dataclass_type,
@@ -29,11 +29,12 @@ from strong_typing.inspection import (
     unwrap_optional_type,
     unwrap_union_types,
 )
+from typing_extensions import TypeForm
 
 from ..model.properties import get_field_properties, is_primary_key_type
 
 
-def is_simple_type(typ: Any) -> bool:
+def is_simple_type(typ: TypeForm[Any]) -> bool:
     "True if the type is not a composite or user-defined type."
 
     typ = unwrap_annotated_type(typ)
@@ -49,7 +50,7 @@ def is_simple_type(typ: Any) -> bool:
         or typ is datetime.time
         or typ is datetime.timedelta
         or typ is uuid.UUID
-        or typ is JsonType
+        or typ is JsonType  # type: ignore[comparison-overlap]  # pyright: ignore[reportUnnecessaryComparison]
         or typ is IPv4Address  # PostgreSQL only
         or typ is IPv6Address  # PostgreSQL only
     ):
@@ -62,7 +63,7 @@ def is_simple_type(typ: Any) -> bool:
     return False
 
 
-def is_entity_type(typ: Any) -> TypeGuard[type[DataclassInstance]]:
+def is_entity_type(typ: TypeForm[Any]) -> TypeGuard[type[DataclassInstance]]:
     "True for data-class types that have a primary key."
 
     if not is_dataclass_type(typ):
@@ -71,7 +72,7 @@ def is_entity_type(typ: Any) -> TypeGuard[type[DataclassInstance]]:
     return dataclass_has_primary_key(typ)
 
 
-def is_struct_type(typ: Any) -> TypeGuard[type[DataclassInstance]]:
+def is_struct_type(typ: TypeForm[Any]) -> TypeGuard[type[DataclassInstance]]:
     "True for data-class types that have no primary key."
 
     if not is_dataclass_type(typ):
@@ -91,8 +92,8 @@ def is_reference_type(typ: Any, cls: type) -> bool:
     if is_entity_type(typ):
         return True
     elif is_type_union(typ):
-        member_types = [evaluate_member_type(t, cls) for t in unwrap_union_types(unwrap_annotated_type(typ))]
-        return all(is_entity_type(t) for t in member_types)
+        member_types = [evaluate_member_type(t, cls) if t is not None else None for t in unwrap_union_types(unwrap_annotated_type(typ))]
+        return is_sequence_of_entity_type(member_types)
     else:
         return False
 
@@ -132,7 +133,7 @@ def dataclass_primary_key_name(typ: type[DataclassInstance]) -> str:
     raise TypeError(f"table {typ.__name__} lacks primary key")
 
 
-def dataclass_primary_key_type(typ: type[DataclassInstance]) -> TypeLike:
+def dataclass_primary_key_type(typ: type[DataclassInstance]) -> TypeForm[Any]:
     """
     Extracts the primary key data type from a dataclass.
 
@@ -159,7 +160,13 @@ def get_entity_types(modules: list[types.ModuleType]) -> list[type[DataclassInst
     return entity_types
 
 
-def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:
+def is_sequence_of_entity_type(types: Sequence[TypeForm[Any] | None]) -> TypeGuard[Sequence[type[DataclassInstance]]]:
+    "True for a sequence of types if all types are entity types."
+
+    return all(t is not None and is_entity_type(t) for t in types)
+
+
+def reference_to_key(typ: TypeForm[Any], cls: type[DataclassInstance]) -> TypeForm[Any]:
     """
     Maps a foreign or discriminated reference type to the primary key type of the entity being referenced.
 
@@ -173,14 +180,15 @@ def reference_to_key(typ: TypeLike, cls: type[DataclassInstance]) -> TypeLike:
     if is_type_optional(plain_type):
         # nullable type
         required_type = reference_to_key(unwrap_optional_type(plain_type), cls)
-        return Optional[required_type]  # noqa: UP045
+        return Optional[required_type]  # type: ignore[return-value]  # pyright: ignore[reportReturnType, reportInvalidTypeForm] # noqa: UP045
     elif is_entity_type(plain_type):
         # foreign key reference
         return dataclass_primary_key_type(plain_type)
     elif is_type_union(plain_type):
         # discriminated key reference
-        union_types = tuple(evaluate_member_type(t, cls) for t in unwrap_union_types(plain_type) if t is not None)
-        if all(is_entity_type(t) for t in union_types):
-            return dataclass_primary_key_type(union_types[0])
+        union_types = tuple(evaluate_member_type(t, cls) if t is not None else None for t in unwrap_union_types(plain_type))
+        if is_sequence_of_entity_type(union_types):
+            dataclass_type = union_types[0]
+            return dataclass_primary_key_type(dataclass_type)
 
     return data_type

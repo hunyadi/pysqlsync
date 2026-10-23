@@ -15,7 +15,7 @@ from io import BytesIO
 from typing import TypeVar
 
 import redshift_connector
-from strong_typing.inspection import DataclassInstance, is_dataclass_type
+from strong_typing.inspection import DataclassInstance, evaluate_member_type, is_dataclass_type
 
 from pysqlsync.base import (
     BaseConnection,
@@ -115,7 +115,9 @@ class RedshiftContext(BaseContext):
             raise TypeError(f"expected dataclass type, got: {table}")
         generator = self.connection.generator
         table_name = generator.get_qualified_id(ClassRef(table))
-        columns = [LocalId(field.name) for field in dataclasses.fields(table) if not is_identity_type(field.type)]
+        columns = [
+            LocalId(field.name) for field in dataclasses.fields(table) if not is_identity_type(evaluate_member_type(field.type, table))
+        ]
         records = generator.get_dataclasses_as_records(table, data, skip_identity=True)
         self._insert_copy_stream(table_name, columns, records)
 
