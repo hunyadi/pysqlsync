@@ -252,7 +252,7 @@ class RandomGenerator:
         self.keys = list(range(count))
         random.shuffle(self.keys)
 
-    def create_json(self, cls: type) -> Callable[[int], dict[str, Any]]:
+    def create_json(self, cls: type[Any]) -> Callable[[int], dict[str, Any]]:
         generators = {field.name: self.create(field.type, cls) for field in dataclass_fields(cls)}
         return lambda k: {field_name: generator(k) for field_name, generator in generators.items()}
 

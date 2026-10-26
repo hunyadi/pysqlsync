@@ -11,6 +11,7 @@ import decimal
 import inspect
 import sys
 import types
+import typing
 import uuid
 from collections.abc import Sequence
 from ipaddress import IPv4Address, IPv6Address
@@ -81,7 +82,7 @@ def is_struct_type(typ: TypeForm[Any]) -> TypeGuard[type[DataclassInstance]]:
     return not dataclass_has_primary_key(typ)
 
 
-def is_reference_type(typ: Any, cls: type) -> bool:
+def is_reference_type(typ: Any, cls: type[Any]) -> bool:
     """
     True for an entity type (foreign key) or a union of entity types (discriminated key).
 
@@ -98,7 +99,7 @@ def is_reference_type(typ: Any, cls: type) -> bool:
         return False
 
 
-def is_ip_address_type(field_type: type) -> bool:
+def is_ip_address_type(field_type: type[Any]) -> bool:
     "Check if type is an IPv4 or IPv6 address type."
 
     if field_type is IPv4Address or field_type is IPv6Address:
@@ -106,8 +107,7 @@ def is_ip_address_type(field_type: type) -> bool:
 
     # check if type is IPv4Address | IPv6Address
     if is_type_union(field_type):
-        field_type = unwrap_annotated_type(field_type)
-        member_types = unwrap_union_types(field_type)
+        member_types = unwrap_union_types(unwrap_annotated_type(field_type))
         if len(member_types) != 2:
             return False
         if IPv4Address in member_types and IPv6Address in member_types:
@@ -117,8 +117,7 @@ def is_ip_address_type(field_type: type) -> bool:
 
 
 def dataclass_has_primary_key(typ: type[DataclassInstance]) -> bool:
-    typ = unwrap_annotated_type(typ)
-    for field in dataclass_fields(typ):
+    for field in dataclass_fields(typing.cast(type[DataclassInstance], unwrap_annotated_type(typ))):
         if is_primary_key_type(field.type):
             return True
 

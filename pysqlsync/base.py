@@ -442,7 +442,7 @@ class BaseGenerator(abc.ABC):
             if not (skip_identity and table.columns[field.name].identity)
         )
 
-    def get_field_extractor(self, column: Column, field_name: str, field_type: type) -> Callable[[Any], Any]:
+    def get_field_extractor(self, column: Column, field_name: str, field_type: type[Any]) -> Callable[[Any], Any]:
         "Returns a callable function object that extracts a single field of a data-class."
 
         if is_type_enum(field_type):
@@ -450,7 +450,7 @@ class BaseGenerator(abc.ABC):
         else:
             return lambda obj: getattr(obj, field_name)
 
-    def get_value_transformer(self, column: Column, field_type: type) -> Callable[[Any], Any] | None:
+    def get_value_transformer(self, column: Column, field_type: type[Any]) -> Callable[[Any], Any] | None:
         "Returns a callable function object that transforms a value type into the expected column type."
 
         if isinstance(column.data_type, SqlJsonType) or (
@@ -1122,7 +1122,7 @@ class BaseContext(abc.ABC):
         table: Table,
         generator: BaseGenerator,
         index: int,
-        field_type: type,
+        field_type: type[Any],
         field_name: str,
     ) -> RecordTransformer:
         """
@@ -1167,7 +1167,7 @@ class BaseContext(abc.ABC):
         else:
             return ScalarTransformer(transformer)
 
-    async def delete_rows(self, table: Table, key_type: type, key_values: Iterable[Any]) -> None:
+    async def delete_rows(self, table: Table, key_type: type[Any], key_values: Iterable[Any]) -> None:
         """
         Deletes rows from a database table.
 
@@ -1190,7 +1190,7 @@ class BaseContext(abc.ABC):
         if isinstance(key_values, Sized):
             LOGGER.info("%d rows have been deleted from %s", len(key_values), table.name)
 
-    async def _delete_rows(self, table: Table, key_type: type, key_values: Iterable[Any]) -> None:
+    async def _delete_rows(self, table: Table, key_type: type[Any], key_values: Iterable[Any]) -> None:
         """
         Deletes rows from a database table.
 

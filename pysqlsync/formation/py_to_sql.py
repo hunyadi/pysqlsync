@@ -110,7 +110,7 @@ ENUM_NAME_LENGTH: Final[int] = 64
 ENUM_LABEL_TYPE = Annotated[str, MaxLength(ENUM_NAME_LENGTH)]
 
 
-def enum_value_type(enum_type: type[enum.Enum]) -> type:
+def enum_value_type(enum_type: type[enum.Enum]) -> type[Any]:
     value_types = enum_value_types(enum_type)
     if len(value_types) > 1:
         raise TypeError(f"inconsistent enumeration value types for type {enum_type.__name__}: {value_types}")
@@ -134,7 +134,7 @@ def is_type_enum_set(typ: TypeForm[Any]) -> TypeGuard[type[set[enum.Enum]]]:
     return is_type_enum(elem_type)
 
 
-def is_extensible_enum_type(typ: TypeForm[Any], cls: type) -> bool:
+def is_extensible_enum_type(typ: TypeForm[Any], cls: type[Any]) -> bool:
     """
     True if the type represents an extensible enumeration type.
 
@@ -154,7 +154,7 @@ def is_extensible_enum_type(typ: TypeForm[Any], cls: type) -> bool:
     return True
 
 
-def unwrap_extensible_enum_type(typ: TypeForm[Any], cls: type) -> type[enum.Enum]:
+def unwrap_extensible_enum_type(typ: TypeForm[Any], cls: type[Any]) -> type[enum.Enum]:
     if is_type_union(typ):
         for t in unwrap_union_types(typ):
             if t is None:
@@ -323,23 +323,23 @@ class DataclassConverter:
         else:
             return PrefixedId(mapped_name, object_name)
 
-    def create_qualified_prefix(self, cls: type) -> str:
+    def create_qualified_prefix(self, cls: type[Any]) -> str:
         if self.options.unique_constraint_names:
             id = self.create_qualified_id(cls.__module__, cls.__name__)
             return id.compact_id.replace(".", "_")
         else:
             return cls.__name__
 
-    def create_foreign_key_name(self, cls: type, field: str) -> str:
+    def create_foreign_key_name(self, cls: type[Any], field: str) -> str:
         return f"fk_{self.create_qualified_prefix(cls)}_{field}"
 
-    def create_discriminated_key_name(self, cls: type, field: str) -> str:
+    def create_discriminated_key_name(self, cls: type[Any], field: str) -> str:
         return f"dk_{self.create_qualified_prefix(cls)}_{field}"
 
-    def create_unique_key_name(self, cls: type, field: str) -> str:
+    def create_unique_key_name(self, cls: type[Any], field: str) -> str:
         return f"uq_{self.create_qualified_prefix(cls)}_{field}"
 
-    def create_check_name(self, cls: type, field: str) -> str:
+    def create_check_name(self, cls: type[Any], field: str) -> str:
         return f"ch_{self.create_qualified_prefix(cls)}_{field}"
 
     def simple_type_to_sql_data_type(self, typ: TypeForm[Any]) -> SqlDataType:
@@ -541,7 +541,7 @@ class DataclassConverter:
                 return SqlUserDefinedType(self.create_qualified_id(typ.__module__, typ.__name__))
             elif self.options.struct_mode is StructMode.INLINE:
                 inline_types: list[SqlStructMember] = []
-                for field in dataclass_fields(unwrap_annotated_type(typ)):
+                for field in dataclass_fields(typing.cast(type[DataclassInstance], unwrap_annotated_type(typ))):
                     inline_props = get_field_properties(field.type)
                     inline_type = self.member_to_sql_data_type(inline_props.field_type, typ)
                     inline_types.append(SqlStructMember(LocalId(field.name), inline_type, inline_props.nullable))
@@ -648,7 +648,7 @@ class DataclassConverter:
                 elif is_type_enum(plain_type):
                     default_expr = next(member.value for member in plain_type)
                 else:
-                    default_expr = plain_type()  # pyright: ignore[reportCallIssue]
+                    default_expr = plain_type()  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
                 default_value = constant(default_expr)
             else:
                 default_value = None
@@ -850,8 +850,8 @@ class DataclassConverter:
         primary_key = (LocalId("id"),)
         constraints: list[Constraint] = []
 
-        enum_type = unwrap_annotated_type(enum_type)
-        enum_member_types: set[type] = {type(e.value) for e in enum_type}
+        enum_type = typing.cast(type[enum.Enum], unwrap_annotated_type(enum_type))
+        enum_member_types: set[type[Any]] = {type(e.value) for e in enum_type}
         if len(enum_member_types) > 1:
             raise TypeError(
                 f"inconsistent member types in enumeration `{enum_type.__name__}`: {sorted(e.__name__ for e in enum_member_types)}"
@@ -959,11 +959,11 @@ class DataclassConverter:
 
                 # field of type list[E]
                 for enum_field in dataclass_fields_as_required(entity, is_type_enum_list):
-                    regular_enum_types.add(unwrap_generic_list(enum_field.type))
+                    regular_enum_types.add(typing.cast(type[enum.Enum], unwrap_generic_list(enum_field.type)))
 
                 # field of type set[E]
                 for enum_field in dataclass_fields_as_required(entity, is_type_enum_set):
-                    regular_enum_types.add(unwrap_generic_set(enum_field.type))
+                    regular_enum_types.add(typing.cast(type[enum.Enum], unwrap_generic_set(enum_field.type)))
 
         for enum_type in sorted(regular_enum_types, key=lambda e: e.__name__):
             table_defs = tables.setdefault(enum_type.__module__, [])
